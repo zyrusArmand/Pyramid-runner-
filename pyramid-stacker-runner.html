@@ -318,8 +318,8 @@ function makePiece(len, axis, color, corner){
   const mat = new THREE.MeshStandardMaterial({ color, roughness:0.85, metalness:0.05 });
   const along = len*BLOCK_SIZE*0.96, depth = BLOCK_SIZE*0.96, h = LAYER_HEIGHT*0.94;
   if (corner){
-    // a clean wrapped corner: full-size cube in the same stone colour, no seam, no highlight
-    const m = new THREE.Mesh(new THREE.BoxGeometry(BLOCK_SIZE, h, BLOCK_SIZE), mat);
+    // a clean corner stone, sized to match the wall pieces so the mortar gaps stay uniform
+    const m = new THREE.Mesh(new THREE.BoxGeometry(BLOCK_SIZE*0.96, h, BLOCK_SIZE*0.96), mat);
     m.castShadow = m.receiveShadow = true; scene.add(m); return m;
   }
   const dims = axis==='x' ? [along, h, depth] : [depth, h, along];
@@ -327,23 +327,33 @@ function makePiece(len, axis, color, corner){
   m.castShadow = true; m.receiveShadow = true; scene.add(m); return m;
 }
 
-// Terrace a block's exposed outer face into 5 receding stone steps (Giza-style staircase look).
-function addCourses(mesh, center, axis, len){
-  const radial = axis==='x' ? 'z' : 'x';            // outward direction = perpendicular to the wall
-  if (Math.abs(center[radial]) < 0.01) return;       // skip ambiguous/central pieces
-  const sgn = center[radial] >= 0 ? 1 : -1;
-  const h = LAYER_HEIGHT*0.94, along = len*BLOCK_SIZE*0.92, faceR = BLOCK_SIZE*0.96/2;
-  const N = 5, stepH = h/N, maxOut = 0.085;          // 5 steps; bottom juts most, top flush
+// Terrace EVERY exposed outer face of a block into 5 boldly receding steps (real pyramid-stair
+// look). Corner stones sit at the ring's edge on two sides, so they get an L of steps that meet
+// at the corner — exactly how a real stepped pyramid corner looks.
+function addCourses(mesh, center, axis, len, n){
+  const H = (n*BLOCK_SIZE)/2;                         // ring half-width: outer wall faces sit on ±H
+  const halfX = (axis==='x' ? len*BLOCK_SIZE*0.96 : BLOCK_SIZE*0.96)/2;   // block half-extent per axis
+  const halfZ = (axis==='z' ? len*BLOCK_SIZE*0.96 : BLOCK_SIZE*0.96)/2;
+  const along = len*BLOCK_SIZE*0.92, depth1 = BLOCK_SIZE*0.92;
   const mat = new THREE.MeshStandardMaterial({ color: mesh.material.color.clone(), roughness:0.92, metalness:0.03 });
+  const faces = [];                                   // [outwardAxis, sign, faceWidth(tangent), faceOffset]
+  if (center.z >  H-0.6) faces.push(['z', 1, axis==='x'?along:depth1, halfZ]);
+  if (center.z < -H+0.6) faces.push(['z',-1, axis==='x'?along:depth1, halfZ]);
+  if (center.x >  H-0.6) faces.push(['x', 1, axis==='z'?along:depth1, halfX]);
+  if (center.x < -H+0.6) faces.push(['x',-1, axis==='z'?along:depth1, halfX]);
+  faces.forEach(([fa, sgn, wid, faceR]) => stair(mesh, fa, sgn, wid, faceR, mat));
+}
+function stair(mesh, fa, sgn, wid, faceR, mat){
+  const h = LAYER_HEIGHT*0.94, N = 5, stepH = h/N, maxOut = 0.22;
   for (let i=0; i<N; i++){
-    const out   = 0.012 + (maxOut-0.012)*(N-1-i)/(N-1);   // recede inward as the steps climb
-    const depth = 0.12 + out;
-    const cy    = -h/2 + stepH*(i+0.5);
-    const w = axis==='x' ? along : depth, d = axis==='x' ? depth : along;
-    const ledge = new THREE.Mesh(new THREE.BoxGeometry(w, stepH*0.92, d), mat);
-    const rPos = sgn*(faceR + out - depth/2);
-    ledge.position.set(axis==='x' ? 0 : rPos, cy, axis==='x' ? rPos : 0);
-    mesh.add(ledge);                                  // no shadow on tiny detail — keeps mobile fast
+    const out = 0.012 + (maxOut-0.012)*(N-1-i)/(N-1);  // bottom step juts most, top step flush
+    const dep = 0.07 + out;                            // each step's tread depth
+    const cy  = -h/2 + stepH*(i+0.5);
+    const w = fa==='x' ? dep : wid, d = fa==='x' ? wid : dep;
+    const ledge = new THREE.Mesh(new THREE.BoxGeometry(w, stepH*0.95, d), mat);
+    const p = { x:0, y:cy, z:0 }; p[fa] = sgn*(faceR + out - dep/2);
+    ledge.position.set(p.x, p.y, p.z);
+    mesh.add(ledge);                                   // no shadow on tiny detail — keeps mobile fast
   }
 }
 
@@ -431,7 +441,7 @@ function spawnBlock(){
   if (capstone){ mesh = makeBlock(color); mesh.scale.set(0.8,0.8,0.8); mesh.material.emissive = new THREE.Color(0x5a3d00); }
   else {
     mesh = makePiece(len, axis, color, corner);
-    addCourses(mesh, center, axis, len);   // Giza-style 5-step stone face on every wall/corner piece
+    addCourses(mesh, center, axis, len, nForLayer(S.layer));   // 5-step stone faces on every exposed side
   }
 
   mesh.position.copy(center);
