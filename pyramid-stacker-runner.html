@@ -342,18 +342,33 @@ function addCourses(mesh, center, axis, len, n){
   if (center.x >  H-0.6) faces.push(['x', 1, axis==='z'?along:depth1, halfX]);
   if (center.x < -H+0.6) faces.push(['x',-1, axis==='z'?along:depth1, halfX]);
   faces.forEach(([fa, sgn, wid, faceR]) => stair(mesh, fa, sgn, wid, faceR, mat));
+  if (faces.length === 2){                            // corner stone: fill the corner column so the
+    const fx = faces.find(f => f[0]==='x'), fz = faces.find(f => f[0]==='z');   // steps wrap around it
+    if (fx && fz) cornerFill(mesh, fx[1], halfX, fz[1], halfZ, mat);
+  }
 }
+const STEP_N = 5, STEP_MAXOUT = 0.22;
+function stepOut(i){ return 0.012 + (STEP_MAXOUT-0.012)*(STEP_N-1-i)/(STEP_N-1); }   // bottom juts most
 function stair(mesh, fa, sgn, wid, faceR, mat){
-  const h = LAYER_HEIGHT*0.94, N = 5, stepH = h/N, maxOut = 0.22;
-  for (let i=0; i<N; i++){
-    const out = 0.012 + (maxOut-0.012)*(N-1-i)/(N-1);  // bottom step juts most, top step flush
-    const dep = 0.07 + out;                            // each step's tread depth
+  const h = LAYER_HEIGHT*0.94, stepH = h/STEP_N;
+  for (let i=0; i<STEP_N; i++){
+    const out = stepOut(i), dep = 0.07 + out;          // each step's tread depth
     const cy  = -h/2 + stepH*(i+0.5);
     const w = fa==='x' ? dep : wid, d = fa==='x' ? wid : dep;
     const ledge = new THREE.Mesh(new THREE.BoxGeometry(w, stepH*0.95, d), mat);
     const p = { x:0, y:cy, z:0 }; p[fa] = sgn*(faceR + out - dep/2);
     ledge.position.set(p.x, p.y, p.z);
     mesh.add(ledge);                                   // no shadow on tiny detail — keeps mobile fast
+  }
+}
+// small stepped column at the very corner so the two staircases wrap continuously around it
+function cornerFill(mesh, sx, hX, sz, hZ, mat){
+  const h = LAYER_HEIGHT*0.94, stepH = h/STEP_N;
+  for (let i=0; i<STEP_N; i++){
+    const out = stepOut(i), dep = 0.07 + out, cy = -h/2 + stepH*(i+0.5);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(dep, stepH*0.95, dep), mat);
+    box.position.set(sx*(hX + out - dep/2), cy, sz*(hZ + out - dep/2));
+    mesh.add(box);
   }
 }
 
