@@ -98,6 +98,45 @@
   #dailyBtn { pointer-events:auto; font-size:11px; letter-spacing:2px; padding:9px 20px; border-radius:30px;
     border:1.5px solid rgba(111,227,160,.5); color:#9fe9c0; cursor:pointer; transition:all .18s; }
   #dailyBtn.on { background:rgba(111,227,160,.18); border-color:#9fe9c0; color:#d6ffe9; }
+
+  /* sandstorm tint */
+  #storm { position:fixed; inset:0; z-index:4; pointer-events:none; opacity:0; transition:opacity .4s;
+    background:linear-gradient(180deg, rgba(206,158,86,.4), rgba(150,100,50,.12)); }
+
+  /* contextual tutorial hint */
+  #hint { position:fixed; left:50%; bottom:calc(max(26px,env(safe-area-inset-bottom)) + 50px); transform:translateX(-50%);
+    z-index:6; pointer-events:none; font-family:'Space Mono',monospace; font-size:12px; letter-spacing:1px;
+    color:#fff; background:rgba(20,12,28,.72); padding:10px 18px; border-radius:22px; border:1px solid rgba(243,200,120,.4);
+    text-align:center; max-width:84vw; opacity:0; transition:opacity .3s; box-shadow:0 4px 18px rgba(0,0,0,.4); }
+  #hint.show { opacity:1; }
+
+  /* local leaderboard on the start screen */
+  #lb { font-family:'Space Mono',monospace; font-size:11px; letter-spacing:1px; color:#f6e9d2; opacity:.85;
+    display:flex; flex-direction:column; gap:3px; min-width:200px; }
+  #lb .lbttl { font-size:10px; letter-spacing:2px; opacity:.5; margin-bottom:3px; text-align:center; }
+  #lb .lbrow { display:flex; justify-content:space-between; }
+  #lb .lbrow span:first-child { opacity:.55; }
+  #lb .lbrow.me b { color:#f3d99a; }
+
+  /* over-screen action buttons (share / double coins) */
+  .obtnRow { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-top:18px; }
+  .obtn { pointer-events:auto; font-size:12px; letter-spacing:2px; padding:12px 22px; border-radius:30px;
+    border:1.5px solid rgba(243,200,120,.5); color:#f3d99a; cursor:pointer; transition:transform .12s; }
+  .obtn:active { transform:scale(.95); }
+  .obtn.gold { border-color:#ffe08a; color:#ffe08a; background:rgba(255,224,138,.1); }
+
+  /* revive prompt + simulated-ad modal */
+  .rbtn { pointer-events:auto; margin-top:12px; font-size:15px; letter-spacing:2px; padding:14px 28px; border-radius:34px;
+    border:1.5px solid rgba(243,200,120,.6); color:#f3d99a; cursor:pointer; min-width:230px; transition:transform .12s; }
+  .rbtn:active { transform:scale(.96); }
+  .rbtn.gold { border-color:#ffe08a; color:#ffe08a; background:rgba(255,224,138,.12); }
+  .rbtn.disabled { opacity:.4; pointer-events:none; }
+  .rbtn.giveup { border-color:rgba(255,255,255,.22); color:#c8a99a; font-size:12px; padding:11px 24px; min-width:0; }
+  #reviveCount { font-family:'Cinzel',serif; font-size:42px; color:#f3d99a; margin:6px 0; }
+  #adModal { position:fixed; inset:0; z-index:20; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:rgba(8,5,12,.97); color:#f6e9d2; font-family:'Space Mono',monospace; }
+  #adModal .adlabel { font-size:12px; letter-spacing:3px; opacity:.6; }
+  #adCount { font-family:'Cinzel',serif; font-size:64px; color:#f3d99a; margin-top:12px; }
 </style>
 </head>
 <body>
@@ -116,8 +155,10 @@
   <div id="meterBar"><div id="meterFill"></div></div></div>
 
 <div id="vignette"></div>
+<div id="storm"></div>
 <div id="flash"></div>
 <div id="pop">PERFECT</div>
+<div id="hint"></div>
 
 <div class="overlay" id="startScreen">
   <div class="title">PYRAMID<br>STACKER</div>
@@ -129,6 +170,7 @@
       <div>COINS<b id="bankCoins">0</b></div>
     </div>
     <div id="shop"></div>
+    <div id="lb"></div>
     <div id="dailyBtn">DAILY CHALLENGE: OFF</div>
   </div>
   <div class="cta">TAP TO BUILD</div>
@@ -139,7 +181,26 @@
   <div class="bigscore" id="finalScore">0</div>
   <div class="gostat" id="finalStat"></div>
   <div class="gostat" id="finalReward" style="margin-top:14px;color:#ffe08a"></div>
+  <div class="obtnRow">
+    <div class="obtn gold" id="dblBtn">2× COINS ▶</div>
+    <div class="obtn" id="shareBtn">SHARE</div>
+  </div>
   <div class="cta">TAP TO PLAY AGAIN</div>
+</div>
+
+<div class="overlay hidden" id="reviveScreen">
+  <div class="title" id="reviveTitle" style="font-size:clamp(26px,8vw,44px)">YOU FELL</div>
+  <div class="sub" style="margin-top:6px">Continue from where you stumbled?</div>
+  <div id="reviveCount">5</div>
+  <div class="rbtn gold" id="reviveCoins">CONTINUE  ◎200</div>
+  <div class="rbtn" id="reviveAd">WATCH AD ▶ FREE REVIVE</div>
+  <div class="rbtn giveup" id="reviveGiveup">GIVE UP</div>
+</div>
+
+<div class="hidden" id="adModal">
+  <div class="adlabel">ADVERTISEMENT (demo)</div>
+  <div id="adCount">3</div>
+  <div class="adlabel" style="margin-top:14px;opacity:.4">reward unlocks when it ends</div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -180,6 +241,8 @@ let bestScore = Store.get('best', 0);
 let bestHeight= Store.get('height', 0);
 let owned     = Store.get('owned', ['sand']);
 let curSkin   = Store.get('skin', 'sand');
+let scores    = Store.get('scores', []);          // local leaderboard (top 10)
+let firstTime = !Store.get('tut', 0);             // show the onboarding hints once
 let dailyMode = false;
 
 // ---------- skins: stone palette + runner colour, unlocked with coins ----------
@@ -332,7 +395,7 @@ function resetState(){
     fallen:0, score:0, streak:0, integrity:1, allBlocks:[],
     layerBlocks:[], active:null, falling:[],
     fx:[], squash:[], shakeAmt:0, shadow:null,
-    coins:0, timeScale:1, heartT:0, bestPerfect:0,
+    coins:0, timeScale:1, heartT:0, bestPerfect:0, coinsDoubled:false,
     pathSlots:[],          // ordered per-cell {pos, placed} for the runner
     run:null, runner:null };
 }
@@ -536,13 +599,24 @@ function startRun(){
       beam.castShadow = true; scene.add(beam); t.obMesh = beam;
     } else {
       const hl = RND()<0.5 ? -1 : 1;
-      t.ob = { type:'lane', lane:hl };
+      const moving = RND() < 0.4;                          // HAZARD: some pillars sweep between lanes
+      t.ob = { type:'lane', lane:hl, moving, phase: RND()*6.28 };
+      t.perp = perp.clone();
       const pil = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.62, 0.3),
-        new THREE.MeshStandardMaterial({ color:0xd23a3a, emissive:0x3a0a0a, roughness:0.6 }));
+        new THREE.MeshStandardMaterial({ color: moving?0xff7a2a:0xd23a3a, emissive: moving?0x4a1e00:0x3a0a0a, roughness:0.6 }));
       pil.position.set(t.pos.x + perp.x*hl*0.32, t.pos.y + 0.31, t.pos.z + perp.z*hl*0.32);
       pil.castShadow = true; scene.add(pil); t.obMesh = pil;
     }
     lastOb = i;
+  }
+  // HAZARD: sandstorm stretches — fog closes in, harder to read the path ahead
+  const storms = [];
+  for (let i = 8; i < tiles.length - 6; i++){
+    if (RND() < 0.05){ storms.push([i, Math.min(i + 6 + Math.floor(RND()*5), tiles.length-2)]); i += 11; }
+  }
+  // HAZARD (spectacle): a few safe tiles crumble away just after you've passed them
+  for (let i = 4; i < tiles.length - 2; i++){
+    if (!tiles[i].gap && !tiles[i].weak && !tiles[i].ob && RND() < 0.12) tiles[i].crumbleBehind = true;
   }
   // coins: a glinting trail of pickups. Most sit on safe tiles; a few hover over gaps,
   // rewarding a well-timed jump (collect-while-airborne pays a bonus).
@@ -576,7 +650,8 @@ function startRun(){
 
   S.run = { tiles, idx:0, t:0, speed:2.9, jumping:false, jumpT:0, jumpDur:0.8, jumpH:1.6,
             falling:false, fallV:0, yOff:0, startDelay:1.4,
-            lane:0, laneX:0, sliding:false, slideT:0, slideDur:0.55 };
+            lane:0, laneX:0, sliding:false, slideT:0, slideDur:0.55,
+            storms, revives:0, usedAdRevive:false, invuln:0, dead:false, deathReason:'fell' };
   g.position.copy(tiles[0].pos);
 
   // HUD swap
@@ -591,18 +666,19 @@ function startRun(){
   showPop('PYRAMID COMPLETE');
   const cracks = tiles.some(t => t.weak);
   setTimeout(()=>{ if (S.phase==='run' && !S.gameOver) showPop(cracks ? 'JUMP THE CRACKS!' : 'CLIMB!'); }, 900);
+  if (firstTime){ showHint('TAP / ↑ JUMP · SWIPE ⟷ MOVE · ↓ SLIDE', 5200); }
 }
 
 function runJump(){
-  const r = S.run; if (!r || r.falling || r.startDelay>0) return;
+  const r = S.run; if (!r || r.falling || r.dead || r.startDelay>0) return;
   if (!r.jumping && !r.sliding){ r.jumping = true; r.jumpT = 0; Sound.jump(); }
 }
 function runSlide(){
-  const r = S.run; if (!r || r.falling || r.startDelay>0) return;
+  const r = S.run; if (!r || r.falling || r.dead || r.startDelay>0) return;
   if (!r.jumping && !r.sliding){ r.sliding = true; r.slideT = 0; Sound.land(); }
 }
 function runMove(dir){   // -1 = left, +1 = right (relative to run direction)
-  const r = S.run; if (!r || r.falling || r.startDelay>0) return;
+  const r = S.run; if (!r || r.falling || r.dead || r.startDelay>0) return;
   r.lane = Math.max(-1, Math.min(1, r.lane + dir));
   Sound.step();
 }
@@ -613,9 +689,19 @@ function updateRun(dt){
   if (r.falling){
     r.fallV -= 12*dt; g.position.y += r.fallV*dt; g.rotation.z += dt*4;
     if (S.shadow) S.shadow.material.opacity *= 0.9;
-    if (g.position.y < -6) endGame(false, r.crashReason || 'fell');
+    if (g.position.y < -6) endGame(false, r.deathReason || 'fell');
     followCam(dt, true); return;
   }
+  if (r.dead){ followCam(dt, false); return; }     // frozen while the revive prompt is up
+
+  // sandstorm: ease the fog in/out depending on whether we're inside a storm stretch
+  const inStorm = (r.storms||[]).some(s => r.idx >= s[0] && r.idx <= s[1]);
+  scene.fog.far  += ((inStorm ? 17 : 46) - scene.fog.far) * Math.min(1, dt*1.6);
+  scene.fog.near  = scene.fog.far * 0.32;
+  S.stormA = (S.stormA||0) + ((inStorm ? 0.55 : 0) - (S.stormA||0)) * Math.min(1, dt*2);
+  $('storm').style.opacity = S.stormA.toFixed(2);
+  if (inStorm && Math.random() < 0.4)
+    spawnDust(g.position.clone().add(new THREE.Vector3((Math.random()-0.5)*4, Math.random()*1.5, (Math.random()-0.5)*4)), 0xceaa6e, 2, 0.6, 0.4);
 
   // hold for the "PYRAMID COMPLETE / CLIMB" beat before moving
   if (r.startDelay > 0){
@@ -624,6 +710,7 @@ function updateRun(dt){
     followCam(dt, false);
     return;
   }
+  if (r.invuln > 0) r.invuln -= dt;                // brief grace after a revive
 
   // advance along the path — the climb steadily quickens to keep the pressure on
   r.speed = 2.9 + Math.min(r.idx * 0.045, 2.7);
@@ -632,12 +719,16 @@ function updateRun(dt){
     r.t -= 1; r.idx++;
     if (r.idx >= r.tiles.length-1){ Sound.win(); endGame(true); return; }
     Sound.step();
-    if (tileUnsafe(r.tiles[r.idx])){
+    // spectacle: a tile a couple of steps behind crumbles away into the void
+    const beh = r.tiles[r.idx-2];
+    if (beh && beh.crumbleBehind && beh.mesh && !beh.mesh.__fell){ beh.mesh.__fell = true;
+      S.falling.push({ mesh:beh.mesh, vel:new THREE.Vector3((Math.random()-0.5)*2, 0.4, (Math.random()-0.5)*2), rot:rand3(4) }); }
+    if (r.invuln <= 0 && tileUnsafe(r.tiles[r.idx])){
       if (!r.jumping){ crumbleTile(r.tiles[r.idx]); startFall(); return; }
       else slowmo();                                                   // clutch jump over a crack/gap
     }
     const ob = r.tiles[r.idx].ob;
-    if (ob){
+    if (r.invuln <= 0 && ob){
       if (ob.type==='beam' && !r.sliding){ runCrash(); return; }       // must slide under
       if (ob.type==='lane' && r.lane===ob.lane){ runCrash(); return; }  // must dodge to another lane
     }
@@ -655,7 +746,7 @@ function updateRun(dt){
     sy = 1 + 0.25*Math.sin(k*Math.PI); sx = 1 - 0.12*Math.sin(k*Math.PI);   // stretch
     if (r.jumpT >= r.jumpDur){
       r.jumping = false; r.yOff = 0;
-      if (tileUnsafe(r.tiles[r.idx])){ crumbleTile(r.tiles[r.idx]); startFall(); return; }
+      if (r.invuln <= 0 && tileUnsafe(r.tiles[r.idx])){ crumbleTile(r.tiles[r.idx]); startFall(); return; }
       Sound.land(); spawnDust(new THREE.Vector3(base.x, base.y-0.05, base.z), 0xe8d8c0, 6, 1.4, 1);
     }
   }
@@ -702,9 +793,90 @@ function placeShadow(g, r){
   S.shadow.material.opacity = 0.32 * Math.max(0.25, 1 - lift*0.5);
 }
 
-function startFall(){ S.run.falling = true; S.run.fallV = -1; Sound.drop(); }
-function runCrash(){ const r=S.run; if(!r||r.falling) return; r.crashReason='hit'; r.falling=true; r.fallV=1.2; Sound.drop(); shake(0.6); }
+function startFall(){ die('fell'); }
+function runCrash(){ die('hit'); }
 function slowmo(){ S.timeScale = 0.32; }      // brief bullet-time, eased back to 1 in the loop
+
+// ---------- death + revive (the "continue" hook for monetisation) ----------
+function reviveCost(){ return 200 * (((S.run && S.run.revives) || 0) + 1); }
+function die(reason){
+  const r = S.run; if (!r || r.dead || r.falling) return;
+  r.dead = true; r.deathReason = reason;
+  Sound.drop(); if (reason==='hit') shake(0.6);
+  const cost = reviveCost();
+  if (r.revives < 3 && (bank >= cost || !r.usedAdRevive)) offerRevive(reason, cost);
+  else beginDeathFall();
+}
+function beginDeathFall(){
+  const r = S.run; if (!r) return;
+  r.falling = true; r.fallV = (r.deathReason==='hit' ? 1.2 : -1);
+}
+function offerRevive(reason, cost){
+  const r = S.run;
+  $('reviveTitle').textContent = reason==='hit' ? 'YOU CRASHED' : 'YOU FELL';
+  const cb = $('reviveCoins');
+  cb.textContent = `CONTINUE  ◎${cost}`;
+  cb.classList.toggle('disabled', bank < cost);
+  $('reviveAd').style.display = r.usedAdRevive ? 'none' : 'block';
+  $('reviveScreen').classList.remove('hidden');
+  let c = 5; $('reviveCount').textContent = c;
+  r.reviveTimer = setInterval(()=>{ c--; $('reviveCount').textContent = Math.max(0,c); if (c<=0) giveUp(); }, 1000);
+}
+function endRevivePrompt(){ const r=S.run; if (r && r.reviveTimer){ clearInterval(r.reviveTimer); r.reviveTimer=null; } $('reviveScreen').classList.add('hidden'); }
+function giveUp(){ endRevivePrompt(); beginDeathFall(); }
+function reviveWithCoins(){ const cost = reviveCost(); if (bank < cost) return; bank -= cost; Store.set('coins', bank); endRevivePrompt(); performRevive(); }
+function reviveWithAd(){ const r=S.run; if (!r || r.usedAdRevive) return; endRevivePrompt(); runAd(()=>{ r.usedAdRevive = true; performRevive(); }); }
+function performRevive(){
+  const r = S.run, g = S.runner; if (!r) return;
+  r.revives++;
+  let i = Math.min(r.idx, r.tiles.length - 2);          // step back to the last solid tile
+  while (i > 0 && tileUnsafe(r.tiles[i])) i--;
+  for (let j = i; j <= Math.min(i+2, r.tiles.length-1); j++){     // clear hazards around the landing
+    const t = r.tiles[j]; if (t.obMesh){ scene.remove(t.obMesh); t.obMesh=null; } if (t.ob) t.ob=null;
+  }
+  r.idx = i; r.t = 0; r.dead = false; r.falling = false; r.fallV = 0;
+  r.jumping = false; r.sliding = false; r.yOff = 0; r.lane = 0; r.laneX = 0;
+  r.startDelay = 0.5; r.invuln = 1.3;
+  g.rotation.z = 0; g.position.copy(r.tiles[i].pos); g.visible = true;
+  if (S.shadow) S.shadow.material.opacity = 0.32;
+  Sound.cap(); showPop('REVIVED!');
+}
+
+// simulated rewarded-ad modal — swap the body for a real ad SDK (AdMob / IronSource) later
+function runAd(done){
+  const m = $('adModal'); m.classList.remove('hidden');
+  let c = 3; $('adCount').textContent = c;
+  const iv = setInterval(()=>{ c--; if (c<=0){ clearInterval(iv); m.classList.add('hidden'); done && done(); } else $('adCount').textContent = c; }, 1000);
+}
+
+// ---------- share + leaderboard + 2× coins ----------
+function recordScore(entry){ scores.push(entry); scores.sort((a,b)=>b.score-a.score); scores = scores.slice(0,10); Store.set('scores', scores); }
+function renderLeaderboard(){
+  const lb = $('lb'); if (!lb) return;
+  if (!scores.length){ lb.innerHTML = '<div class="lbttl">NO RUNS YET — BUILD ONE!</div>'; return; }
+  lb.innerHTML = '<div class="lbttl">TOP RUNS</div>' + scores.slice(0,5).map((s,i)=>
+    `<div class="lbrow"><span>${i+1}.${s.daily?' ◈':''}</span><b>${s.score}</b></div>`).join('');
+}
+function shareScore(){
+  Sound.blip(660,0.08,'sine',0.12);
+  const txt = `I scored ${S.score} in Pyramid Stacker${dailyMode?' (Daily Challenge)':''}! Think you can beat me?`;
+  const url = location.href;
+  if (navigator.share){ navigator.share({ title:'Pyramid Stacker', text:txt, url }).catch(()=>{}); }
+  else if (navigator.clipboard){ navigator.clipboard.writeText(txt + ' ' + url).then(()=>showPop('COPIED!'), ()=>showPop(txt)); }
+  else showPop('SHARE: ' + S.score);
+}
+function doubleCoins(){
+  if (S.coinsDoubled || S.coins <= 0) return;
+  runAd(()=>{
+    S.coinsDoubled = true; bank += S.coins; Store.set('coins', bank);   // add a second copy of the run's coins
+    $('finalReward').innerHTML = `★ COINS DOUBLED! &nbsp;·&nbsp; +${S.coins*2} this run &nbsp;·&nbsp; bank ◎${bank}`;
+    $('dblBtn').style.display = 'none'; Sound.buy();
+  });
+}
+function showHint(text, ms){
+  const h = $('hint'); h.textContent = text; h.classList.add('show');
+  clearTimeout(showHint._t); if (ms) showHint._t = setTimeout(()=>h.classList.remove('show'), ms);
+}
 
 function collectCoin(t, r){
   if (!t.coin || t.coin.got) return;
@@ -788,6 +960,9 @@ function startGame(){
   $('lives').style.display='none'; $('meterLabel').textContent='STRUCTURAL INTEGRITY'; $('meterBar').style.display='block';
   $('meterWrap').style.opacity='1';
   $('coinHud').classList.add('hidden'); $('combo').classList.remove('show'); $('vignette').style.opacity='0';
+  $('storm').style.opacity='0'; scene.fog.near=16; scene.fog.far=46; S.stormA=0;
+  $('reviveScreen').classList.add('hidden'); $('adModal').classList.add('hidden'); $('hint').classList.remove('show');
+  if (firstTime) showHint('TAP to drop · land each block CENTERED for PERFECT', 5000);
   updateHUD(); spawnBlock();
 }
 
@@ -821,6 +996,7 @@ function renderMeta(){
     ? ('DAILY CHALLENGE: ON' + (dbest ? ' · TODAY ' + dbest : ''))
     : 'DAILY CHALLENGE: OFF';
   db.classList.toggle('on', dailyMode);
+  renderLeaderboard();
 }
 function pickSkin(key){
   Sound.init(); if (Sound.ctx && Sound.ctx.state==='suspended') Sound.ctx.resume();
@@ -835,6 +1011,7 @@ function pickSkin(key){
 function endGame(won, how){
   if (S.gameOver) return;
   S.gameOver = true; S.won = won; S.phase = 'over';
+  $('reviveScreen').classList.add('hidden');
   // bank the run's coins and save records
   bank += S.coins; Store.set('coins', bank);
   const newBest = S.score > bestScore;
@@ -842,6 +1019,8 @@ function endGame(won, how){
   const peak = S.peakY || 0;
   if (peak > (bestHeight||0)){ bestHeight = peak; Store.set('height', bestHeight); }
   if (dailyMode){ const k='daily_'+todayKey(); if (S.score > Store.get(k,0)) Store.set(k, S.score); }
+  recordScore({ score:S.score, daily:dailyMode, date:Date.now() });
+  if (firstTime){ firstTime = false; Store.set('tut', 1); }   // onboarding only on the first game
   setTimeout(()=>{
     $('overTitle').textContent = won ? 'YOU REACHED THE TOP' : (how==='fell' ? 'YOU FELL' : how==='hit' ? 'YOU CRASHED' : how==='collapsed' ? 'IT ALL CAME DOWN' : 'GAME OVER');
     $('finalScore').textContent = S.score;
@@ -850,6 +1029,7 @@ function endGame(won, how){
       : (how==='fell' ? 'So close to the summit.' : how==='hit' ? 'Hit an obstacle on the climb.' : `The structure gave way on layer ${S.layer+1}.`);
     $('finalReward').innerHTML = (newBest ? '★ NEW BEST! &nbsp;·&nbsp; ' : '') +
       `+${S.coins} coins collected &nbsp;·&nbsp; bank ◎${bank}`;
+    $('dblBtn').style.display = (S.coins > 0 && !S.coinsDoubled) ? '' : 'none';
     $('overScreen').classList.remove('hidden');
   }, 700);
 }
@@ -864,6 +1044,14 @@ $('dailyBtn').addEventListener('pointerdown', e => {
   e.stopPropagation(); e.preventDefault();
   dailyMode = !dailyMode; renderMeta();
 });
+
+// buttons that must NOT bubble to the global tap handler (so they don't restart the game)
+function btn(id, fn){ $(id).addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); fn(); }); }
+btn('shareBtn',      shareScore);
+btn('dblBtn',        doubleCoins);
+btn('reviveCoins',   reviveWithCoins);
+btn('reviveAd',      reviveWithAd);
+btn('reviveGiveup',  giveUp);
 
 window.addEventListener('pointerdown', e => {
   e.preventDefault(); primeAudio();
@@ -954,6 +1142,12 @@ function animate(){
   if (S.run) S.run.tiles.forEach(t => {
     if (t.marker) t.marker.material.opacity = 0.5 + 0.4*pulse;
     if (t.coin && !t.coin.got) t.coin.mesh.rotation.z += dt*3.4;
+    // moving pillars sweep between lanes — keep the mesh and its live hit-lane in sync
+    if (t.ob && t.ob.moving && t.obMesh && t.perp){
+      const f = Math.sin(performance.now()*0.0024 + t.ob.phase);
+      t.ob.lane = f > 0.33 ? 1 : (f < -0.33 ? -1 : 0);
+      t.obMesh.position.set(t.pos.x + t.perp.x*f*0.32, t.pos.y + 0.31, t.pos.z + t.perp.z*f*0.32);
+    }
   });
 
   if (S.phase==='run') updateRun(sdt);
