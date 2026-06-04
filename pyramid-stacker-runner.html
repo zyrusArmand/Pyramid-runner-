@@ -261,7 +261,7 @@ const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0x2a1d33, 16, 46);
 
 const renderer = new THREE.WebGLRenderer({ antialias:true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));   // cap DPR — big mobile perf win, minimal visual loss
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -427,20 +427,9 @@ function spawnBlock(){
 
   let mesh;
   if (capstone){ mesh = makeBlock(color); mesh.scale.set(0.8,0.8,0.8); mesh.material.emissive = new THREE.Color(0x5a3d00); }
-  else { mesh = makePiece(len, axis, color, corner); }
-
-  if (corner && !capstone && RND() < 0.55){
-    // L-shaped cornerstone: same stone, wraps a cell down each adjoining wall
-    const runDir  = [[1,0,0],[0,0,-1],[-1,0,0],[0,0,1]][S.wall];
-    const prevDir = [[0,0,-1],[-1,0,0],[0,0,1],[1,0,0]][S.wall];
-    const hh = LAYER_HEIGHT*0.94, L = BLOCK_SIZE*0.92, W = BLOCK_SIZE*0.96, OFF = BLOCK_SIZE*0.5;
-    const arm = (d) => {
-      const dims = d[0]!==0 ? [L, hh, W] : [W, hh, L];
-      const a = new THREE.Mesh(new THREE.BoxGeometry(dims[0], dims[1], dims[2]),
-        new THREE.MeshStandardMaterial({ color: mesh.material.color.clone(), roughness:0.85, metalness:0.05 }));
-      a.position.set(d[0]*OFF, 0, d[2]*OFF); a.castShadow = a.receiveShadow = true; mesh.add(a);
-    };
-    arm(runDir); arm(prevDir);
+  else {
+    mesh = makePiece(len, axis, color, corner);
+    if (!corner) addCourses(mesh, center, axis, len);   // Giza-style stepped stone face on wall pieces
   }
 
   mesh.position.copy(center);
@@ -700,8 +689,7 @@ function updateRun(dt){
   scene.fog.near  = scene.fog.far * 0.32;
   S.stormA = (S.stormA||0) + ((inStorm ? 0.55 : 0) - (S.stormA||0)) * Math.min(1, dt*2);
   $('storm').style.opacity = S.stormA.toFixed(2);
-  if (inStorm && Math.random() < 0.4)
-    spawnDust(g.position.clone().add(new THREE.Vector3((Math.random()-0.5)*4, Math.random()*1.5, (Math.random()-0.5)*4)), 0xceaa6e, 2, 0.6, 0.4);
+  // (the fog + screen tint convey the storm; no per-frame dust particles — keeps mobile smooth)
 
   // hold for the "PYRAMID COMPLETE / CLIMB" beat before moving
   if (r.startDelay > 0){
@@ -1037,7 +1025,13 @@ function endGame(won, how){
 // ---------- input ----------
 let atMenu = true;          // showing the start screen / shop
 let gStart = null;
-function primeAudio(){ Sound.init(); if (Sound.ctx && Sound.ctx.state==='suspended') Sound.ctx.resume(); }
+function primeAudio(){
+  Sound.init();
+  if (!Sound.ctx) return;
+  if (Sound.ctx.state==='suspended') Sound.ctx.resume();
+  // iOS/Safari only "unlocks" audio if a sound plays inside the first gesture — fire a silent tick
+  if (!Sound._unlocked){ Sound._unlocked = true; Sound.blip(440, 0.02, 'sine', 0.0001); }
+}
 
 // daily-challenge toggle — its own listener so tapping it doesn't launch the game
 $('dailyBtn').addEventListener('pointerdown', e => {
