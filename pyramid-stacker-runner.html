@@ -46,7 +46,7 @@
     background:radial-gradient(ellipse at 50% 40%,rgba(40,26,52,.55),rgba(12,8,16,.92));
     color:#f6e9d2; font-family:'Space Mono',monospace; padding:24px; backdrop-filter:blur(2px);
     transition:opacity .4s; }
-  .hidden { opacity:0; pointer-events:none; }
+  .hidden { opacity:0; pointer-events:none; visibility:hidden; }   /* visibility:hidden also blocks taps on children that set pointer-events:auto (shop/buttons) */
   .title { font-family:'Cinzel',serif; font-weight:700; font-size:clamp(30px,10vw,56px);
     letter-spacing:3px; line-height:1.05; color:#f3d99a; text-shadow:0 0 28px rgba(243,200,120,.45); }
   .sub { margin-top:14px; font-size:13px; letter-spacing:2px; opacity:.75; max-width:330px; line-height:1.5; }
@@ -327,21 +327,23 @@ function makePiece(len, axis, color, corner){
   m.castShadow = true; m.receiveShadow = true; scene.add(m); return m;
 }
 
-// Terrace a block's exposed outer face into a few receding stone courses (Giza-style detail).
+// Terrace a block's exposed outer face into 5 receding stone steps (Giza-style staircase look).
 function addCourses(mesh, center, axis, len){
   const radial = axis==='x' ? 'z' : 'x';            // outward direction = perpendicular to the wall
   if (Math.abs(center[radial]) < 0.01) return;       // skip ambiguous/central pieces
   const sgn = center[radial] >= 0 ? 1 : -1;
-  const h = LAYER_HEIGHT*0.94, along = len*BLOCK_SIZE*0.9, faceR = BLOCK_SIZE*0.96/2, N = 3;
-  const shade = mesh.material.color.clone();
-  for (let i=0; i<N-1; i++){                          // lower courses jut out; top course stays flush
-    const out = (N-1-i)*0.06, ch = h/N, cy = -h/2 + ch*(i+0.5), ledgeD = 0.14 + out;
-    const w = axis==='x' ? along : ledgeD, d = axis==='x' ? ledgeD : along;
-    const ledge = new THREE.Mesh(new THREE.BoxGeometry(w, ch*0.9, d),
-      new THREE.MeshStandardMaterial({ color:shade, roughness:0.9, metalness:0.04 }));
-    const rPos = sgn*(faceR + out - ledgeD/2);
+  const h = LAYER_HEIGHT*0.94, along = len*BLOCK_SIZE*0.92, faceR = BLOCK_SIZE*0.96/2;
+  const N = 5, stepH = h/N, maxOut = 0.085;          // 5 steps; bottom juts most, top flush
+  const mat = new THREE.MeshStandardMaterial({ color: mesh.material.color.clone(), roughness:0.92, metalness:0.03 });
+  for (let i=0; i<N; i++){
+    const out   = 0.012 + (maxOut-0.012)*(N-1-i)/(N-1);   // recede inward as the steps climb
+    const depth = 0.12 + out;
+    const cy    = -h/2 + stepH*(i+0.5);
+    const w = axis==='x' ? along : depth, d = axis==='x' ? depth : along;
+    const ledge = new THREE.Mesh(new THREE.BoxGeometry(w, stepH*0.92, d), mat);
+    const rPos = sgn*(faceR + out - depth/2);
     ledge.position.set(axis==='x' ? 0 : rPos, cy, axis==='x' ? rPos : 0);
-    ledge.castShadow = true; mesh.add(ledge);
+    mesh.add(ledge);                                  // no shadow on tiny detail — keeps mobile fast
   }
 }
 
@@ -429,7 +431,7 @@ function spawnBlock(){
   if (capstone){ mesh = makeBlock(color); mesh.scale.set(0.8,0.8,0.8); mesh.material.emissive = new THREE.Color(0x5a3d00); }
   else {
     mesh = makePiece(len, axis, color, corner);
-    if (!corner) addCourses(mesh, center, axis, len);   // Giza-style stepped stone face on wall pieces
+    addCourses(mesh, center, axis, len);   // Giza-style 5-step stone face on every wall/corner piece
   }
 
   mesh.position.copy(center);
