@@ -58,6 +58,46 @@
   .bigscore { font-family:'Cinzel',serif; font-size:54px; font-weight:700; color:#f3d99a;
     margin:6px 0; text-shadow:0 0 20px rgba(243,200,120,.4); }
   .gostat { font-size:13px; letter-spacing:2px; opacity:.8; }
+
+  /* coin counter (top-centre) */
+  #coinHud { position:fixed; top:max(16px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
+    z-index:5; pointer-events:none; font-family:'Space Mono',monospace; color:#ffe08a; font-weight:700;
+    font-size:20px; text-shadow:0 2px 6px rgba(0,0,0,.6); display:flex; align-items:center; gap:7px; transition:transform .12s; }
+  #coinHud.pulse { transform:translateX(-50%) scale(1.25); }
+  #coinHud .coinIcon { width:15px; height:15px; border-radius:50%; background:radial-gradient(circle at 35% 30%,#fff3b0,#e8b020);
+    box-shadow:0 0 8px rgba(232,200,90,.8); display:inline-block; }
+  #coinHud.hidden { display:none; }
+
+  /* combo flag under the score */
+  #combo { position:fixed; top:calc(max(16px,env(safe-area-inset-top)) + 52px); left:18px; z-index:5;
+    pointer-events:none; font-family:'Space Mono',monospace; font-weight:700; font-size:14px; letter-spacing:1px;
+    color:#ffd36a; text-shadow:0 0 10px rgba(255,180,80,.7); opacity:0; transition:opacity .25s; }
+  #combo.show { opacity:1; }
+
+  /* low-integrity danger vignette */
+  #vignette { position:fixed; inset:0; z-index:4; pointer-events:none; opacity:0;
+    box-shadow:inset 0 0 120px 40px rgba(200,30,30,.65); transition:opacity .2s; }
+  /* perfect / collect flash */
+  #flash { position:fixed; inset:0; z-index:7; pointer-events:none; opacity:0; background:#fff; }
+  #flash.show { animation:flashfx .32s ease-out; }
+  @keyframes flashfx { 0%{opacity:.5;} 100%{opacity:0;} }
+
+  /* shop / skins on the start screen */
+  #meta { margin-top:26px; display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .bestRow { display:flex; gap:22px; font-size:12px; letter-spacing:2px; opacity:.85; }
+  .bestRow b { display:block; font-size:20px; color:#f3d99a; margin-top:3px; letter-spacing:1px; }
+  #shop { display:flex; gap:10px; pointer-events:auto; flex-wrap:wrap; justify-content:center; max-width:340px; }
+  .skin { width:54px; padding:8px 4px; border-radius:12px; border:1.5px solid rgba(243,200,120,.25);
+    background:rgba(255,255,255,.05); display:flex; flex-direction:column; align-items:center; gap:5px;
+    cursor:pointer; transition:all .18s; }
+  .skin.sel { border-color:#f3d99a; background:rgba(243,200,120,.16); box-shadow:0 0 14px rgba(243,200,120,.3); }
+  .skin.locked { opacity:.6; }
+  .swatch { width:26px; height:26px; border-radius:6px; box-shadow:inset 0 -6px 8px rgba(0,0,0,.3); }
+  .skinName { font-size:8px; letter-spacing:1px; opacity:.8; }
+  .skinCost { font-size:9px; color:#ffe08a; font-weight:700; }
+  #dailyBtn { pointer-events:auto; font-size:11px; letter-spacing:2px; padding:9px 20px; border-radius:30px;
+    border:1.5px solid rgba(111,227,160,.5); color:#9fe9c0; cursor:pointer; transition:all .18s; }
+  #dailyBtn.on { background:rgba(111,227,160,.18); border-color:#9fe9c0; color:#d6ffe9; }
 </style>
 </head>
 <body>
@@ -69,14 +109,28 @@
     <div id="lives"><span class="life"></span><span class="life"></span><span class="life"></span></div></div>
 </div>
 
+<div id="coinHud" class="hidden"><span class="coinIcon"></span><span id="coinVal">0</span></div>
+<div id="combo"></div>
+
 <div id="meterWrap"><div id="meterLabel">LAYER STABILITY</div>
   <div id="meterBar"><div id="meterFill"></div></div></div>
 
+<div id="vignette"></div>
+<div id="flash"></div>
 <div id="pop">PERFECT</div>
 
 <div class="overlay" id="startScreen">
   <div class="title">PYRAMID<br>STACKER</div>
-  <div class="sub">PHASE 1 — Tap to drop each block; each layer rests halfway on the one below, like real pyramid stone. The first layer is forgiving, but higher up a sloppy drop weakens the structure — and a drop way off its support topples off and leaves a gap. Lose too much integrity and it all comes down.<br><br>PHASE 2 — Then run the spiral up what you built, jumping any gaps and cracks, to the capstone.</div>
+  <div class="sub">PHASE 1 — Tap to drop each block; each layer rests halfway on the one below, like real pyramid stone. The first layer is forgiving, but higher up a sloppy drop weakens the structure — and a drop way off its support topples off and leaves a gap. Lose too much integrity and it all comes down.<br><br>PHASE 2 — Then run the spiral up what you built, grabbing coins, jumping any gaps and cracks, to the capstone.</div>
+  <div id="meta">
+    <div class="bestRow">
+      <div>BEST<b id="bestScore">0</b></div>
+      <div>HIGH CLIMB<b id="bestHeight">0m</b></div>
+      <div>COINS<b id="bankCoins">0</b></div>
+    </div>
+    <div id="shop"></div>
+    <div id="dailyBtn">DAILY CHALLENGE: OFF</div>
+  </div>
   <div class="cta">TAP TO BUILD</div>
 </div>
 
@@ -84,6 +138,7 @@
   <div class="title" id="overTitle" style="font-size:clamp(26px,8vw,44px)">IT CRUMBLED</div>
   <div class="bigscore" id="finalScore">0</div>
   <div class="gostat" id="finalStat"></div>
+  <div class="gostat" id="finalReward" style="margin-top:14px;color:#ffe08a"></div>
   <div class="cta">TAP TO PLAY AGAIN</div>
 </div>
 
@@ -107,6 +162,35 @@ const PERFECT_DISTANCE      = 0.14;
 const MAX_PIECE_LEN         = 2;     // pieces span 1–2 cells (longer rectangles)
 const CORNER_CHANCE         = 0.6;   // chance the first piece of a wall is a cornerstone
 const FALL_THRESHOLD        = 0.55;  // above layer 1, a drop this far off its support topples off
+
+// ---------- seeded RNG (so the Daily Challenge is identical for everyone, every day) ----------
+let __seed = 0, __seeded = false;
+function srand(){ __seed = (Math.imul(__seed, 1664525) + 1013904223) >>> 0; return __seed / 4294967296; }
+function RND(){ return __seeded ? srand() : Math.random(); }
+function dailySeed(){ const d = new Date(); return (d.getFullYear()*10000 + (d.getMonth()+1)*100 + d.getDate()) >>> 0; }
+function todayKey(){ const d = new Date(); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; }
+
+// ---------- persistence (best score / climb, coin bank, owned + selected skins) ----------
+const Store = {
+  get(k, def){ try { const v = localStorage.getItem('pyr_'+k); return v===null ? def : JSON.parse(v); } catch(e){ return def; } },
+  set(k, v){ try { localStorage.setItem('pyr_'+k, JSON.stringify(v)); } catch(e){} }
+};
+let bank      = Store.get('coins', 0);
+let bestScore = Store.get('best', 0);
+let bestHeight= Store.get('height', 0);
+let owned     = Store.get('owned', ['sand']);
+let curSkin   = Store.get('skin', 'sand');
+let dailyMode = false;
+
+// ---------- skins: stone palette + runner colour, unlocked with coins ----------
+const SKINS = {
+  sand:     { name:'SAND',  cost:0,    swatch:'#c79a5e', runner:0x3ad6c5, hue:30, sat:48, lig:62 },
+  ice:      { name:'ICE',   cost:200,  swatch:'#8fc7e8', runner:0xeaf6ff, hue:200, sat:45, lig:70 },
+  rose:     { name:'ROSE',  cost:450,  swatch:'#d87a98', runner:0xff7fae, hue:330, sat:50, lig:66 },
+  emerald:  { name:'JADE',  cost:800,  swatch:'#4ec98a', runner:0x9affc8, hue:150, sat:50, lig:58 },
+  obsidian: { name:'NIGHT', cost:1500, swatch:'#5b4a78', runner:0xb98aff, hue:265, sat:30, lig:40 }
+};
+function skin(){ return SKINS[curSkin] || SKINS.sand; }
 
 const app = document.getElementById('app');
 
@@ -147,7 +231,7 @@ scene.add(ground);
 const $ = id => document.getElementById(id);
 function rand3(s){ return new THREE.Vector3((Math.random()-0.5)*s,(Math.random()-0.5)*s,(Math.random()-0.5)*s); }
 function nForLayer(L){ return BASE_BLOCKS_PER_WALL - L; }   // blocks per wall at layer L (half-block inset)
-function layerColor(L){ const hue=(30+L*26)%360; return new THREE.Color(`hsl(${hue},48%,62%)`); }
+function layerColor(L){ const s=skin(); const hue=(s.hue+L*22)%360; return new THREE.Color(`hsl(${hue},${s.sat}%,${s.lig}%)`); }
 
 function gridPos(wall, index, n, layer){
   const H = (n*BLOCK_SIZE)/2, along = index*BLOCK_SIZE;
@@ -220,7 +304,10 @@ const Sound = {
   land(){ this.blip(300, 0.08, 'triangle', 0.12, 180); },
   step(){ this.blip(240, 0.05, 'sine', 0.05); },
   cap(){ [0,7,12,16,19].forEach((s,i)=> setTimeout(()=>this.blip(523*Math.pow(2,s/12),0.5,'triangle',0.16),i*90)); },
-  win(){ [0,5,7,12,17,19,24].forEach((s,i)=> setTimeout(()=>this.blip(523*Math.pow(2,s/12),0.4,'sine',0.16),i*110)); }
+  win(){ [0,5,7,12,17,19,24].forEach((s,i)=> setTimeout(()=>this.blip(523*Math.pow(2,s/12),0.4,'sine',0.16),i*110)); },
+  coin(n=0){ this.blip(880*Math.pow(2,Math.min(n,8)/24), 0.10, 'square', 0.10, 1320); },
+  heart(){ this.blip(70, 0.16, 'sine', 0.22, 45); },
+  buy(){ [0,7,12].forEach((s,i)=> setTimeout(()=>this.blip(523*Math.pow(2,s/12),0.2,'triangle',0.14),i*70)); }
 };
 
 // ---------- particles / fx ----------
@@ -245,6 +332,7 @@ function resetState(){
     fallen:0, score:0, streak:0, integrity:1, allBlocks:[],
     layerBlocks:[], active:null, falling:[],
     fx:[], squash:[], shakeAmt:0, shadow:null,
+    coins:0, timeScale:1, heartT:0, bestPerfect:0,
     pathSlots:[],          // ordered per-cell {pos, placed} for the runner
     run:null, runner:null };
 }
@@ -256,14 +344,14 @@ function spawnBlock(){
 
   if (capstone){
     center = new THREE.Vector3(0, S.layer*LAYER_HEIGHT, 0);
-    axis = Math.random()<0.5 ? 'x' : 'z';
+    axis = RND()<0.5 ? 'x' : 'z';
     cells = [0];
   } else {
     const n = nForLayer(S.layer);
     axis = (S.wall===0 || S.wall===2) ? 'x' : 'z';
     const remaining = n - S.cellIndex;
-    corner = (S.cellIndex === 0) && (Math.random() < CORNER_CHANCE);
-    len = corner ? 1 : Math.min(1 + Math.floor(Math.random()*MAX_PIECE_LEN), remaining);
+    corner = (S.cellIndex === 0) && (RND() < CORNER_CHANCE);
+    len = corner ? 1 : Math.min(1 + Math.floor(RND()*MAX_PIECE_LEN), remaining);
     // cells this piece occupies, and the geometric center across them
     const a = gridPos(S.wall, S.cellIndex, n, S.layer);
     const b = gridPos(S.wall, S.cellIndex + len - 1, n, S.layer);
@@ -271,14 +359,14 @@ function spawnBlock(){
     for (let c = S.cellIndex; c < S.cellIndex + len; c++) cells.push(c);
   }
 
-  const speed = 1.8 + S.layer*0.18 + Math.random()*0.15;
+  const speed = 1.8 + S.layer*0.18 + RND()*0.15;
   const color = capstone ? 0xf4cf6a : layerColor(S.layer);
 
   let mesh;
   if (capstone){ mesh = makeBlock(color); mesh.scale.set(0.8,0.8,0.8); mesh.material.emissive = new THREE.Color(0x5a3d00); }
   else { mesh = makePiece(len, axis, color, corner); }
 
-  if (corner && !capstone && Math.random() < 0.55){
+  if (corner && !capstone && RND() < 0.55){
     // L-shaped cornerstone: same stone, wraps a cell down each adjoining wall
     const runDir  = [[1,0,0],[0,0,-1],[-1,0,0],[0,0,1]][S.wall];
     const prevDir = [[0,0,-1],[-1,0,0],[0,0,1],[1,0,0]][S.wall];
@@ -377,16 +465,27 @@ function pushCells(a, placed, weak, off=0){
 
 function blockPlaced(mesh, instability, capstone, len){
   S.layerBlocks.push(mesh);
+  S.squash.push({ mesh, t:0 });                 // satisfying landing squash (juice)
   if (instability < PERFECT_DISTANCE){
-    S.streak++; S.score += (100 + S.streak*25) * len;
+    S.streak++; S.bestPerfect = Math.max(S.bestPerfect, S.streak);
+    S.score += (100 + S.streak*25) * len;
     showPop(S.streak>2?`PERFECT x${S.streak}`:'PERFECT');
     Sound.perfect(S.streak); sparkle(mesh.position.clone().add(new THREE.Vector3(0,0.5,0)));
-  } else { S.streak = 0; S.score += 40 * len; Sound.place(); }
+    if (S.streak >= 2) flash();
+    showCombo(S.streak);
+  } else { S.streak = 0; S.score += 40 * len; Sound.place(); showCombo(0); }
   updateHUD();
 
   if (capstone){ startRun(); return; }     // pyramid complete!
   advance(len);
 }
+
+function showCombo(n){
+  const c = $('combo');
+  if (n >= 2){ c.textContent = `COMBO x${n}`; c.classList.add('show'); }
+  else c.classList.remove('show');
+}
+function flash(){ const f=$('flash'); f.classList.remove('show'); void f.offsetWidth; f.classList.add('show'); }
 
 function advance(len){
   const n = nForLayer(S.layer);
@@ -399,11 +498,6 @@ function advance(len){
     }
   }
   spawnBlock();
-}
-
-function collapseLayer(blocks){
-  blocks.forEach(b => S.falling.push({ mesh:b, vel:new THREE.Vector3((Math.random()-0.5)*4,1,(Math.random()-0.5)*4), rot:rand3(6) }));
-  if (S.active){ S.falling.push({ mesh:S.active.mesh, vel:rand3(4), rot:rand3(6) }); S.active=null; }
 }
 
 // ---------- RUN PHASE ----------
@@ -429,11 +523,11 @@ function startRun(){
   for (let i = 5; i < tiles.length - 2; i++){
     const t = tiles[i];
     if (t.gap || t.weak || i - lastOb < 4) continue;
-    if (Math.random() > 0.18) continue;
+    if (RND() > 0.18) continue;
     const A = tiles[i].pos, B = tiles[Math.min(i+1, tiles.length-1)].pos;
     let fwd = B.clone().sub(A); fwd.y = 0; if (fwd.lengthSq()<1e-4) fwd.set(0,0,1); else fwd.normalize();
     const perp = new THREE.Vector3(-fwd.z, 0, fwd.x);
-    if (Math.random() < 0.5){
+    if (RND() < 0.5){
       t.ob = { type:'beam' };
       const beam = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.16, 0.16),
         new THREE.MeshStandardMaterial({ color:0xffa23a, emissive:0x4a2600, roughness:0.5 }));
@@ -441,7 +535,7 @@ function startRun(){
       beam.position.set(t.pos.x, t.pos.y + 0.6, t.pos.z);
       beam.castShadow = true; scene.add(beam); t.obMesh = beam;
     } else {
-      const hl = Math.random()<0.5 ? -1 : 1;
+      const hl = RND()<0.5 ? -1 : 1;
       t.ob = { type:'lane', lane:hl };
       const pil = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.62, 0.3),
         new THREE.MeshStandardMaterial({ color:0xd23a3a, emissive:0x3a0a0a, roughness:0.6 }));
@@ -450,10 +544,25 @@ function startRun(){
     }
     lastOb = i;
   }
+  // coins: a glinting trail of pickups. Most sit on safe tiles; a few hover over gaps,
+  // rewarding a well-timed jump (collect-while-airborne pays a bonus).
+  for (let i = 3; i < tiles.length - 1; i++){
+    const t = tiles[i];
+    if (t.ob) continue;
+    const overGap = t.gap || t.weak;
+    if (overGap ? (RND() < 0.7) : (RND() < 0.42)){
+      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.045, 18),
+        new THREE.MeshStandardMaterial({ color:0xffd24a, emissive:0x6a4a00, metalness:0.7, roughness:0.3 }));
+      c.rotation.x = Math.PI/2;
+      c.position.set(t.pos.x, t.pos.y + (overGap ? 0.95 : 0.45), t.pos.z);
+      c.castShadow = true; scene.add(c);
+      t.coin = { mesh:c, got:false, air:overGap };
+    }
+  }
   // little runner figure — small and nimble
   const g = new THREE.Group();
   const body = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.3,0.2),
-    new THREE.MeshStandardMaterial({ color:0x3ad6c5, emissive:0x0a3d38, roughness:0.4 }));
+    new THREE.MeshStandardMaterial({ color:skin().runner, emissive:0x0a3d38, roughness:0.4 }));
   body.position.y = 0.15; body.castShadow = true;
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.12,16,16),
     new THREE.MeshStandardMaterial({ color:0xfff0d0, emissive:0x332600 }));
@@ -475,6 +584,10 @@ function startRun(){
   $('lives').style.display = 'none';
   $('meterLabel').textContent = 'SWIPE: ← → MOVE · ↑ JUMP · ↓ SLIDE';
   $('meterBar').style.display = 'none';
+  $('vignette').style.opacity = '0';            // danger meter is gone in the run phase
+  $('combo').classList.remove('show');
+  $('coinHud').classList.remove('hidden');
+  updateCoinHud(false);
   showPop('PYRAMID COMPLETE');
   const cracks = tiles.some(t => t.weak);
   setTimeout(()=>{ if (S.phase==='run' && !S.gameOver) showPop(cracks ? 'JUMP THE CRACKS!' : 'CLIMB!'); }, 900);
@@ -512,18 +625,23 @@ function updateRun(dt){
     return;
   }
 
-  // advance along the path
+  // advance along the path — the climb steadily quickens to keep the pressure on
+  r.speed = 2.9 + Math.min(r.idx * 0.045, 2.7);
   r.t += r.speed * dt / 1;
   while (r.t >= 1){
     r.t -= 1; r.idx++;
     if (r.idx >= r.tiles.length-1){ Sound.win(); endGame(true); return; }
     Sound.step();
-    if (tileUnsafe(r.tiles[r.idx]) && !r.jumping){ crumbleTile(r.tiles[r.idx]); startFall(); return; }
+    if (tileUnsafe(r.tiles[r.idx])){
+      if (!r.jumping){ crumbleTile(r.tiles[r.idx]); startFall(); return; }
+      else slowmo();                                                   // clutch jump over a crack/gap
+    }
     const ob = r.tiles[r.idx].ob;
     if (ob){
       if (ob.type==='beam' && !r.sliding){ runCrash(); return; }       // must slide under
       if (ob.type==='lane' && r.lane===ob.lane){ runCrash(); return; }  // must dodge to another lane
     }
+    collectCoin(r.tiles[r.idx], r);
   }
   const A = r.tiles[r.idx].pos, B = r.tiles[Math.min(r.idx+1,r.tiles.length-1)].pos;
   const base = A.clone().lerp(B, r.t);
@@ -567,6 +685,7 @@ function updateRun(dt){
   if (dir.lengthSq() > 0.0001) g.rotation.y = Math.atan2(dir.x, dir.z);
 
   // progress HUD
+  S.peakY = Math.max(S.peakY||0, base.y);
   $('score').textContent = base.y.toFixed(1) + 'm';
   $('layer').textContent = Math.round(r.idx / (r.tiles.length-1) * 100) + '%';
 
@@ -585,6 +704,23 @@ function placeShadow(g, r){
 
 function startFall(){ S.run.falling = true; S.run.fallV = -1; Sound.drop(); }
 function runCrash(){ const r=S.run; if(!r||r.falling) return; r.crashReason='hit'; r.falling=true; r.fallV=1.2; Sound.drop(); shake(0.6); }
+function slowmo(){ S.timeScale = 0.32; }      // brief bullet-time, eased back to 1 in the loop
+
+function collectCoin(t, r){
+  if (!t.coin || t.coin.got) return;
+  if (t.coin.air && !r.jumping) return;       // hovering coins demand a jump to grab
+  t.coin.got = true;
+  const bonus = t.coin.air ? 2 : 1;           // airborne grabs pay double
+  S.coins += bonus; S.score += 50 * bonus;
+  Sound.coin(S.coins);
+  sparkle(t.coin.mesh.position.clone());
+  scene.remove(t.coin.mesh);
+  updateCoinHud(true);
+}
+function updateCoinHud(pulse){
+  const h = $('coinHud'); $('coinVal').textContent = S.coins;
+  if (pulse){ h.classList.add('pulse'); setTimeout(()=>h.classList.remove('pulse'), 130); }
+}
 
 // a tile you can't safely stand on: a hole, or a cracked (weak) block
 function tileUnsafe(t){ return t.gap || t.weak; }
@@ -637,6 +773,7 @@ function updateHUD(){
   const integ = Math.max(0, S.integrity);
   $('meterFill').style.width = (integ*100)+'%';
   $('meterFill').style.background = integ>0.4 ? 'linear-gradient(90deg,#6fe3a0,#e8d35f)' : 'linear-gradient(90deg,#e8a35f,#e85f5f)';
+  $('vignette').style.opacity = (S.phase==='build' && integ < 0.4) ? String((0.4-integ)/0.4 * 0.9) : '0';
 }
 function showPop(t){ const p=$('pop'); p.textContent=t; p.classList.remove('show'); void p.offsetWidth; p.classList.add('show'); }
 
@@ -644,41 +781,94 @@ function startGame(){
   resetState();
   [...scene.children].forEach(o => { if (o.isMesh && o!==ground && o!==sky) scene.remove(o); if (o.isGroup) scene.remove(o); });
   S.phase='build';
+  if (dailyMode){ __seeded = true; __seed = dailySeed(); } else { __seeded = false; }
+  atMenu = false;
   $('startScreen').classList.add('hidden'); $('overScreen').classList.add('hidden');
   $('lblA').textContent='SCORE'; $('lblB').textContent='LAYER';
   $('lives').style.display='none'; $('meterLabel').textContent='STRUCTURAL INTEGRITY'; $('meterBar').style.display='block';
   $('meterWrap').style.opacity='1';
+  $('coinHud').classList.add('hidden'); $('combo').classList.remove('show'); $('vignette').style.opacity='0';
   updateHUD(); spawnBlock();
+}
+
+// ---------- start screen / shop / daily challenge ----------
+function showStart(){
+  atMenu = true;
+  S.phase = null; S.gameOver = false;
+  $('overScreen').classList.add('hidden');
+  $('startScreen').classList.remove('hidden');
+  $('coinHud').classList.add('hidden'); $('combo').classList.remove('show'); $('vignette').style.opacity='0';
+  renderMeta();
+}
+function renderMeta(){
+  $('bestScore').textContent  = bestScore;
+  $('bestHeight').textContent = (bestHeight||0).toFixed(0)+'m';
+  $('bankCoins').textContent  = bank;
+  const shop = $('shop'); shop.innerHTML = '';
+  Object.keys(SKINS).forEach(key => {
+    const s = SKINS[key], have = owned.includes(key), sel = curSkin===key;
+    const el = document.createElement('div');
+    el.className = 'skin' + (sel?' sel':'') + (have?'':' locked');
+    el.innerHTML = `<div class="swatch" style="background:${s.swatch}"></div>`+
+      `<div class="skinName">${s.name}</div>`+
+      `<div class="skinCost">${have ? (sel?'✓':'OWNED') : '◎'+s.cost}</div>`;
+    el.addEventListener('pointerdown', ev => { ev.stopPropagation(); ev.preventDefault(); pickSkin(key); });
+    shop.appendChild(el);
+  });
+  const db = $('dailyBtn');
+  const dbest = Store.get('daily_'+todayKey(), 0);
+  db.textContent = dailyMode
+    ? ('DAILY CHALLENGE: ON' + (dbest ? ' · TODAY ' + dbest : ''))
+    : 'DAILY CHALLENGE: OFF';
+  db.classList.toggle('on', dailyMode);
+}
+function pickSkin(key){
+  Sound.init(); if (Sound.ctx && Sound.ctx.state==='suspended') Sound.ctx.resume();
+  const s = SKINS[key];
+  if (owned.includes(key)){ curSkin = key; Store.set('skin', key); Sound.blip(660,0.08,'sine',0.12); }
+  else if (bank >= s.cost){ bank -= s.cost; Store.set('coins', bank); owned.push(key); Store.set('owned', owned);
+    curSkin = key; Store.set('skin', key); Sound.buy(); }
+  else { Sound.blip(150,0.16,'sawtooth',0.14); showPop('NEED MORE COINS'); }
+  renderMeta();
 }
 
 function endGame(won, how){
   if (S.gameOver) return;
   S.gameOver = true; S.won = won; S.phase = 'over';
+  // bank the run's coins and save records
+  bank += S.coins; Store.set('coins', bank);
+  const newBest = S.score > bestScore;
+  if (newBest){ bestScore = S.score; Store.set('best', bestScore); }
+  const peak = S.peakY || 0;
+  if (peak > (bestHeight||0)){ bestHeight = peak; Store.set('height', bestHeight); }
+  if (dailyMode){ const k='daily_'+todayKey(); if (S.score > Store.get(k,0)) Store.set(k, S.score); }
   setTimeout(()=>{
     $('overTitle').textContent = won ? 'YOU REACHED THE TOP' : (how==='fell' ? 'YOU FELL' : how==='hit' ? 'YOU CRASHED' : how==='collapsed' ? 'IT ALL CAME DOWN' : 'GAME OVER');
     $('finalScore').textContent = S.score;
     $('finalStat').textContent = won
       ? 'Pyramid built and conquered.'
       : (how==='fell' ? 'So close to the summit.' : how==='hit' ? 'Hit an obstacle on the climb.' : `The structure gave way on layer ${S.layer+1}.`);
+    $('finalReward').innerHTML = (newBest ? '★ NEW BEST! &nbsp;·&nbsp; ' : '') +
+      `+${S.coins} coins collected &nbsp;·&nbsp; bank ◎${bank}`;
     $('overScreen').classList.remove('hidden');
   }, 700);
 }
 
 // ---------- input ----------
-function onTap(e){
-  e.preventDefault();
-  if (S.phase===undefined || !S.phase){ startGame(); return; }
-  if (S.phase==='build'){ if (!S.started){} drop(); return; }
-  if (S.phase==='run'){ runJump(); return; }
-}
-// boot: first tap starts; thereafter route by phase
-let booted = false;
+let atMenu = true;          // showing the start screen / shop
 let gStart = null;
+function primeAudio(){ Sound.init(); if (Sound.ctx && Sound.ctx.state==='suspended') Sound.ctx.resume(); }
+
+// daily-challenge toggle — its own listener so tapping it doesn't launch the game
+$('dailyBtn').addEventListener('pointerdown', e => {
+  e.stopPropagation(); e.preventDefault();
+  dailyMode = !dailyMode; renderMeta();
+});
+
 window.addEventListener('pointerdown', e => {
-  e.preventDefault();
-  Sound.init(); if (Sound.ctx && Sound.ctx.state==='suspended') Sound.ctx.resume();
-  if (!booted){ booted = true; startGame(); return; }
-  if (S.gameOver){ if (!$('overScreen').classList.contains('hidden')){ booted=true; startGame(); } return; }
+  e.preventDefault(); primeAudio();
+  if (atMenu){ startGame(); return; }
+  if (S.gameOver){ if (!$('overScreen').classList.contains('hidden')) showStart(); return; }
   if (S.phase==='build'){ drop(); return; }
   if (S.phase==='run'){ gStart = { x:e.clientX, y:e.clientY }; }   // wait for swipe direction
 }, { passive:false });
@@ -694,9 +884,9 @@ window.addEventListener('pointerup', e => {
 window.addEventListener('keydown', e => {
   const k = e.code;
   if (k!=='Space' && k!=='ArrowUp' && k!=='ArrowDown' && k!=='ArrowLeft' && k!=='ArrowRight') return;
-  e.preventDefault();
-  if (!booted){ booted=true; startGame(); return; }
-  if (S.gameOver){ if (!$('overScreen').classList.contains('hidden')) startGame(); return; }
+  e.preventDefault(); primeAudio();
+  if (atMenu){ startGame(); return; }
+  if (S.gameOver){ if (!$('overScreen').classList.contains('hidden')) showStart(); return; }
   if (S.phase==='build'){ if (k==='Space'||k==='ArrowUp'||k==='ArrowDown') drop(); return; }
   if (S.phase==='run'){
     if (k==='Space'||k==='ArrowUp') runJump();
@@ -712,6 +902,9 @@ resetState(); S.phase = null;
 function animate(){
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
+  // slow-mo: timeScale dips on a clutch jump, then eases back to full speed
+  S.timeScale = (S.timeScale||1) + (1 - (S.timeScale||1)) * Math.min(1, dt*3.5);
+  const sdt = dt * (S.timeScale||1);
 
   if (S.active && S.phase==='build'){
     const a = S.active;
@@ -728,19 +921,19 @@ function animate(){
     }
   }
   for (let i=S.falling.length-1;i>=0;i--){ const f=S.falling[i];
-    f.vel.y -= 9.8*dt; f.mesh.position.addScaledVector(f.vel,dt);
-    f.mesh.rotation.x += f.rot.x*dt; f.mesh.rotation.z += f.rot.z*dt;
+    f.vel.y -= 9.8*sdt; f.mesh.position.addScaledVector(f.vel,sdt);
+    f.mesh.rotation.x += f.rot.x*sdt; f.mesh.rotation.z += f.rot.z*sdt;
     if (f.mesh.position.y < -8){ scene.remove(f.mesh); S.falling.splice(i,1); } }
 
   // particles
   for (let i=S.fx.length-1;i>=0;i--){ const p=S.fx[i];
-    p.vel.y -= 6*dt; p.mesh.position.addScaledVector(p.vel,dt);
-    p.life -= p.decay*dt; p.mesh.material.opacity = Math.max(0,p.life);
-    p.mesh.scale.multiplyScalar(1 - dt*0.6);
+    p.vel.y -= 6*sdt; p.mesh.position.addScaledVector(p.vel,sdt);
+    p.life -= p.decay*sdt; p.mesh.material.opacity = Math.max(0,p.life);
+    p.mesh.scale.multiplyScalar(1 - sdt*0.6);
     if (p.life<=0){ scene.remove(p.mesh); S.fx.splice(i,1); } }
 
   // landing squash on placed blocks
-  for (let i=S.squash.length-1;i>=0;i--){ const q=S.squash[i]; q.t += dt*5;
+  for (let i=S.squash.length-1;i>=0;i--){ const q=S.squash[i]; q.t += sdt*5;
     const k = Math.min(q.t,1); const s = 1 - 0.28*Math.sin(k*Math.PI);
     q.mesh.scale.set(1, s, 1);
     if (q.t>=1){ q.mesh.scale.set(1,1,1); S.squash.splice(i,1); } }
@@ -748,19 +941,29 @@ function animate(){
   // decay camera shake
   if (S.shakeAmt) S.shakeAmt = Math.max(0, S.shakeAmt - dt*2.2);
 
-  // gentle glow pulse on capstone + gap markers
+  // heartbeat that quickens as the structure nears collapse
+  if (S.phase==='build' && !S.gameOver){
+    const integ = Math.max(0, S.integrity);
+    if (integ < 0.35){ S.heartT -= dt; if (S.heartT <= 0){ Sound.heart(); S.heartT = 0.4 + integ*1.4; } }
+  }
+
+  // gentle glow pulse on capstone + gap markers; coins spin & bob
   const pulse = 0.5 + 0.5*Math.sin(performance.now()*0.004);
   if (S.active && S.active.capstone && S.active.mesh.material.emissive)
     S.active.mesh.material.emissive.setRGB(0.35*pulse, 0.24*pulse, 0.0);
-  if (S.run) S.run.tiles.forEach(t => { if (t.marker) t.marker.material.opacity = 0.5 + 0.4*pulse; });
+  if (S.run) S.run.tiles.forEach(t => {
+    if (t.marker) t.marker.material.opacity = 0.5 + 0.4*pulse;
+    if (t.coin && !t.coin.got) t.coin.mesh.rotation.z += dt*3.4;
+  });
 
-  if (S.phase==='run') updateRun(dt);
+  if (S.phase==='run') updateRun(sdt);
   else updateBuildCam(dt);
 
   renderer.render(scene, camera);
 }
 // initial idle camera
 camera.position.set(0,7,11); camera.lookAt(0,2,0);
+renderMeta();          // populate best scores, coin bank and the skin shop on the start screen
 animate();
 
 addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
