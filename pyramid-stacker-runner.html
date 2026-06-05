@@ -442,16 +442,13 @@ const sky = new THREE.Mesh(skyGeo, skyMat); scene.add(sky);
 
 const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 120);
 
-scene.add(new THREE.HemisphereLight(0xffd9a8, 0x33203a, 0.62));
-const sun = new THREE.DirectionalLight(0xfff0d0, 1.15);          // warm key — contrast without blowing out
-sun.position.set(9,18,7); sun.castShadow = true;
-sun.shadow.mapSize.set(2048,2048);                               // crisper shadows
+scene.add(new THREE.HemisphereLight(0xffd9a8, 0x33203a, 0.7));
+const sun = new THREE.DirectionalLight(0xfff0d0, 1.15);
+sun.position.set(7,16,9); sun.castShadow = true;
+sun.shadow.mapSize.set(1024,1024);
 sun.shadow.camera.near=1; sun.shadow.camera.far=60;
 sun.shadow.camera.left=-16; sun.shadow.camera.right=16; sun.shadow.camera.top=16; sun.shadow.camera.bottom=-16;
-sun.shadow.bias = -0.0004;
 scene.add(sun);
-const rim = new THREE.DirectionalLight(0x9a7cff, 0.35);          // cool rim light for depth
-rim.position.set(-9,7,-11); scene.add(rim);
 
 // ---------- true bloom (post-processing) — best-effort, falls back to plain render ----------
 // Tuned so ONLY genuinely bright/emissive things (coins, capstone) glow — not the lit stone.
@@ -985,15 +982,24 @@ function startRun(){
       lastCoin = i;
     }
   }
-  // little runner figure — small and nimble
+  // ---- rigged little climber: torso, head, arms & legs pivoted at the shoulders/hips ----
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.3,0.2),
-    new THREE.MeshStandardMaterial({ color:character().color, emissive:0x0a3d38, roughness:0.4 }));
-  body.position.y = 0.15; body.castShadow = true;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.12,16,16),
+  const cMat = new THREE.MeshStandardMaterial({ color:character().color, emissive:0x0a2a28, roughness:0.45 });
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.17,0.22,0.12), cMat);
+  torso.position.y = 0.34; torso.castShadow = true; g.add(torso);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.1,16,16),
     new THREE.MeshStandardMaterial({ color:0xfff0d0, emissive:0x332600 }));
-  head.position.y = 0.4; head.castShadow = true;
-  g.add(body); g.add(head); g.scale.set(RUN_SCALE, RUN_SCALE, RUN_SCALE); scene.add(g);   // tiny climber
+  head.position.y = 0.52; head.castShadow = true; g.add(head);
+  function limb(px, py, w, h){                          // pivot group with the limb hanging below it
+    const piv = new THREE.Group(); piv.position.set(px, py, 0);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, w*1.1), cMat);
+    m.position.y = -h/2; m.castShadow = true; piv.add(m); g.add(piv); return piv;
+  }
+  g.legL = limb(-0.045, 0.22, 0.06, 0.2);
+  g.legR = limb( 0.045, 0.22, 0.06, 0.2);
+  g.armL = limb(-0.105, 0.43, 0.045, 0.16);
+  g.armR = limb( 0.105, 0.43, 0.045, 0.16);
+  g.scale.set(RUN_SCALE, RUN_SCALE, RUN_SCALE); scene.add(g);   // tiny climber
   S.runner = g;
   // soft shadow blob under the runner
   const sh = new THREE.Mesh(new THREE.CircleGeometry(0.2, 20),
@@ -1121,6 +1127,15 @@ function updateRun(dt){
   g.position.set(base.x + perp.x*r.laneX, base.y + r.yOff, base.z + perp.z*r.laneX);
   g.scale.set(sx*RUN_SCALE, sy*RUN_SCALE, sx*RUN_SCALE);
   placeShadow(g, r);
+
+  // ---- rig animation: legs & arms pump while running, tuck on a jump, kick out on a slide ----
+  if (g.legL){
+    r.stride = (r.stride||0) + dt * r.speed * 2.0;
+    const sw = Math.sin(r.stride) * 0.9;
+    if (r.jumping){ g.legL.rotation.x = -1.0; g.legR.rotation.x = -0.55; g.armL.rotation.x = -2.2; g.armR.rotation.x = -2.2; }
+    else if (r.sliding){ g.legL.rotation.x = 1.3; g.legR.rotation.x = 0.95; g.armL.rotation.x = 0.7; g.armR.rotation.x = 0.7; }
+    else { g.legL.rotation.x = sw; g.legR.rotation.x = -sw; g.armL.rotation.x = -sw*0.8; g.armR.rotation.x = sw*0.8; }
+  }
 
   // face direction of travel
   const dir = B.clone().sub(A); dir.y = 0;
