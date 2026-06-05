@@ -340,6 +340,33 @@ function makePiece(len, axis, color, corner){
   m.castShadow = true; m.receiveShadow = true; scene.add(m); return m;
 }
 
+// A real stepped-pyramid stone: a stack of plates that taper inward on each EXPOSED outer face.
+// This makes the steps part of the block's volume (clearly visible, carved in), and because each
+// stone tapers, neighbouring stones stay visually distinct instead of merging into one slab.
+function makeSteppedPiece(len, axis, color, center, n){
+  const mat = new THREE.MeshStandardMaterial({ color, roughness:0.9, metalness:0.04 });
+  const h = LAYER_HEIGHT*0.94;
+  const xHalf = (axis==='x' ? len*BLOCK_SIZE*0.96 : BLOCK_SIZE*0.96)/2;
+  const zHalf = (axis==='z' ? len*BLOCK_SIZE*0.96 : BLOCK_SIZE*0.96)/2;
+  const H = (n*BLOCK_SIZE)/2;
+  const ePX = center.x >  H-0.6, eNX = center.x < -H+0.6;   // which outer faces are open to the air
+  const ePZ = center.z >  H-0.6, eNZ = center.z < -H+0.6;
+  const N = STEP_N, stepH = h/N, inset = 0.04;              // each course recedes `inset` on exposed faces
+  const g = new THREE.Group();
+  for (let i=0; i<N; i++){
+    const x0 = -xHalf + (eNX ? i*inset : 0), x1 = xHalf - (ePX ? i*inset : 0);
+    const z0 = -zHalf + (eNZ ? i*inset : 0), z1 = zHalf - (ePZ ? i*inset : 0);
+    const w = Math.max(0.12, x1-x0), d = Math.max(0.12, z1-z0);
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(w, stepH+0.004, d), mat);
+    plate.position.set((x0+x1)/2, -h/2 + stepH*(i+0.5), (z0+z1)/2);
+    plate.receiveShadow = true; plate.castShadow = (i===0);   // only the base casts a shadow (perf)
+    g.add(plate);
+  }
+  g.material = mat;                                          // so weak-tile tinting still works
+  scene.add(g);
+  return g;
+}
+
 // Terrace EVERY exposed outer face of a block into 5 boldly receding steps (real pyramid-stair
 // look). Corner stones sit at the ring's edge on two sides, so they get an L of steps that meet
 // at the corner — exactly how a real stepped pyramid corner looks.
@@ -467,10 +494,7 @@ function spawnBlock(){
 
   let mesh;
   if (capstone){ mesh = makeBlock(color); mesh.scale.set(0.8,0.8,0.8); mesh.material.emissive = new THREE.Color(0x5a3d00); }
-  else {
-    mesh = makePiece(len, axis, color, corner);
-    addCourses(mesh, center, axis, len, nForLayer(S.layer));   // 5-step stone faces on every exposed side
-  }
+  else mesh = makeSteppedPiece(len, axis, color, center, nForLayer(S.layer));   // real stepped-pyramid stone
 
   mesh.position.copy(center);
 
