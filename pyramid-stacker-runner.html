@@ -545,15 +545,10 @@ function drop(){
 
   const offN = Math.min(1, dist / 1.3);               // 0 = dead-on, 1 = way off
 
-  // WAY OFF its support → the stone topples off and leaves a gap (capstone never topples)
+  // WAY OFF its support → the stone topples off, crumbles apart and leaves a gap (capstone never topples)
   if (!a.capstone && dist > FALL_THRESHOLD){
     a.mesh.position.copy(a.center); a.mesh.position[a.axis] = cur;
-    S.falling.push({ mesh:a.mesh, vel:new THREE.Vector3((Math.random()-0.5)*4, 1.2, (Math.random()-0.5)*4), rot:rand3(6) });
-    Sound.drop(); shake(0.3);
-    S.integrity = Math.max(0, S.integrity - (0.05 + offN*S.layer*0.03));
-    S.streak = 0; showCombo(0); showPop('MISSED!');
-    pushCells(a, false, false, 0);                    // its cells become a gap in the run path
-    updateHUD();
+    missStone(a);
     if (S.integrity <= 0){ collapseAll(); endGame(false, 'collapsed'); return; }
     advance(a.len);
     return;
@@ -561,6 +556,15 @@ function drop(){
 
   // CLOSE ENOUGH → snap to its exact grid spot, so placed stones never overlap or merge
   a.mesh.position.copy(a.center);
+
+  // COLLISION SAFETY: if the snapped stone would still touch/overlap an existing one, it misses instead of merging
+  if (!a.capstone && boxesOverlap(pieceBox(a, a.center[a.axis]))){
+    missStone(a);
+    if (S.integrity <= 0){ collapseAll(); endGame(false, 'collapsed'); return; }
+    advance(a.len);
+    return;
+  }
+
   const weak = dist > 0.32;                            // a sloppy-but-caught drop sets a crack
   const dmg = (weak ? offN : offN*0.4) * S.layer * 0.04;
   S.integrity = Math.max(0, S.integrity - dmg);
@@ -586,6 +590,30 @@ function boxesOverlap(b){
   const tol = 0.12;                                 // allow the mortar gap + a hair; bigger = crumble
   return S.layerBoxes.some(o =>
     b.x0 < o.x1-tol && b.x1 > o.x0+tol && b.z0 < o.z1-tol && b.z1 > o.z0+tol);
+}
+
+// break a stone apart into its individual courses for a satisfying crumble (keeps fall physics)
+function crumbleStone(g){
+  if (g.isGroup && g.children.length){
+    const base = g.position;
+    [...g.children].forEach(p => {
+      const wp = new THREE.Vector3(base.x + p.position.x, base.y + p.position.y, base.z + p.position.z);
+      g.remove(p); scene.add(p); p.position.copy(wp);
+      S.falling.push({ mesh:p, vel:new THREE.Vector3((Math.random()-0.5)*5, 1.0+Math.random()*2.2, (Math.random()-0.5)*5), rot:rand3(9) });
+    });
+    scene.remove(g);
+  } else {
+    S.falling.push({ mesh:g, vel:new THREE.Vector3((Math.random()-0.5)*4, 1.2, (Math.random()-0.5)*4), rot:rand3(6) });
+  }
+}
+// a misplaced / colliding stone: crumble it apart and leave a gap (same logic as before, new visual)
+function missStone(a){
+  crumbleStone(a.mesh);
+  Sound.drop(); shake(0.35);
+  S.integrity = Math.max(0, S.integrity - 0.06);
+  S.streak = 0; showCombo(0); showPop('MISS');
+  pushCells(a, false, false, 0);                    // its cells become a gap in the run path
+  updateHUD();
 }
 
 function collapseAll(){
@@ -978,8 +1006,7 @@ function tileUnsafe(t){ return t.gap || t.weak; }
 function crumbleTile(t){
   if (t.marker){ scene.remove(t.marker); t.marker = null; }
   const m = t.mesh;
-  if (m && !m.__fell){ m.__fell = true;
-    S.falling.push({ mesh:m, vel:new THREE.Vector3((Math.random()-0.5)*3, 0.5, (Math.random()-0.5)*3), rot:rand3(5) }); }
+  if (m && !m.__fell){ m.__fell = true; crumbleStone(m); }
 }
 
 function followCam(dt, falling){
