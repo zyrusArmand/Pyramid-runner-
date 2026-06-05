@@ -99,6 +99,16 @@
     border:1.5px solid rgba(111,227,160,.5); color:#9fe9c0; cursor:pointer; transition:all .18s; }
   #dailyBtn.on { background:rgba(111,227,160,.18); border-color:#9fe9c0; color:#d6ffe9; }
 
+  /* in-game main-menu button */
+  #menuBtn { position:fixed; left:14px; bottom:calc(max(26px,env(safe-area-inset-bottom)) + 40px); z-index:6;
+    font-family:'Space Mono',monospace; font-size:11px; letter-spacing:2px; color:#f6e9d2; display:none;
+    background:rgba(20,12,28,.55); border:1px solid rgba(243,200,120,.4); border-radius:20px;
+    padding:9px 15px; pointer-events:auto; }
+  #menuBtn:active { transform:scale(.95); }
+
+  /* character / theme picker label on the start screen */
+  #shopLabel { font-size:11px; letter-spacing:3px; opacity:.7; }
+
   /* sandstorm tint */
   #storm { position:fixed; inset:0; z-index:4; pointer-events:none; opacity:0; transition:opacity .4s;
     background:linear-gradient(180deg, rgba(206,158,86,.4), rgba(150,100,50,.12)); }
@@ -150,6 +160,7 @@
 
 <div id="coinHud" class="hidden"><span class="coinIcon"></span><span id="coinVal">0</span></div>
 <div id="combo"></div>
+<div id="menuBtn">☰ MENU</div>
 
 <div id="meterWrap"><div id="meterLabel">LAYER STABILITY</div>
   <div id="meterBar"><div id="meterFill"></div></div></div>
@@ -168,6 +179,7 @@
       <div>HIGH CLIMB<b id="bestHeight">0m</b></div>
       <div>COINS<b id="bankCoins">0</b></div>
     </div>
+    <div id="shopLabel">CHARACTER &amp; STONE — TAP TO EQUIP</div>
     <div id="shop"></div>
     <div id="lb"></div>
     <div id="dailyBtn">DAILY CHALLENGE: OFF</div>
@@ -246,7 +258,7 @@ let dailyMode = false;
 
 // ---------- skins: stone palette + runner colour, unlocked with coins ----------
 const SKINS = {
-  sand:     { name:'SAND',  cost:0,    swatch:'#c79a5e', runner:0x3ad6c5, hue:30, sat:48, lig:62 },
+  sand:     { name:'SAND',  cost:0,    swatch:'#cdb083', runner:0x3ad6c5, hue:36, sat:33, lig:63 },
   ice:      { name:'ICE',   cost:200,  swatch:'#8fc7e8', runner:0xeaf6ff, hue:200, sat:45, lig:70 },
   rose:     { name:'ROSE',  cost:450,  swatch:'#d87a98', runner:0xff7fae, hue:330, sat:50, lig:66 },
   emerald:  { name:'JADE',  cost:800,  swatch:'#4ec98a', runner:0x9affc8, hue:150, sat:50, lig:58 },
@@ -293,7 +305,7 @@ scene.add(ground);
 const $ = id => document.getElementById(id);
 function rand3(s){ return new THREE.Vector3((Math.random()-0.5)*s,(Math.random()-0.5)*s,(Math.random()-0.5)*s); }
 function nForLayer(L){ return BASE_BLOCKS_PER_WALL - L; }   // blocks per wall at layer L (half-block inset)
-function layerColor(L){ const s=skin(); const hue=(s.hue+L*22)%360; return new THREE.Color(`hsl(${hue},${s.sat}%,${s.lig}%)`); }
+function layerColor(L){ const s=skin(); const hue=(s.hue+L*6)%360; const lig=Math.max(36, s.lig - L*2); return new THREE.Color(`hsl(${hue},${s.sat}%,${lig}%)`); }
 
 function gridPos(wall, index, n, layer){
   const H = (n*BLOCK_SIZE)/2, along = index*BLOCK_SIZE;
@@ -346,7 +358,7 @@ function addCourses(mesh, center, axis, len, n){
     if (fx && fz) cornerFill(mesh, fx[1], halfX, fz[1], halfZ, mat);
   }
 }
-const STEP_N = 5, STEP_MAXOUT = 0.22;
+const STEP_N = 5, STEP_MAXOUT = 0.15;
 function stepOut(i){ return 0.012 + (STEP_MAXOUT-0.012)*(STEP_N-1-i)/(STEP_N-1); }   // bottom juts most
 function stair(mesh, fa, sgn, wid, faceR, mat){
   const h = LAYER_HEIGHT*0.94, stepH = h/STEP_N;
@@ -897,6 +909,7 @@ function collectCoin(t, r){
   t.coin.got = true;
   const bonus = t.coin.air ? 2 : 1;           // airborne grabs pay double
   S.coins += bonus; S.score += 50 * bonus;
+  bank += bonus; Store.set('coins', bank);    // bank instantly so coins persist even if you quit mid-run
   Sound.coin(S.coins);
   sparkle(t.coin.mesh.position.clone());
   scene.remove(t.coin.mesh);
@@ -975,6 +988,7 @@ function startGame(){
   $('coinHud').classList.add('hidden'); $('combo').classList.remove('show'); $('vignette').style.opacity='0';
   $('storm').style.opacity='0'; scene.fog.near=16; scene.fog.far=46; S.stormA=0;
   $('reviveScreen').classList.add('hidden'); $('adModal').classList.add('hidden'); $('hint').classList.remove('show');
+  $('menuBtn').style.display = 'block';
   if (firstTime) showHint('TAP to drop · land each block CENTERED for PERFECT', 5000);
   updateHUD(); spawnBlock();
 }
@@ -986,6 +1000,7 @@ function showStart(){
   $('overScreen').classList.add('hidden');
   $('startScreen').classList.remove('hidden');
   $('coinHud').classList.add('hidden'); $('combo').classList.remove('show'); $('vignette').style.opacity='0';
+  $('menuBtn').style.display = 'none'; $('reviveScreen').classList.add('hidden');
   renderMeta();
 }
 function renderMeta(){
@@ -1024,9 +1039,8 @@ function pickSkin(key){
 function endGame(won, how){
   if (S.gameOver) return;
   S.gameOver = true; S.won = won; S.phase = 'over';
-  $('reviveScreen').classList.add('hidden');
-  // bank the run's coins and save records
-  bank += S.coins; Store.set('coins', bank);
+  $('reviveScreen').classList.add('hidden'); $('menuBtn').style.display = 'none';
+  // coins were already banked as they were collected; just save records here
   const newBest = S.score > bestScore;
   if (newBest){ bestScore = S.score; Store.set('best', bestScore); }
   const peak = S.peakY || 0;
@@ -1071,6 +1085,8 @@ btn('dblBtn',        doubleCoins);
 btn('reviveCoins',   reviveWithCoins);
 btn('reviveAd',      reviveWithAd);
 btn('reviveGiveup',  giveUp);
+btn('menuBtn',       goMenu);
+function goMenu(){ endRevivePrompt(); $('adModal').classList.add('hidden'); showStart(); }   // quit to main menu mid-game
 
 window.addEventListener('pointerdown', e => {
   e.preventDefault(); primeAudio();
