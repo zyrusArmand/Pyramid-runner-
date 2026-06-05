@@ -460,7 +460,7 @@ function resetState(){
     wall:0, cellIndex:0, layer:0, capstone:false,
     camRot:0, camHeight:0, camR:BASE_BLOCKS_PER_WALL + 5,
     fallen:0, score:0, streak:0, integrity:1, allBlocks:[],
-    layerBlocks:[], layerBoxes:[], active:null, falling:[],
+    layerBlocks:[], layerBoxes:[], prevLayerBoxes:[], active:null, falling:[],
     fx:[], squash:[], shakeAmt:0, shadow:null,
     coins:0, timeScale:1, heartT:0, bestPerfect:0, coinsDoubled:false,
     pathSlots:[],          // ordered per-cell {pos, placed} for the runner
@@ -542,54 +542,58 @@ function drop(){
   const off = cur - a.center[a.axis];                 // how far from dead-centre, signed
   const dist = Math.abs(off);
   S.active = null;
-
   const offN = Math.min(1, dist / 1.3);               // 0 = dead-on, 1 = way off
 
-  // WAY OFF its support → the stone topples off, crumbles apart and leaves a gap (capstone never topples)
-  if (!a.capstone && dist > FALL_THRESHOLD){
-    a.mesh.position.copy(a.center); a.mesh.position[a.axis] = cur;
-    missStone(a);
-    if (S.integrity <= 0){ collapseAll(); endGame(false, 'collapsed'); return; }
-    advance(a.len);
-    return;
-  }
-
-  // CLOSE ENOUGH → snap to its exact grid spot, so placed stones never overlap or merge
+  // place the stone exactly where it was dropped
   a.mesh.position.copy(a.center);
+  a.mesh.position[a.axis] = cur;
 
-  // COLLISION SAFETY: if the snapped stone would still touch/overlap an existing one, it misses instead of merging
-  if (!a.capstone && boxesOverlap(pieceBox(a, a.center[a.axis]))){
-    missStone(a);
-    if (S.integrity <= 0){ collapseAll(); endGame(false, 'collapsed'); return; }
-    advance(a.len);
-    return;
+  // a stone only fails two ways: SQUISHED into another stone, or NO BASE under it (layer 2+)
+  if (!a.capstone){
+    const box = pieceBox(a, cur);
+    const squished   = boxesOverlap(box);                       // wedged into / overlapping a neighbour
+    const unsupported = S.layer > 0 && !isSupported(box);       // nothing beneath it (HUD layer 2+)
+    if (squished || unsupported){
+      missStone(a, squished ? 'SQUISHED' : 'NO BASE');
+      if (S.integrity <= 0){ collapseAll(); endGame(false, 'collapsed'); return; }
+      advance(a.len);
+      return;
+    }
+    S.layerBoxes.push(box);
   }
 
-  const weak = dist > 0.32;                            // a sloppy-but-caught drop sets a crack
+  const weak = dist > 0.34;                            // a noticeably-off (but valid) drop sets a crack
   const dmg = (weak ? offN : offN*0.4) * S.layer * 0.04;
   S.integrity = Math.max(0, S.integrity - dmg);
-  if (dmg > 0.02 || weak) Sound.drop();
+  if (weak) Sound.drop();
 
   S.allBlocks.push(a.mesh);
-  S.layerBoxes.push(pieceBox(a, a.center[a.axis]));
-  pushCells(a, true, weak, 0);                         // snapped to grid → clean path, crack if sloppy
+  pushCells(a, true, weak, off);                       // run path follows where the stone actually landed
   updateHUD();
 
   if (S.integrity <= 0){ collapseAll(); endGame(false, 'collapsed'); return; }
   blockPlaced(a.mesh, offN, a.capstone, a.len);
 }
 
-// footprint (AABB in x/z) of a placed piece, and whether it overlaps any stone already on this layer
+// footprint (AABB in x/z) of a placed piece
 function pieceBox(a, cur){
-  const halfA = (a.len*BLOCK_SIZE*0.96)/2, halfP = (BLOCK_SIZE*0.96)/2;
+  const halfA = (a.len*BLOCK_SIZE*0.985)/2, halfP = (BLOCK_SIZE*0.985)/2;
   const c = { x:a.center.x, z:a.center.z }; c[a.axis] = cur;
   const hx = a.axis==='x' ? halfA : halfP, hz = a.axis==='z' ? halfA : halfP;
   return { x0:c.x-hx, x1:c.x+hx, z0:c.z-hz, z1:c.z+hz };
 }
 function boxesOverlap(b){
-  const tol = 0.12;                                 // allow the mortar gap + a hair; bigger = crumble
+  const tol = 0.12;                                 // allow the hairline crack; bigger overlap = squished
   return S.layerBoxes.some(o =>
     b.x0 < o.x1-tol && b.x1 > o.x0+tol && b.z0 < o.z1-tol && b.z1 > o.z0+tol);
+}
+// is this stone resting on a stone in the layer below? (needs real overlap, not just a touching edge)
+function isSupported(b){
+  return S.prevLayerBoxes.some(o => {
+    const ox = Math.max(0, Math.min(b.x1,o.x1) - Math.max(b.x0,o.x0));
+    const oz = Math.max(0, Math.min(b.z1,o.z1) - Math.max(b.z0,o.z0));
+    return ox*oz > 0.14;                            // ~enough footprint beneath to hold it up
+  });
 }
 
 // shatter a stone into a scatter of little rocks (rubble) instead of dropping solid slabs
@@ -610,12 +614,12 @@ function crumbleStone(g){
   }
   spawnDust(c, 0xceaa6e, 10, 2.2, 1.6);                 // puff of dust
 }
-// a misplaced / colliding stone: crumble it apart and leave a gap (same logic as before, new visual)
-function missStone(a){
+// a squished / unsupported stone: crumble it apart and leave a gap (same logic as before, new visual)
+function missStone(a, label){
   crumbleStone(a.mesh);
   Sound.drop(); shake(0.35);
   S.integrity = Math.max(0, S.integrity - 0.06);
-  S.streak = 0; showCombo(0); showPop('MISS');
+  S.streak = 0; showCombo(0); showPop(label || 'MISS');
   pushCells(a, false, false, 0);                    // its cells become a gap in the run path
   updateHUD();
 }
@@ -644,6 +648,7 @@ function blockPlaced(mesh, instability, capstone, len){
   if (instability < PERFECT_DISTANCE){
     S.streak++; S.bestPerfect = Math.max(S.bestPerfect, S.streak);
     S.score += (100 + S.streak*25) * len;
+    S.coins += 1; bank += 1; Store.set('coins', bank); updateCoinHud(true);   // +1 coin per perfect placement
     showPop(S.streak>2?`PERFECT x${S.streak}`:'PERFECT');
     Sound.perfect(S.streak); sparkle(mesh.position.clone().add(new THREE.Vector3(0,0.5,0)));
     if (S.streak >= 2) flash();
@@ -668,7 +673,8 @@ function advance(len){
   if (S.cellIndex >= n){
     S.cellIndex = 0; S.wall++; S.camRot += Math.PI/2;
     if (S.wall > 3){
-      S.wall = 0; S.layer++; S.camHeight += LAYER_HEIGHT; S.layerBlocks = []; S.layerBoxes = [];
+      S.wall = 0; S.layer++; S.camHeight += LAYER_HEIGHT; S.layerBlocks = [];
+      S.prevLayerBoxes = S.layerBoxes; S.layerBoxes = [];   // remember the finished layer for support checks
       if (nForLayer(S.layer) <= 0){ S.capstone = true; }   // time for the capstone
     }
   }
