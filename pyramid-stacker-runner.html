@@ -107,8 +107,46 @@
   #menuBtn:active { transform:scale(.95); }
   #hud > div:first-child { padding-left:46px; }   /* clear room for the menu button */
 
-  /* character / theme picker label on the start screen */
-  #shopLabel { font-size:11px; letter-spacing:3px; opacity:.7; }
+  /* ---------- home screen (cover art + buttons) ---------- */
+  #startScreen { padding:0; justify-content:flex-end; }
+  #homeArt { position:absolute; inset:0; z-index:-1; }
+  #homeArt svg { width:100%; height:100%; display:block; }
+  .bolt { opacity:0; animation:strike 5s linear infinite; filter:drop-shadow(0 0 5px #bfe0ff); }
+  .bolt.b2 { animation-delay:2.4s; }
+  @keyframes strike { 0%,7%,12%,100%{opacity:0;} 8%,10%{opacity:.95;} 9%{opacity:.2;} }
+  #homeInner { position:relative; z-index:1; width:100%; display:flex; flex-direction:column; align-items:center;
+    padding:24px 24px max(40px,env(safe-area-inset-bottom)); gap:14px;
+    background:linear-gradient(to top, rgba(12,8,16,.92) 40%, rgba(12,8,16,0)); }
+  .homeTitle { font-size:clamp(34px,12vw,62px); }
+  .homeBest { margin-top:4px; }
+  .homeRow { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+  .midBtn { pointer-events:auto; font-size:13px; letter-spacing:2px; padding:13px 20px; border-radius:30px;
+    border:1.5px solid rgba(243,200,120,.5); color:#f3d99a; cursor:pointer; transition:transform .12s; }
+  .midBtn:active { transform:scale(.95); }
+  #homePlay { pointer-events:auto; cursor:pointer; margin-top:6px; }
+
+  /* ---------- leaderboard / shop panels ---------- */
+  .panel { justify-content:flex-start; padding-top:max(46px,calc(env(safe-area-inset-top) + 30px)); gap:16px; }
+  .panelTitle { font-family:'Cinzel',serif; font-weight:700; font-size:clamp(24px,7vw,38px); color:#f3d99a;
+    letter-spacing:3px; text-shadow:0 0 22px rgba(243,200,120,.4); }
+  .backBtn { pointer-events:auto; position:fixed; left:16px; top:max(16px,env(safe-area-inset-top));
+    font-family:'Space Mono',monospace; font-size:12px; letter-spacing:2px; color:#f6e9d2;
+    background:rgba(20,12,28,.6); border:1px solid rgba(243,200,120,.4); border-radius:18px; padding:9px 14px; cursor:pointer; }
+  .shopCoins { font-family:'Space Mono',monospace; font-weight:700; font-size:20px; color:#ffe08a;
+    display:flex; align-items:center; gap:8px; }
+  .tabRow { display:flex; gap:10px; }
+  .tab { pointer-events:auto; font-family:'Space Mono',monospace; font-size:12px; letter-spacing:2px; padding:10px 18px;
+    border-radius:22px; border:1.5px solid rgba(243,200,120,.25); color:#caa; cursor:pointer; }
+  .tab.sel { border-color:#f3d99a; color:#f3d99a; background:rgba(243,200,120,.14); }
+  #shopGrid { display:flex; flex-wrap:wrap; gap:12px; justify-content:center; max-width:360px; }
+  .shopItem { width:84px; padding:12px 6px; border-radius:14px; border:1.5px solid rgba(243,200,120,.22);
+    background:rgba(255,255,255,.05); display:flex; flex-direction:column; align-items:center; gap:7px;
+    cursor:pointer; pointer-events:auto; transition:all .16s; }
+  .shopItem.sel { border-color:#f3d99a; background:rgba(243,200,120,.16); box-shadow:0 0 14px rgba(243,200,120,.3); }
+  .shopItem.locked { opacity:.7; }
+  .shopItem .swatch { width:38px; height:38px; border-radius:8px; box-shadow:inset 0 -7px 10px rgba(0,0,0,.3); }
+  .shopItem .iName { font-size:10px; letter-spacing:1px; opacity:.85; }
+  .shopItem .iCost { font-size:11px; color:#ffe08a; font-weight:700; }
 
   /* sandstorm tint */
   #storm { position:fixed; inset:0; z-index:4; pointer-events:none; opacity:0; transition:opacity .4s;
@@ -173,19 +211,60 @@
 <div id="hint"></div>
 
 <div class="overlay" id="startScreen">
-  <div class="title">PYRAMID<br>STACKER</div>
-  <div id="meta">
-    <div class="bestRow">
+  <div id="homeArt">
+    <svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
+      <defs>
+        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#140d26"/><stop offset="0.55" stop-color="#3b2348"/><stop offset="1" stop-color="#9c5a3a"/>
+        </linearGradient>
+        <radialGradient id="moon" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stop-color="#ffe6b0"/><stop offset="1" stop-color="#ffe6b0" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <rect width="400" height="300" fill="url(#sky)"/>
+      <circle cx="305" cy="74" r="62" fill="url(#moon)"/><circle cx="305" cy="74" r="20" fill="#ffeec4"/>
+      <g fill="#fff" opacity="0.85"><circle cx="40" cy="40" r="1.2"/><circle cx="92" cy="66" r="1"/><circle cx="150" cy="28" r="1.3"/><circle cx="225" cy="48" r="1"/><circle cx="355" cy="36" r="1.2"/><circle cx="120" cy="52" r="0.9"/><circle cx="262" cy="24" r="1.1"/></g>
+      <polyline class="bolt" points="176,0 168,58 186,64 162,150" fill="none" stroke="#dcefff" stroke-width="2.6"/>
+      <polyline class="bolt b2" points="332,0 342,46 327,52 344,118" fill="none" stroke="#eaf3ff" stroke-width="2"/>
+      <polygon points="14,232 92,116 170,232" fill="#caa066"/><polygon points="92,116 170,232 128,232" fill="#a07a48"/>
+      <polygon points="150,236 212,146 274,236" fill="#bd9357"/><polygon points="212,146 274,236 240,236" fill="#9a763f"/>
+      <g fill="#9c7a45"><rect x="244" y="212" width="150" height="28"/><rect x="259" y="188" width="120" height="25"/><rect x="274" y="166" width="90" height="23"/><rect x="289" y="146" width="60" height="21"/><rect x="304" y="129" width="30" height="19"/></g>
+      <rect x="315" y="129" width="20" height="111" fill="#83632f"/>
+      <rect x="0" y="240" width="400" height="60" fill="#7a4a2c"/>
+    </svg>
+  </div>
+  <div id="homeInner">
+    <div class="title homeTitle">PYRAMID<br>STACKER</div>
+    <div class="bestRow homeBest">
       <div>BEST<b id="bestScore">0</b></div>
-      <div>HIGH CLIMB<b id="bestHeight">0m</b></div>
+      <div>CLIMB<b id="bestHeight">0m</b></div>
       <div>COINS<b id="bankCoins">0</b></div>
     </div>
-    <div id="shopLabel">CHARACTER &amp; STONE — TAP TO EQUIP</div>
-    <div id="shop"></div>
-    <div id="lb"></div>
-    <div id="dailyBtn">DAILY CHALLENGE: OFF</div>
+    <div class="cta" id="homePlay">PLAY</div>
+    <div class="homeRow">
+      <div class="midBtn" id="homeLeader">🏆 LEADERBOARD</div>
+      <div class="midBtn" id="homeShop">🛒 SHOP</div>
+    </div>
   </div>
-  <div class="cta">PLAY</div>
+</div>
+
+<div class="overlay hidden panel" id="leaderPanel">
+  <div class="panelTitle">LEADERBOARD</div>
+  <div class="bestRow"><div>BEST<b id="lbBest">0</b></div><div>HIGH CLIMB<b id="lbHeight">0m</b></div></div>
+  <div id="lb"></div>
+  <div id="dailyBtn">DAILY CHALLENGE: OFF</div>
+  <div class="backBtn" id="leaderBack">◀ BACK</div>
+</div>
+
+<div class="overlay hidden panel" id="shopPanel">
+  <div class="panelTitle">SHOP</div>
+  <div class="shopCoins"><span class="coinIcon"></span><span id="shopCoins">0</span></div>
+  <div class="tabRow">
+    <div class="tab sel" id="tabChars">CHARACTERS</div>
+    <div class="tab" id="tabStones">STONES</div>
+  </div>
+  <div id="shopGrid"></div>
+  <div class="backBtn" id="shopBack">◀ BACK</div>
 </div>
 
 <div class="overlay hidden" id="overScreen">
@@ -236,7 +315,7 @@ const PERFECT_DISTANCE      = 0.14;
 const MAX_PIECE_LEN         = 2;     // pieces span 1–2 cells (longer rectangles)
 const CORNER_CHANCE         = 0.6;   // chance the first piece of a wall is a cornerstone
 const FALL_THRESHOLD        = 0.55;  // above layer 1, a drop this far off its support topples off
-const RUN_SCALE             = 0.42;  // tiny climber → the pyramid feels massive on the run up
+const RUN_SCALE             = 0.26;  // tiny climber → the pyramid feels massive on the run up
 
 // ---------- seeded RNG (so the Daily Challenge is identical for everyone, every day) ----------
 let __seed = 0, __seeded = false;
@@ -253,21 +332,33 @@ const Store = {
 let bank      = Store.get('coins', 0);
 let bestScore = Store.get('best', 0);
 let bestHeight= Store.get('height', 0);
-let owned     = Store.get('owned', ['sand']);
-let curSkin   = Store.get('skin', 'sand');
 let scores    = Store.get('scores', []);          // local leaderboard (top 10)
 let firstTime = !Store.get('tut', 0);             // show the onboarding hints once
 let dailyMode = false;
 
-// ---------- skins: stone palette + runner colour, unlocked with coins ----------
-const SKINS = {
-  sand:     { name:'SAND',  cost:0,    swatch:'#cdb083', runner:0x3ad6c5, hue:36, sat:33, lig:63 },
-  ice:      { name:'ICE',   cost:200,  swatch:'#8fc7e8', runner:0xeaf6ff, hue:200, sat:45, lig:70 },
-  rose:     { name:'ROSE',  cost:450,  swatch:'#d87a98', runner:0xff7fae, hue:330, sat:50, lig:66 },
-  emerald:  { name:'JADE',  cost:800,  swatch:'#4ec98a', runner:0x9affc8, hue:150, sat:50, lig:58 },
-  obsidian: { name:'NIGHT', cost:1500, swatch:'#5b4a78', runner:0xb98aff, hue:265, sat:30, lig:40 }
+// ---------- cosmetics: STONE themes (block palette) + CHARACTER costumes (runner), bought with coins ----------
+const STONES = {
+  sand:  { name:'SANDSTONE', cost:0,    swatch:'#cdb083', hue:36,  sat:33, lig:63 },
+  ice:   { name:'ICE',       cost:200,  swatch:'#8fc7e8', hue:200, sat:42, lig:70 },
+  rose:  { name:'ROSE',      cost:450,  swatch:'#d87a98', hue:330, sat:48, lig:66 },
+  jade:  { name:'JADE',      cost:800,  swatch:'#4ec98a', hue:150, sat:48, lig:58 },
+  gold:  { name:'GOLD',      cost:1200, swatch:'#e8c45a', hue:45,  sat:62, lig:60 },
+  night: { name:'OBSIDIAN',  cost:1800, swatch:'#6a5a86', hue:265, sat:30, lig:44 }
 };
-function skin(){ return SKINS[curSkin] || SKINS.sand; }
+const CHARACTERS = {
+  explorer:{ name:'EXPLORER', cost:0,    swatch:'#3ad6c5', color:0x3ad6c5 },
+  amber:   { name:'AMBER',    cost:150,  swatch:'#ffb24a', color:0xffb24a },
+  crimson: { name:'CRIMSON',  cost:300,  swatch:'#ff5a6a', color:0xff5a6a },
+  violet:  { name:'VIOLET',   cost:600,  swatch:'#b98aff', color:0xb98aff },
+  frost:   { name:'FROST',    cost:900,  swatch:'#eaf6ff', color:0xeaf6ff },
+  gold:    { name:'PHARAOH',  cost:1500, swatch:'#ffd86a', color:0xffd86a }
+};
+let ownedStones = Store.get('ownedStones', ['sand']);
+let curStone    = Store.get('stone', 'sand');
+let ownedChars  = Store.get('ownedChars', ['explorer']);
+let curChar     = Store.get('char', 'explorer');
+function stone(){ return STONES[curStone] || STONES.sand; }
+function character(){ return CHARACTERS[curChar] || CHARACTERS.explorer; }
 
 const app = document.getElementById('app');
 
@@ -308,7 +399,7 @@ scene.add(ground);
 const $ = id => document.getElementById(id);
 function rand3(s){ return new THREE.Vector3((Math.random()-0.5)*s,(Math.random()-0.5)*s,(Math.random()-0.5)*s); }
 function nForLayer(L){ return BASE_BLOCKS_PER_WALL - L; }   // blocks per wall at layer L (half-block inset)
-function layerColor(L){ const s=skin(); const hue=(s.hue+L*6)%360; const lig=Math.max(36, s.lig - L*2); return new THREE.Color(`hsl(${hue},${s.sat}%,${lig}%)`); }
+function layerColor(L){ const s=stone(); const hue=(s.hue+L*6)%360; const lig=Math.max(36, s.lig - L*2); return new THREE.Color(`hsl(${hue},${s.sat}%,${lig}%)`); }
 
 function gridPos(wall, index, n, layer){
   const H = (n*BLOCK_SIZE)/2, along = index*BLOCK_SIZE;
@@ -687,37 +778,46 @@ function advance(len){
 }
 
 // ---------- RUN PHASE ----------
-// Order the placed cells into a bottom-to-top climb up the pyramid's FRONT face (the front wall of
-// each layer, zig-zagging up), instead of spiralling around the whole ring.
-function frontFaceClimb(){
-  const byL = new Map();
-  S.pathSlots.forEach(s => {
-    const L = Math.round(s.pos.y / LAYER_HEIGHT);
-    if (!byL.has(L)) byL.set(L, []);
-    byL.get(L).push(s);
-  });
-  const Ls = [...byL.keys()].sort((a,b)=>a-b);
-  const out = [];
-  Ls.forEach((L, li) => {
-    const slots = byL.get(L);
-    const maxZ = Math.max(...slots.map(s=>s.pos.z));
-    let front = slots.filter(s => s.pos.z > maxZ - 0.6);   // the front-facing (+z) edge of this layer
-    if (!front.length) front = slots;
-    front.sort((a,b)=> a.pos.x - b.pos.x);
-    if (li % 2 === 1) front.reverse();                     // switchback — alternate direction each layer
-    out.push(...front);
-  });
-  return out.length ? out : S.pathSlots;
+// A steep, direct climb straight up the pyramid's front face — stepping on each individual stone
+// course (10 per layer), base to capstone. A missing front stone becomes one jumpable gap.
+function climbPath(){
+  const tiles = [];
+  const h = LAYER_HEIGHT*0.94, zHalf = BLOCK_SIZE*0.985/2, inset = 0.04, N = STEP_N, stepH = h/N;
+  const maxL = BASE_BLOCKS_PER_WALL - 1;
+  function frontInfo(L){
+    const n = nForLayer(L), H = (n*BLOCK_SIZE)/2, y = L*LAYER_HEIGHT;
+    let cx = 0, bestDX = 1e9;                                   // front-centre cell x (closest to 0)
+    for (let idx=0; idx<n; idx++){ const x = -H + idx*BLOCK_SIZE; if (Math.abs(x) < bestDX){ bestDX=Math.abs(x); cx=x; } }
+    let slot = null, best = 0.7;                                // match the placed stone there
+    S.pathSlots.forEach(s => {
+      if (Math.abs(s.pos.y - y) > 0.3) return;
+      const d = Math.abs(s.pos.x - cx) + Math.abs(s.pos.z - H);
+      if (d < best){ best = d; slot = s; }
+    });
+    return { cx, H, y, slot };
+  }
+  for (let L=0; L<=maxL; L++){
+    const fi = frontInfo(L), placed = fi.slot ? fi.slot.placed : false;
+    const weak = fi.slot ? !!fi.slot.weak : false, mesh = fi.slot ? fi.slot.mesh : null;
+    if (!placed){
+      tiles.push({ pos:new THREE.Vector3(fi.cx, fi.y + LAYER_HEIGHT*0.5, fi.H + zHalf - 0.2), gap:true, weak:false, mesh, crumbled:false });
+      continue;
+    }
+    for (let i=0; i<N; i++){
+      const ty = fi.y - h/2 + stepH*(i+1) + 0.015;             // tread top
+      const tz = fi.H + zHalf - i*inset - 0.02;                // tread front edge, receding up the slope
+      tiles.push({ pos:new THREE.Vector3(fi.cx, ty, tz), gap:false, weak, mesh, crumbled:false });
+    }
+  }
+  const cap = S.pathSlots[S.pathSlots.length-1];                // capstone on top
+  if (cap) tiles.push({ pos:new THREE.Vector3(cap.pos.x, cap.pos.y + LAYER_HEIGHT*0.5, cap.pos.z), gap:false, weak:false, mesh:cap.mesh, crumbled:false });
+  return tiles;
 }
 
 function startRun(){
   S.phase = 'run';
   Sound.cap();
-  // tile path climbs bottom-to-top up the pyramid's front face
-  const tiles = frontFaceClimb().map(s => ({
-    pos: new THREE.Vector3(s.pos.x, s.pos.y + LAYER_HEIGHT*0.5, s.pos.z),   // top surface
-    gap: !s.placed, weak: !!s.weak, mesh: s.mesh, crumbled:false
-  }));
+  const tiles = climbPath();   // steep, direct step-by-step climb up the front face
   // cracked (weak) tiles: tint the block red and float a warning ring above it
   tiles.forEach(t => {
     if (!t.weak) return;
@@ -782,7 +882,7 @@ function startRun(){
   // little runner figure — small and nimble
   const g = new THREE.Group();
   const body = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.3,0.2),
-    new THREE.MeshStandardMaterial({ color:skin().runner, emissive:0x0a3d38, roughness:0.4 }));
+    new THREE.MeshStandardMaterial({ color:character().color, emissive:0x0a3d38, roughness:0.4 }));
   body.position.y = 0.15; body.castShadow = true;
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.12,16,16),
     new THREE.MeshStandardMaterial({ color:0xfff0d0, emissive:0x332600 }));
@@ -794,9 +894,9 @@ function startRun(){
     new THREE.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:0.32 }));
   sh.rotation.x = -Math.PI/2; scene.add(sh); S.shadow = sh;
 
-  S.run = { tiles, idx:0, t:0, speed:2.2, jumping:false, jumpT:0, jumpDur:0.8, jumpH:1.4,
+  S.run = { tiles, idx:0, t:0, speed:4.0, jumping:false, jumpT:0, jumpDur:0.5, jumpH:0.95,
             falling:false, fallV:0, yOff:0, startDelay:1.4,
-            lane:0, laneX:0, sliding:false, slideT:0, slideDur:0.55,
+            lane:0, laneX:0, sliding:false, slideT:0, slideDur:0.5,
             storms, revives:0, usedAdRevive:false, invuln:0, dead:false, deathReason:'fell' };
   g.position.copy(tiles[0].pos);
 
@@ -858,7 +958,7 @@ function updateRun(dt){
   if (r.invuln > 0) r.invuln -= dt;                // brief grace after a revive
 
   // advance along the path — the climb steadily quickens to keep the pressure on
-  r.speed = 2.2 + Math.min(r.idx * 0.04, 2.0);
+  r.speed = 4.0 + Math.min(r.idx * 0.03, 2.5);
   r.t += r.speed * dt / 1;
   while (r.t >= 1){
     r.t -= 1; r.idx++;
@@ -1052,9 +1152,9 @@ function followCam(dt, falling){
   const A = r.tiles[r.idx].pos, B = r.tiles[Math.min(r.idx+1,r.tiles.length-1)].pos;
   let dir = B.clone().sub(A); dir.y = 0;
   if (dir.lengthSq() < 0.0001) dir.set(0,0,1); else dir.normalize();
-  const want = g.position.clone().addScaledVector(dir, -2.1); want.y = g.position.y + 1.3;
+  const want = g.position.clone().addScaledVector(dir, -1.5); want.y = g.position.y + 0.95;
   camera.position.lerp(want, Math.min(1, dt*4));
-  camera.lookAt(g.position.x, g.position.y + 0.18, g.position.z);
+  camera.lookAt(g.position.x, g.position.y + 0.12, g.position.z);
   applyShake();
 }
 
@@ -1100,6 +1200,7 @@ function startGame(){
   if (dailyMode){ __seeded = true; __seed = dailySeed(); } else { __seeded = false; }
   atMenu = false;
   $('startScreen').classList.add('hidden'); $('overScreen').classList.add('hidden');
+  $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden');
   $('lblA').textContent='SCORE'; $('lblB').textContent='LAYER';
   $('lives').style.display='none'; $('meterLabel').textContent='STRUCTURAL INTEGRITY'; $('meterBar').style.display='block';
   $('meterWrap').style.opacity='1';
@@ -1112,49 +1213,65 @@ function startGame(){
   updateHUD(); spawnBlock();
 }
 
-// ---------- start screen / shop / daily challenge ----------
-function showStart(){
+// ---------- home / leaderboard / shop ----------
+let shopTab = 'chars';
+function showStart(){            // the main "home" menu (cover art + PLAY / LEADERBOARD / SHOP)
   atMenu = true;
   S.phase = null; S.gameOver = false;
   $('overScreen').classList.add('hidden');
+  $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden');
   $('startScreen').classList.remove('hidden');
   $('coinHud').classList.add('hidden'); $('combo').classList.remove('show'); $('vignette').style.opacity='0';
   $('menuBtn').style.display = 'none'; $('reviveScreen').classList.add('hidden');
   $('hud').style.display = 'none';                  // clear leftover run HUD behind the menu
-  renderMeta();
+  renderHome();
 }
-function renderMeta(){
+function renderHome(){
   $('bestScore').textContent  = bestScore;
   $('bestHeight').textContent = (bestHeight||0).toFixed(0)+'m';
   $('bankCoins').textContent  = bank;
-  const shop = $('shop'); shop.innerHTML = '';
-  Object.keys(SKINS).forEach(key => {
-    const s = SKINS[key], have = owned.includes(key), sel = curSkin===key;
-    const el = document.createElement('div');
-    el.className = 'skin' + (sel?' sel':'') + (have?'':' locked');
-    el.innerHTML = `<div class="swatch" style="background:${s.swatch}"></div>`+
-      `<div class="skinName">${s.name}</div>`+
-      `<div class="skinCost">${have ? (sel?'✓':'OWNED') : '◎'+s.cost}</div>`;
-    el.addEventListener('pointerdown', ev => { ev.stopPropagation(); ev.preventDefault(); pickSkin(key); });
-    shop.appendChild(el);
-  });
-  const db = $('dailyBtn');
-  const dbest = Store.get('daily_'+todayKey(), 0);
-  db.textContent = dailyMode
-    ? ('DAILY CHALLENGE: ON' + (dbest ? ' · TODAY ' + dbest : ''))
-    : 'DAILY CHALLENGE: OFF';
-  db.classList.toggle('on', dailyMode);
+}
+function showLeader(){ $('startScreen').classList.add('hidden'); $('leaderPanel').classList.remove('hidden'); renderLeader(); }
+function showShop(){ $('startScreen').classList.add('hidden'); $('shopPanel').classList.remove('hidden'); renderShop(); }
+function backHome(){ $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden'); $('startScreen').classList.remove('hidden'); renderHome(); }
+function renderLeader(){
+  $('lbBest').textContent = bestScore;
+  $('lbHeight').textContent = (bestHeight||0).toFixed(0)+'m';
   renderLeaderboard();
+  const db = $('dailyBtn'), dbest = Store.get('daily_'+todayKey(), 0);
+  db.textContent = dailyMode ? ('DAILY CHALLENGE: ON' + (dbest ? ' · TODAY ' + dbest : '')) : 'DAILY CHALLENGE: OFF';
+  db.classList.toggle('on', dailyMode);
 }
-function pickSkin(key){
+function renderShop(){
+  $('shopCoins').textContent = bank;
+  $('tabChars').classList.toggle('sel', shopTab==='chars');
+  $('tabStones').classList.toggle('sel', shopTab==='stones');
+  const grid = $('shopGrid'); grid.innerHTML = '';
+  const isChar = shopTab==='chars';
+  const set = isChar ? CHARACTERS : STONES;
+  const own = isChar ? ownedChars : ownedStones;
+  const cur = isChar ? curChar : curStone;
+  Object.keys(set).forEach(key => {
+    const it = set[key], have = own.includes(key), sel = cur===key;
+    const el = document.createElement('div');
+    el.className = 'shopItem' + (sel?' sel':'') + (have?'':' locked');
+    el.innerHTML = `<div class="swatch" style="background:${it.swatch}"></div>`+
+      `<div class="iName">${it.name}</div>`+
+      `<div class="iCost">${have ? (sel?'✓ WORN':'OWNED') : '◎'+it.cost}</div>`;
+    el.addEventListener('pointerdown', ev => { ev.stopPropagation(); ev.preventDefault(); isChar ? pickChar(key) : pickStone(key); });
+    grid.appendChild(el);
+  });
+}
+function buyOrEquip(key, set, own, ownedKey, equip){
   Sound.init(); if (Sound.ctx && Sound.ctx.state==='suspended') Sound.ctx.resume();
-  const s = SKINS[key];
-  if (owned.includes(key)){ curSkin = key; Store.set('skin', key); Sound.blip(660,0.08,'sine',0.12); }
-  else if (bank >= s.cost){ bank -= s.cost; Store.set('coins', bank); owned.push(key); Store.set('owned', owned);
-    curSkin = key; Store.set('skin', key); Sound.buy(); }
+  const it = set[key];
+  if (own.includes(key)){ equip(key); Sound.blip(660,0.08,'sine',0.12); }
+  else if (bank >= it.cost){ bank -= it.cost; Store.set('coins', bank); own.push(key); Store.set(ownedKey, own); equip(key); Sound.buy(); }
   else { Sound.blip(150,0.16,'sawtooth',0.14); showPop('NEED MORE COINS'); }
-  renderMeta();
+  renderShop();
 }
+function pickChar(key){ buyOrEquip(key, CHARACTERS, ownedChars, 'ownedChars', k => { curChar=k; Store.set('char',k); }); }
+function pickStone(key){ buyOrEquip(key, STONES, ownedStones, 'ownedStones', k => { curStone=k; Store.set('stone',k); }); }
 
 function endGame(won, how){
   if (S.gameOver) return;
@@ -1193,14 +1310,16 @@ function primeAudio(){
   if (!Sound._unlocked){ Sound._unlocked = true; Sound.blip(440, 0.02, 'sine', 0.0001); }
 }
 
-// daily-challenge toggle — its own listener so tapping it doesn't launch the game
-$('dailyBtn').addEventListener('pointerdown', e => {
-  e.stopPropagation(); e.preventDefault();
-  dailyMode = !dailyMode; renderMeta();
-});
-
-// buttons that must NOT bubble to the global tap handler (so they don't restart the game)
+// buttons that must NOT bubble to the global tap handler
 function btn(id, fn){ $(id).addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); fn(); }); }
+btn('homePlay',      ()=>startGame());
+btn('homeLeader',    showLeader);
+btn('homeShop',      showShop);
+btn('leaderBack',    backHome);
+btn('shopBack',      backHome);
+btn('tabChars',      ()=>{ shopTab='chars';  renderShop(); });
+btn('tabStones',     ()=>{ shopTab='stones'; renderShop(); });
+btn('dailyBtn',      ()=>{ dailyMode = !dailyMode; renderLeader(); });
 btn('shareBtn',      shareScore);
 btn('dblBtn',        doubleCoins);
 btn('reviveCoins',   reviveWithCoins);
@@ -1212,8 +1331,8 @@ function goMenu(){ endRevivePrompt(); $('adModal').classList.add('hidden'); show
 
 window.addEventListener('pointerdown', e => {
   e.preventDefault(); primeAudio();
-  if (atMenu){ startGame(); return; }
-  if (S.gameOver){ if (!$('overScreen').classList.contains('hidden')) showStart(); return; }
+  if (atMenu){ return; }                                                   // menu uses its own buttons
+  if (S.gameOver){ if (!$('overScreen').classList.contains('hidden')) startGame(); return; }   // tap = play again
   if (S.phase==='build'){ drop(); return; }
   if (S.phase==='run'){ gStart = { x:e.clientX, y:e.clientY }; }   // wait for swipe direction
 }, { passive:false });
@@ -1231,7 +1350,7 @@ window.addEventListener('keydown', e => {
   if (k!=='Space' && k!=='ArrowUp' && k!=='ArrowDown' && k!=='ArrowLeft' && k!=='ArrowRight') return;
   e.preventDefault(); primeAudio();
   if (atMenu){ startGame(); return; }
-  if (S.gameOver){ if (!$('overScreen').classList.contains('hidden')) showStart(); return; }
+  if (S.gameOver){ if (!$('overScreen').classList.contains('hidden')) startGame(); return; }
   if (S.phase==='build'){ if (k==='Space'||k==='ArrowUp'||k==='ArrowDown') drop(); return; }
   if (S.phase==='run'){
     if (k==='Space'||k==='ArrowUp') runJump();
@@ -1323,7 +1442,7 @@ function animate(){
 // initial idle camera
 camera.position.set(0,7,11); camera.lookAt(0,2,0);
 $('hud').style.display = 'none';          // hidden until a game starts, so the menu stays clean
-renderMeta();          // populate best scores, coin bank and the skin shop on the start screen
+renderHome();          // populate best scores & coin bank on the home screen
 animate();
 
 addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
