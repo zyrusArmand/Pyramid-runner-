@@ -345,9 +345,9 @@ function makePiece(len, axis, color, corner){
 // stone tapers, neighbouring stones stay visually distinct instead of merging into one slab.
 function makeSteppedPiece(len, axis, color, center, n){
   const mat = new THREE.MeshStandardMaterial({ color, roughness:0.9, metalness:0.04 });
-  const h = LAYER_HEIGHT*0.94;
-  const xHalf = (axis==='x' ? len*BLOCK_SIZE*0.96 : BLOCK_SIZE*0.96)/2;
-  const zHalf = (axis==='z' ? len*BLOCK_SIZE*0.96 : BLOCK_SIZE*0.96)/2;
+  const h = LAYER_HEIGHT*0.94, GAP = 0.90;            // <1 leaves a clear mortar gap between stones
+  const xHalf = (axis==='x' ? len*BLOCK_SIZE*GAP : BLOCK_SIZE*GAP)/2;
+  const zHalf = (axis==='z' ? len*BLOCK_SIZE*GAP : BLOCK_SIZE*GAP)/2;
   const H = (n*BLOCK_SIZE)/2;
   const ePX = center.x >  H-0.6, eNX = center.x < -H+0.6;   // which outer faces are open to the air
   const ePZ = center.z >  H-0.6, eNZ = center.z < -H+0.6;
@@ -544,35 +544,31 @@ function drop(){
   S.active = null;
 
   const offN = Math.min(1, dist / 1.3);               // 0 = dead-on, 1 = way off
-  const dmg = offN * S.layer * 0.05;                  // first layer free; higher layers weaken
-  S.integrity = Math.max(0, S.integrity - dmg);
 
-  // lock it EXACTLY where it was tapped — no snapping, no sinking, no wobble
-  a.mesh.position.copy(a.center);
-  a.mesh.position[a.axis] = cur;
-
-  // OVERLAP RULE: if this stone is dropped over/into another stone on the same layer, it crumbles off
-  if (!a.capstone){
-    const box = pieceBox(a, cur);
-    if (boxesOverlap(box)){
-      a.mesh.position[a.axis] = cur;
-      S.falling.push({ mesh:a.mesh, vel:new THREE.Vector3((Math.random()-0.5)*4, 1.2, (Math.random()-0.5)*4), rot:rand3(6) });
-      Sound.drop(); shake(0.35);
-      S.integrity = Math.max(0, S.integrity - 0.06);
-      S.streak = 0; showCombo(0); showPop('CRUMBLED!');
-      pushCells(a, false, false, off);            // its cells become a gap in the run path
-      updateHUD();
-      if (S.integrity <= 0){ collapseAll(); endGame(false, 'collapsed'); return; }
-      advance(a.len);
-      return;
-    }
-    S.layerBoxes.push(box);
+  // WAY OFF its support → the stone topples off and leaves a gap (capstone never topples)
+  if (!a.capstone && dist > FALL_THRESHOLD){
+    a.mesh.position.copy(a.center); a.mesh.position[a.axis] = cur;
+    S.falling.push({ mesh:a.mesh, vel:new THREE.Vector3((Math.random()-0.5)*4, 1.2, (Math.random()-0.5)*4), rot:rand3(6) });
+    Sound.drop(); shake(0.3);
+    S.integrity = Math.max(0, S.integrity - (0.05 + offN*S.layer*0.03));
+    S.streak = 0; showCombo(0); showPop('MISSED!');
+    pushCells(a, false, false, 0);                    // its cells become a gap in the run path
+    updateHUD();
+    if (S.integrity <= 0){ collapseAll(); endGame(false, 'collapsed'); return; }
+    advance(a.len);
+    return;
   }
 
-  if (dmg > 0.02) Sound.drop();
+  // CLOSE ENOUGH → snap to its exact grid spot, so placed stones never overlap or merge
+  a.mesh.position.copy(a.center);
+  const weak = dist > 0.32;                            // a sloppy-but-caught drop sets a crack
+  const dmg = (weak ? offN : offN*0.4) * S.layer * 0.04;
+  S.integrity = Math.max(0, S.integrity - dmg);
+  if (dmg > 0.02 || weak) Sound.drop();
 
   S.allBlocks.push(a.mesh);
-  pushCells(a, true, offN > 0.45, off);   // run path follows where the block actually landed
+  S.layerBoxes.push(pieceBox(a, a.center[a.axis]));
+  pushCells(a, true, weak, 0);                         // snapped to grid → clean path, crack if sloppy
   updateHUD();
 
   if (S.integrity <= 0){ collapseAll(); endGame(false, 'collapsed'); return; }
