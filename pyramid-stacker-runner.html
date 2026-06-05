@@ -345,7 +345,7 @@ function makePiece(len, axis, color, corner){
 // stone tapers, neighbouring stones stay visually distinct instead of merging into one slab.
 function makeSteppedPiece(len, axis, color, center, n){
   const mat = new THREE.MeshStandardMaterial({ color, roughness:0.9, metalness:0.04 });
-  const h = LAYER_HEIGHT*0.94, GAP = 0.90;            // <1 leaves a clear mortar gap between stones
+  const h = LAYER_HEIGHT*0.94, GAP = 0.985;           // nearly flush — only a hairline crack between stones
   const xHalf = (axis==='x' ? len*BLOCK_SIZE*GAP : BLOCK_SIZE*GAP)/2;
   const zHalf = (axis==='z' ? len*BLOCK_SIZE*GAP : BLOCK_SIZE*GAP)/2;
   const H = (n*BLOCK_SIZE)/2;
@@ -592,19 +592,23 @@ function boxesOverlap(b){
     b.x0 < o.x1-tol && b.x1 > o.x0+tol && b.z0 < o.z1-tol && b.z1 > o.z0+tol);
 }
 
-// break a stone apart into its individual courses for a satisfying crumble (keeps fall physics)
+// shatter a stone into a scatter of little rocks (rubble) instead of dropping solid slabs
 function crumbleStone(g){
-  if (g.isGroup && g.children.length){
-    const base = g.position;
-    [...g.children].forEach(p => {
-      const wp = new THREE.Vector3(base.x + p.position.x, base.y + p.position.y, base.z + p.position.z);
-      g.remove(p); scene.add(p); p.position.copy(wp);
-      S.falling.push({ mesh:p, vel:new THREE.Vector3((Math.random()-0.5)*5, 1.0+Math.random()*2.2, (Math.random()-0.5)*5), rot:rand3(9) });
-    });
-    scene.remove(g);
-  } else {
-    S.falling.push({ mesh:g, vel:new THREE.Vector3((Math.random()-0.5)*4, 1.2, (Math.random()-0.5)*4), rot:rand3(6) });
+  const col = (g.material && g.material.color) ? g.material.color.clone() : new THREE.Color(0xcdb083);
+  const c = g.position.clone();
+  if (g.isGroup){ [...g.children].forEach(p => g.remove(p)); }
+  scene.remove(g);
+  const mat = new THREE.MeshStandardMaterial({ color:col, roughness:0.96, metalness:0.02 });
+  const n = 13;
+  for (let i=0; i<n; i++){
+    const s = 0.07 + Math.random()*0.13;               // little chunks of varied size
+    const rock = new THREE.Mesh(new THREE.BoxGeometry(s, s*(0.7+Math.random()*0.7), s*(0.7+Math.random()*0.7)), mat);
+    rock.position.set(c.x + (Math.random()-0.5)*0.7, c.y + (Math.random()-0.5)*0.35, c.z + (Math.random()-0.5)*0.7);
+    rock.rotation.set(Math.random()*3.1, Math.random()*3.1, Math.random()*3.1);
+    rock.castShadow = true; scene.add(rock);
+    S.falling.push({ mesh:rock, vel:new THREE.Vector3((Math.random()-0.5)*5, 1.4+Math.random()*2.4, (Math.random()-0.5)*5), rot:rand3(11) });
   }
+  spawnDust(c, 0xceaa6e, 10, 2.2, 1.6);                 // puff of dust
 }
 // a misplaced / colliding stone: crumble it apart and leave a gap (same logic as before, new visual)
 function missStone(a){
