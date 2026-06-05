@@ -452,9 +452,12 @@ scene.add(sun);
 
 // ---------- true bloom (post-processing) — best-effort, falls back to plain render ----------
 // Tuned so ONLY genuinely bright/emissive things (coins, capstone) glow — not the lit stone.
+// NOTE: bloom is OFF — in this LDR pipeline it also blooms brightly-lit stone (washes the scene).
+// Flip BLOOM_ON to true only with HDR tone-mapping in place so it stays selective.
+const BLOOM_ON = false;
 let composer = null;
 try {
-  if (THREE.EffectComposer && THREE.UnrealBloomPass && THREE.RenderPass){
+  if (BLOOM_ON && THREE.EffectComposer && THREE.UnrealBloomPass && THREE.RenderPass){
     composer = new THREE.EffectComposer(renderer);
     composer.addPass(new THREE.RenderPass(scene, camera));
     composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.45, 0.4, 0.92));
@@ -482,7 +485,7 @@ const SAND_BUMP  = noiseTex(128, 30, 10); if (SAND_BUMP) SAND_BUMP.repeat.set(20
 
 // ---------- richer desert ground + rolling horizon dunes ----------
 const ground = new THREE.Mesh(new THREE.CircleGeometry(64,56),
-  new THREE.MeshStandardMaterial({ color:0x7a5230, roughness:1, bumpMap:SAND_BUMP||undefined, bumpScale:0.06 }));
+  new THREE.MeshStandardMaterial({ color:0x6b4a32, roughness:1, bumpMap:SAND_BUMP||undefined, bumpScale:0.06 }));
 ground.rotation.x = -Math.PI/2; ground.position.y = -0.5; ground.receiveShadow = true;
 scene.add(ground);
 const duneMat = new THREE.MeshStandardMaterial({ color:0x946642, roughness:1, bumpMap:SAND_BUMP||undefined, bumpScale:0.1 });
@@ -685,7 +688,7 @@ function spawnBlock(){
   const color = capstone ? 0xf4cf6a : layerColor(S.layer);
 
   let mesh;
-  if (capstone){ mesh = makeBlock(color); mesh.scale.set(0.8,0.8,0.8); mesh.material.emissive = new THREE.Color(0x8a5e00); mesh.material.emissiveIntensity = 1.6; }
+  if (capstone){ mesh = makeBlock(color); mesh.scale.set(0.8,0.8,0.8); mesh.material.emissive = new THREE.Color(0x5a3d00); }
   else mesh = makeSteppedPiece(len, axis, color, center, nForLayer(S.layer));   // real stepped-pyramid stone
 
   mesh.position.copy(center);
@@ -974,7 +977,7 @@ function startRun(){
     if (i - lastCoin < 3) continue;                              // space coins out on the dense steps
     if (overGap ? (RND() < 0.6) : (RND() < 0.22)){
       const c = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.018, 14),   // small coin for the tiny climber
-        new THREE.MeshStandardMaterial({ color:0xffd24a, emissive:0xc08a16, emissiveIntensity:1.8, metalness:0.7, roughness:0.3 }));
+        new THREE.MeshStandardMaterial({ color:0xffd24a, emissive:0x6a4a00, metalness:0.7, roughness:0.3 }));
       c.rotation.x = Math.PI/2;
       c.position.set(t.pos.x, t.pos.y + (overGap ? 0.34 : 0.14), t.pos.z);
       c.castShadow = true; scene.add(c);
@@ -1544,7 +1547,7 @@ function animate(){
   // gentle glow pulse on capstone + gap markers; coins spin & bob
   const pulse = 0.5 + 0.5*Math.sin(performance.now()*0.004);
   if (S.active && S.active.capstone && S.active.mesh.material.emissive)
-    S.active.mesh.material.emissive.setRGB(0.6*pulse+0.2, 0.42*pulse+0.12, 0.0);
+    S.active.mesh.material.emissive.setRGB(0.35*pulse, 0.24*pulse, 0.0);
   if (S.run) S.run.tiles.forEach(t => {
     if (t.marker) t.marker.material.opacity = 0.5 + 0.4*pulse;
     if (t.coin && !t.coin.got) t.coin.mesh.rotation.z += dt*3.4;
