@@ -497,6 +497,40 @@ for (let i=0;i<11;i++){
   d.__env = true; scene.add(d);                          // __env = keep across game restarts
 }
 
+// ---------- desert dressing: palm trees, boulders, ruined columns ----------
+const PALM_BARK = new THREE.MeshStandardMaterial({ color:0x6e4f2e, roughness:1 });
+const PALM_FROND = new THREE.MeshStandardMaterial({ color:0x4f7a37, roughness:0.85, side:THREE.DoubleSide });
+const ROCK_MAT = new THREE.MeshStandardMaterial({ color:0x8a6a44, roughness:1, bumpMap:STONE_BUMP||undefined, bumpScale:0.05 });
+const RUIN_MAT = new THREE.MeshStandardMaterial({ color:0xb59866, roughness:1, bumpMap:STONE_BUMP||undefined, bumpScale:0.04 });
+function makePalm(x,z,s){
+  const p = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.1*s,0.17*s,2.3*s,7), PALM_BARK);
+  trunk.position.y = 1.15*s; trunk.castShadow = true; p.add(trunk);
+  for (let i=0;i<7;i++){
+    const piv = new THREE.Group(); piv.position.y = 2.3*s; piv.rotation.y = i/7*Math.PI*2;
+    const f = new THREE.Mesh(new THREE.ConeGeometry(0.13*s, 1.5*s, 5), PALM_FROND);
+    f.rotation.z = -Math.PI/2 + 0.35; f.position.set(0.72*s, -0.12*s, 0); f.castShadow = true;
+    piv.add(f); p.add(piv);
+  }
+  p.position.set(x,-0.5,z); p.__env = true; scene.add(p);
+}
+function makeRock(x,z,s){
+  const r = new THREE.Mesh(new THREE.DodecahedronGeometry(s,0), ROCK_MAT);
+  r.position.set(x, -0.5+s*0.35, z);
+  r.scale.set(1+Math.random()*0.5, 0.7+Math.random()*0.4, 1+Math.random()*0.5);
+  r.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3);
+  r.castShadow = true; r.__env = true; scene.add(r);
+}
+function makeColumn(x,z,h){
+  const c = new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.5,h,12), RUIN_MAT);
+  c.position.set(x, -0.5+h/2, z); c.rotation.y = Math.random()*0.4; c.castShadow = true; c.__env = true; scene.add(c);
+  const cap = new THREE.Mesh(new THREE.BoxGeometry(1.1,0.25,1.1), RUIN_MAT);
+  cap.position.set(x, -0.5+h+0.1, z); cap.castShadow = true; cap.__env = true; scene.add(cap);
+}
+for (let i=0;i<6;i++){  const a=Math.random()*6.28, d=12+Math.random()*16; makePalm(Math.sin(a)*d, Math.cos(a)*d, 0.8+Math.random()*0.5); }
+for (let i=0;i<16;i++){ const a=Math.random()*6.28, d=9+Math.random()*24;  makeRock(Math.sin(a)*d, Math.cos(a)*d, 0.4+Math.random()*0.7); }
+for (let i=0;i<5;i++){  const a=Math.random()*6.28, d=15+Math.random()*15; makeColumn(Math.sin(a)*d, Math.cos(a)*d, 1.4+Math.random()*2.2); }
+
 // ---------- helpers ----------
 const $ = id => document.getElementById(id);
 function rand3(s){ return new THREE.Vector3((Math.random()-0.5)*s,(Math.random()-0.5)*s,(Math.random()-0.5)*s); }
@@ -539,7 +573,7 @@ function makePiece(len, axis, color, corner){
 // stone tapers, neighbouring stones stay visually distinct instead of merging into one slab.
 function makeSteppedPiece(len, axis, color, center, n){
   const mat = new THREE.MeshStandardMaterial({ color, roughness:0.92, metalness:0.04 });
-  if (STONE_BUMP){ mat.bumpMap = STONE_BUMP; mat.bumpScale = 0.022; }   // carved stone surface relief
+  if (STONE_BUMP){ mat.bumpMap = STONE_BUMP; mat.bumpScale = 0.04; }    // carved stone surface relief
   const h = LAYER_HEIGHT*0.94, GAP = 0.985;           // nearly flush — only a hairline crack between stones
   const xHalf = (axis==='x' ? len*BLOCK_SIZE*GAP : BLOCK_SIZE*GAP)/2;
   const zHalf = (axis==='z' ? len*BLOCK_SIZE*GAP : BLOCK_SIZE*GAP)/2;
@@ -940,12 +974,17 @@ function startRun(){
     let fwd = B.clone().sub(A); fwd.y = 0; if (fwd.lengthSq()<1e-4) fwd.set(0,0,1); else fwd.normalize();
     const perp = new THREE.Vector3(-fwd.z, 0, fwd.x);
     if (RND() < 0.5){
-      t.ob = { type:'beam' };
-      const beam = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.09, 0.09),
-        new THREE.MeshStandardMaterial({ color:0xffa23a, emissive:0x4a2600, roughness:0.5 }));
-      beam.rotation.y = Math.atan2(-perp.z, perp.x);
-      beam.position.set(t.pos.x, t.pos.y + 0.26, t.pos.z);
-      beam.castShadow = true; scene.add(beam); t.obMesh = beam;
+      // a giant golden pendulum hammer overhead — SLIDE under it as it swings up
+      t.ob = { type:'beam', swing:true, phase:RND()*6.28 };
+      const ham = new THREE.Group();
+      const goldMat = new THREE.MeshStandardMaterial({ color:0xddb24a, metalness:0.6, roughness:0.4 });
+      const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,0.46,6), goldMat);
+      handle.position.y = -0.23; ham.add(handle);
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.13,0.11,0.11), goldMat);
+      head.position.y = -0.47; head.castShadow = true; ham.add(head);
+      ham.position.set(t.pos.x, t.pos.y + 0.52, t.pos.z);   // pivot above the path; hangs down and swings
+      ham.rotation.y = Math.atan2(fwd.x, fwd.z);
+      scene.add(ham); t.obMesh = ham; t.perp = perp.clone();
     } else {
       const hl = RND()<0.5 ? -1 : 1;
       const moving = RND() < 0.4;                          // HAZARD: some pillars sweep between lanes
@@ -1002,6 +1041,12 @@ function startRun(){
   g.legR = limb( 0.045, 0.22, 0.06, 0.2);
   g.armL = limb(-0.105, 0.43, 0.045, 0.16);
   g.armR = limb( 0.105, 0.43, 0.045, 0.16);
+  const pack = new THREE.Mesh(new THREE.BoxGeometry(0.13,0.16,0.08),               // explorer's backpack
+    new THREE.MeshStandardMaterial({ color:0x6e4a2c, roughness:0.8 }));
+  pack.position.set(0, 0.34, -0.09); pack.castShadow = true; g.add(pack);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 8, 0, Math.PI*2, 0, Math.PI*0.55),  // little hat
+    new THREE.MeshStandardMaterial({ color:0x5a3d22, roughness:0.8 }));
+  cap.position.y = 0.55; cap.castShadow = true; g.add(cap);
   g.scale.set(RUN_SCALE, RUN_SCALE, RUN_SCALE); scene.add(g);   // tiny climber
   S.runner = g;
   // soft shadow blob under the runner
@@ -1556,6 +1601,9 @@ function animate(){
       const f = Math.sin(performance.now()*0.0024 + t.ob.phase);
       t.ob.lane = f > 0.33 ? 1 : (f < -0.33 ? -1 : 0);
       t.obMesh.position.set(t.pos.x + t.perp.x*f*0.24, t.pos.y + 0.15, t.pos.z + t.perp.z*f*0.24);
+    }
+    if (t.ob && t.ob.swing && t.obMesh){              // pendulum hammer swing
+      t.obMesh.rotation.x = Math.sin(performance.now()*0.004 + t.ob.phase) * 0.95;
     }
   });
 
