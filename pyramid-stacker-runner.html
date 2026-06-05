@@ -442,8 +442,8 @@ const sky = new THREE.Mesh(skyGeo, skyMat); scene.add(sky);
 
 const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 120);
 
-scene.add(new THREE.HemisphereLight(0xffd9a8, 0x33203a, 0.7));
-const sun = new THREE.DirectionalLight(0xfff0d0, 1.15);
+scene.add(new THREE.HemisphereLight(0xffd9a8, 0x33203a, 0.55));
+const sun = new THREE.DirectionalLight(0xfff0d0, 0.72);          // softer key so light sandstone doesn't blow out to white
 sun.position.set(7,16,9); sun.castShadow = true;
 sun.shadow.mapSize.set(1024,1024);
 sun.shadow.camera.near=1; sun.shadow.camera.far=60;
