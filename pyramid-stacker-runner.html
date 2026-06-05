@@ -347,7 +347,7 @@ function addCourses(mesh, center, axis, len, n){
   const H = (n*BLOCK_SIZE)/2;                         // ring half-width: outer wall faces sit on ±H
   const halfX = (axis==='x' ? len*BLOCK_SIZE*0.96 : BLOCK_SIZE*0.96)/2;   // block half-extent per axis
   const halfZ = (axis==='z' ? len*BLOCK_SIZE*0.96 : BLOCK_SIZE*0.96)/2;
-  const along = len*BLOCK_SIZE*0.92, depth1 = BLOCK_SIZE*0.92;
+  const along = len*BLOCK_SIZE*0.96, depth1 = BLOCK_SIZE*0.96;   // full block width — steps span edge to edge
   const mat = new THREE.MeshStandardMaterial({ color: mesh.material.color.clone(), roughness:0.92, metalness:0.03 });
   const faces = [];                                   // [outwardAxis, sign, faceWidth(tangent), faceOffset]
   if (center.z >  H-0.6) faces.push(['z', 1, axis==='x'?along:depth1, halfZ]);
@@ -360,7 +360,7 @@ function addCourses(mesh, center, axis, len, n){
     if (fx && fz) cornerFill(mesh, fx[1], halfX, fz[1], halfZ, mat);
   }
 }
-const STEP_N = 5, STEP_MAXOUT = 0.15;
+const STEP_N = 10, STEP_MAXOUT = 0.18;
 function stepOut(i){ return 0.012 + (STEP_MAXOUT-0.012)*(STEP_N-1-i)/(STEP_N-1); }   // bottom juts most
 function stair(mesh, fa, sgn, wid, faceR, mat){
   const h = LAYER_HEIGHT*0.94, stepH = h/STEP_N;
