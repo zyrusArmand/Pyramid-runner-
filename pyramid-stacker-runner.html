@@ -196,6 +196,7 @@
   <div class="obtnRow">
     <div class="obtn gold" id="dblBtn">2× COINS ▶</div>
     <div class="obtn" id="shareBtn">SHARE</div>
+    <div class="obtn" id="menuFromOver">MAIN MENU</div>
   </div>
   <div class="cta">TAP TO PLAY AGAIN</div>
 </div>
@@ -948,7 +949,7 @@ function collectCoin(t, r){
   updateCoinHud(true);
 }
 function updateCoinHud(pulse){
-  const h = $('coinHud'); $('coinVal').textContent = S.coins;
+  const h = $('coinHud'); $('coinVal').textContent = bank;   // show total coins you own (persists, grows live)
   if (pulse){ h.classList.add('pulse'); setTimeout(()=>h.classList.remove('pulse'), 130); }
 }
 
@@ -1017,7 +1018,8 @@ function startGame(){
   $('lblA').textContent='SCORE'; $('lblB').textContent='LAYER';
   $('lives').style.display='none'; $('meterLabel').textContent='STRUCTURAL INTEGRITY'; $('meterBar').style.display='block';
   $('meterWrap').style.opacity='1';
-  $('coinHud').classList.add('hidden'); $('combo').classList.remove('show'); $('vignette').style.opacity='0';
+  $('coinHud').classList.remove('hidden'); $('combo').classList.remove('show'); $('vignette').style.opacity='0';
+  $('hud').style.display='flex'; updateCoinHud(false);     // coin counter visible the whole game
   $('storm').style.opacity='0'; scene.fog.near=16; scene.fog.far=46; S.stormA=0;
   $('reviveScreen').classList.add('hidden'); $('adModal').classList.add('hidden'); $('hint').classList.remove('show');
   $('menuBtn').style.display = 'block';
@@ -1033,6 +1035,7 @@ function showStart(){
   $('startScreen').classList.remove('hidden');
   $('coinHud').classList.add('hidden'); $('combo').classList.remove('show'); $('vignette').style.opacity='0';
   $('menuBtn').style.display = 'none'; $('reviveScreen').classList.add('hidden');
+  $('hud').style.display = 'none';                  // clear leftover run HUD behind the menu
   renderMeta();
 }
 function renderMeta(){
@@ -1072,6 +1075,7 @@ function endGame(won, how){
   if (S.gameOver) return;
   S.gameOver = true; S.won = won; S.phase = 'over';
   $('reviveScreen').classList.add('hidden'); $('menuBtn').style.display = 'none';
+  $('hud').style.display = 'none'; $('coinHud').classList.add('hidden');
   // coins were already banked as they were collected; just save records here
   const newBest = S.score > bestScore;
   if (newBest){ bestScore = S.score; Store.set('best', bestScore); }
@@ -1118,6 +1122,7 @@ btn('reviveCoins',   reviveWithCoins);
 btn('reviveAd',      reviveWithAd);
 btn('reviveGiveup',  giveUp);
 btn('menuBtn',       goMenu);
+btn('menuFromOver',  goMenu);
 function goMenu(){ endRevivePrompt(); $('adModal').classList.add('hidden'); showStart(); }   // quit to main menu mid-game
 
 window.addEventListener('pointerdown', e => {
@@ -1224,6 +1229,7 @@ function animate(){
 }
 // initial idle camera
 camera.position.set(0,7,11); camera.lookAt(0,2,0);
+$('hud').style.display = 'none';          // hidden until a game starts, so the menu stays clean
 renderMeta();          // populate best scores, coin bank and the skin shop on the start screen
 animate();
 
