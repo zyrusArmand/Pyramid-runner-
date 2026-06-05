@@ -99,12 +99,13 @@
     border:1.5px solid rgba(111,227,160,.5); color:#9fe9c0; cursor:pointer; transition:all .18s; }
   #dailyBtn.on { background:rgba(111,227,160,.18); border-color:#9fe9c0; color:#d6ffe9; }
 
-  /* in-game main-menu button */
-  #menuBtn { position:fixed; left:14px; bottom:calc(max(26px,env(safe-area-inset-bottom)) + 40px); z-index:6;
-    font-family:'Space Mono',monospace; font-size:11px; letter-spacing:2px; color:#f6e9d2; display:none;
-    background:rgba(20,12,28,.55); border:1px solid rgba(243,200,120,.4); border-radius:20px;
-    padding:9px 15px; pointer-events:auto; }
+  /* in-game main-menu button (top-left) */
+  #menuBtn { position:fixed; left:14px; top:calc(max(16px,env(safe-area-inset-top)) + 2px); z-index:6;
+    font-family:'Space Mono',monospace; font-size:16px; line-height:1; color:#f6e9d2; display:none;
+    background:rgba(20,12,28,.55); border:1px solid rgba(243,200,120,.4); border-radius:10px;
+    padding:8px 11px; pointer-events:auto; }
   #menuBtn:active { transform:scale(.95); }
+  #hud > div:first-child { padding-left:46px; }   /* clear room for the menu button */
 
   /* character / theme picker label on the start screen */
   #shopLabel { font-size:11px; letter-spacing:3px; opacity:.7; }
@@ -160,7 +161,7 @@
 
 <div id="coinHud" class="hidden"><span class="coinIcon"></span><span id="coinVal">0</span></div>
 <div id="combo"></div>
-<div id="menuBtn">☰ MENU</div>
+<div id="menuBtn">☰</div>
 
 <div id="meterWrap"><div id="meterLabel">LAYER STABILITY</div>
   <div id="meterBar"><div id="meterFill"></div></div></div>
@@ -184,7 +185,7 @@
     <div id="lb"></div>
     <div id="dailyBtn">DAILY CHALLENGE: OFF</div>
   </div>
-  <div class="cta">TAP TO BUILD</div>
+  <div class="cta">PLAY</div>
 </div>
 
 <div class="overlay hidden" id="overScreen">
@@ -431,7 +432,7 @@ function resetState(){
     wall:0, cellIndex:0, layer:0, capstone:false,
     camRot:0, camHeight:0, camR:BASE_BLOCKS_PER_WALL + 5,
     fallen:0, score:0, streak:0, integrity:1, allBlocks:[],
-    layerBlocks:[], active:null, falling:[],
+    layerBlocks:[], layerBoxes:[], active:null, falling:[],
     fx:[], squash:[], shakeAmt:0, shadow:null,
     coins:0, timeScale:1, heartT:0, bestPerfect:0, coinsDoubled:false,
     pathSlots:[],          // ordered per-cell {pos, placed} for the runner
@@ -525,6 +526,24 @@ function drop(){
   a.mesh.position.copy(a.center);
   a.mesh.position[a.axis] = cur;
 
+  // OVERLAP RULE: if this stone is dropped over/into another stone on the same layer, it crumbles off
+  if (!a.capstone){
+    const box = pieceBox(a, cur);
+    if (boxesOverlap(box)){
+      a.mesh.position[a.axis] = cur;
+      S.falling.push({ mesh:a.mesh, vel:new THREE.Vector3((Math.random()-0.5)*4, 1.2, (Math.random()-0.5)*4), rot:rand3(6) });
+      Sound.drop(); shake(0.35);
+      S.integrity = Math.max(0, S.integrity - 0.06);
+      S.streak = 0; showCombo(0); showPop('CRUMBLED!');
+      pushCells(a, false, false, off);            // its cells become a gap in the run path
+      updateHUD();
+      if (S.integrity <= 0){ collapseAll(); endGame(false, 'collapsed'); return; }
+      advance(a.len);
+      return;
+    }
+    S.layerBoxes.push(box);
+  }
+
   if (dmg > 0.02) Sound.drop();
 
   S.allBlocks.push(a.mesh);
@@ -533,6 +552,19 @@ function drop(){
 
   if (S.integrity <= 0){ collapseAll(); endGame(false, 'collapsed'); return; }
   blockPlaced(a.mesh, offN, a.capstone, a.len);
+}
+
+// footprint (AABB in x/z) of a placed piece, and whether it overlaps any stone already on this layer
+function pieceBox(a, cur){
+  const halfA = (a.len*BLOCK_SIZE*0.96)/2, halfP = (BLOCK_SIZE*0.96)/2;
+  const c = { x:a.center.x, z:a.center.z }; c[a.axis] = cur;
+  const hx = a.axis==='x' ? halfA : halfP, hz = a.axis==='z' ? halfA : halfP;
+  return { x0:c.x-hx, x1:c.x+hx, z0:c.z-hz, z1:c.z+hz };
+}
+function boxesOverlap(b){
+  const tol = 0.12;                                 // allow the mortar gap + a hair; bigger = crumble
+  return S.layerBoxes.some(o =>
+    b.x0 < o.x1-tol && b.x1 > o.x0+tol && b.z0 < o.z1-tol && b.z1 > o.z0+tol);
 }
 
 function collapseAll(){
@@ -583,7 +615,7 @@ function advance(len){
   if (S.cellIndex >= n){
     S.cellIndex = 0; S.wall++; S.camRot += Math.PI/2;
     if (S.wall > 3){
-      S.wall = 0; S.layer++; S.camHeight += LAYER_HEIGHT; S.layerBlocks = [];
+      S.wall = 0; S.layer++; S.camHeight += LAYER_HEIGHT; S.layerBlocks = []; S.layerBoxes = [];
       if (nForLayer(S.layer) <= 0){ S.capstone = true; }   // time for the capstone
     }
   }
