@@ -1277,6 +1277,7 @@ function showStart(){            // the main "home" menu (cover art + PLAY / LEA
   $('coinHud').classList.add('hidden'); $('combo').classList.remove('show'); $('vignette').style.opacity='0';
   $('menuBtn').style.display = 'none'; $('reviveScreen').classList.add('hidden');
   $('hud').style.display = 'none';                  // clear leftover run HUD behind the menu
+  $('meterWrap').style.opacity = '0';              // hide the structural-integrity bar on the menus
   renderHome();
 }
 function renderHome(){
@@ -1495,6 +1496,7 @@ function animate(){
 // initial idle camera
 camera.position.set(0,7,11); camera.lookAt(0,2,0);
 $('hud').style.display = 'none';          // hidden until a game starts, so the menu stays clean
+$('meterWrap').style.opacity = '0';
 renderHome();          // populate best scores & coin bank on the home screen
 animate();
 requestAnimationFrame(()=>{ const l=$('loader'); if (l){ l.classList.add('hidden'); setTimeout(()=>l.style.display='none', 600); } });   // reveal once ready
