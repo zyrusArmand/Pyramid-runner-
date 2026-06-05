@@ -455,7 +455,7 @@ rim.position.set(-9,7,-11); scene.add(rim);
 // glowing sun disc high in the sky — reads as a light source and blooms beautifully
 const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(3.6, 24, 16),
   new THREE.MeshBasicMaterial({ color:0xffe9b6 }));
-sunDisc.position.set(10, 40, -42); scene.add(sunDisc);
+sunDisc.position.set(10, 40, -42); sunDisc.__env = true; scene.add(sunDisc);
 
 // ---------- true bloom (post-processing) — best-effort, falls back to plain render ----------
 let composer = null;
@@ -468,10 +468,37 @@ try {
   }
 } catch(e){ composer = null; }
 
-const ground = new THREE.Mesh(new THREE.CircleGeometry(50,48),
-  new THREE.MeshStandardMaterial({ color:0x6b4a32, roughness:1 }));
+// ---------- procedural textures (stone surface relief + sand grain) ----------
+function noiseTex(size, grain, blotch){
+  try {
+    const c = document.createElement('canvas'); c.width = c.height = size;
+    const x = c.getContext && c.getContext('2d'); if (!x) return null;
+    x.fillStyle = '#888'; x.fillRect(0,0,size,size);
+    for (let i=0;i<blotch;i++){ const r=size*0.08+Math.random()*size*0.18, gx=Math.random()*size, gy=Math.random()*size;
+      const v=90+(Math.random()*90|0), g=x.createRadialGradient(gx,gy,0,gx,gy,r);
+      g.addColorStop(0,`rgba(${v},${v},${v},0.45)`); g.addColorStop(1,'rgba(0,0,0,0)'); x.fillStyle=g; x.fillRect(0,0,size,size); }
+    const img=x.getImageData(0,0,size,size), d=img.data;
+    for (let i=0;i<d.length;i+=4){ const n=(Math.random()-0.5)*grain; d[i]+=n; d[i+1]+=n; d[i+2]+=n; }
+    x.putImageData(img,0,0);
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+  } catch(e){ return null; }
+}
+const STONE_BUMP = noiseTex(128, 52, 16);
+const SAND_BUMP  = noiseTex(128, 30, 10); if (SAND_BUMP) SAND_BUMP.repeat.set(20,20);
+
+// ---------- richer desert ground + rolling horizon dunes ----------
+const ground = new THREE.Mesh(new THREE.CircleGeometry(64,56),
+  new THREE.MeshStandardMaterial({ color:0x7a5230, roughness:1, bumpMap:SAND_BUMP||undefined, bumpScale:0.06 }));
 ground.rotation.x = -Math.PI/2; ground.position.y = -0.5; ground.receiveShadow = true;
 scene.add(ground);
+const duneMat = new THREE.MeshStandardMaterial({ color:0x946642, roughness:1, bumpMap:SAND_BUMP||undefined, bumpScale:0.1 });
+for (let i=0;i<11;i++){
+  const a=(i/11)*Math.PI*2 + 0.4, dist=36+Math.random()*9;
+  const d=new THREE.Mesh(new THREE.SphereGeometry(8+Math.random()*7, 18, 12), duneMat);
+  d.position.set(Math.sin(a)*dist, -7-Math.random()*2, Math.cos(a)*dist);
+  d.scale.set(1.7+Math.random(), 0.45+Math.random()*0.3, 1.7+Math.random());
+  d.__env = true; scene.add(d);                          // __env = keep across game restarts
+}
 
 // ---------- helpers ----------
 const $ = id => document.getElementById(id);
@@ -514,7 +541,8 @@ function makePiece(len, axis, color, corner){
 // This makes the steps part of the block's volume (clearly visible, carved in), and because each
 // stone tapers, neighbouring stones stay visually distinct instead of merging into one slab.
 function makeSteppedPiece(len, axis, color, center, n){
-  const mat = new THREE.MeshStandardMaterial({ color, roughness:0.9, metalness:0.04 });
+  const mat = new THREE.MeshStandardMaterial({ color, roughness:0.92, metalness:0.04 });
+  if (STONE_BUMP){ mat.bumpMap = STONE_BUMP; mat.bumpScale = 0.022; }   // carved stone surface relief
   const h = LAYER_HEIGHT*0.94, GAP = 0.985;           // nearly flush — only a hairline crack between stones
   const xHalf = (axis==='x' ? len*BLOCK_SIZE*GAP : BLOCK_SIZE*GAP)/2;
   const zHalf = (axis==='z' ? len*BLOCK_SIZE*GAP : BLOCK_SIZE*GAP)/2;
@@ -1276,7 +1304,7 @@ function showPop(t){ const p=$('pop'); p.textContent=t; p.classList.remove('show
 
 function startGame(){
   resetState();
-  [...scene.children].forEach(o => { if (o.isMesh && o!==ground && o!==sky) scene.remove(o); if (o.isGroup) scene.remove(o); });
+  [...scene.children].forEach(o => { if (o.__env || o===ground || o===sky) return; if (o.isMesh) scene.remove(o); if (o.isGroup) scene.remove(o); });
   S.phase='build';
   if (dailyMode){ __seeded = true; __seed = dailySeed(); } else { __seeded = false; }
   atMenu = false;
