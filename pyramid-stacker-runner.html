@@ -109,21 +109,54 @@
 
   /* ---------- home screen (cover art + buttons) ---------- */
   #startScreen { padding:0; justify-content:flex-end; }
-  #homeArt { position:absolute; inset:0; z-index:-1; }
+  #homeArt { position:absolute; inset:0; z-index:-1; overflow:hidden; }
   #homeArt svg { width:100%; height:100%; display:block; }
-  .bolt { opacity:0; animation:strike 5s linear infinite; filter:drop-shadow(0 0 5px #bfe0ff); }
-  .bolt.b2 { animation-delay:2.4s; }
-  @keyframes strike { 0%,7%,12%,100%{opacity:0;} 8%,10%{opacity:.95;} 9%{opacity:.2;} }
+  #homeFlash { position:absolute; inset:0; background:radial-gradient(ellipse at 40% 25%, rgba(220,238,255,.9), rgba(180,210,255,.2) 45%, transparent 70%);
+    opacity:0; mix-blend-mode:screen; animation:strike 6s linear infinite; }
+  .bolt { opacity:0; animation:strike 6s linear infinite; filter:drop-shadow(0 0 5px #bfe0ff); }
+  .bolt.b2 { animation-delay:3s; }
+  @keyframes strike { 0%,6%,11%,100%{opacity:0;} 7%,9.5%{opacity:.95;} 8%{opacity:.25;} }
+  .tw { animation:twinkle 3.5s ease-in-out infinite; } .tw.t2{animation-delay:1.2s;} .tw.t3{animation-delay:2.3s;}
+  @keyframes twinkle { 0%,100%{opacity:.25;} 50%{opacity:.95;} }
+  .mote { animation:drift 9s ease-in-out infinite; opacity:.5; } .mote.m2{animation-delay:3s;} .mote.m3{animation-delay:6s;}
+  @keyframes drift { 0%{transform:translate(0,0);opacity:0;} 20%{opacity:.6;} 80%{opacity:.4;} 100%{transform:translate(-26px,-30px);opacity:0;} }
   #homeInner { position:relative; z-index:1; width:100%; display:flex; flex-direction:column; align-items:center;
-    padding:24px 24px max(40px,env(safe-area-inset-bottom)); gap:14px;
-    background:linear-gradient(to top, rgba(12,8,16,.92) 40%, rgba(12,8,16,0)); }
-  .homeTitle { font-size:clamp(34px,12vw,62px); }
-  .homeBest { margin-top:4px; }
+    padding:24px 24px max(40px,env(safe-area-inset-bottom)); gap:12px;
+    background:linear-gradient(to top, rgba(10,7,14,.94) 42%, rgba(10,7,14,0));
+    animation:rise .65s cubic-bezier(.2,.85,.25,1) both; }
+  @keyframes rise { from{opacity:0; transform:translateY(26px);} to{opacity:1; transform:none;} }
+  .homeTitle { font-size:clamp(36px,13vw,64px); line-height:1.02;
+    background:linear-gradient(180deg,#ffeec2,#f1c764 58%,#bd8a3a);
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent;
+    filter:drop-shadow(0 2px 12px rgba(243,200,120,.45)) drop-shadow(0 1px 1px rgba(0,0,0,.6)); }
+  .tagline { font-family:'Space Mono',monospace; font-size:11px; letter-spacing:5px; color:#e8c98a; opacity:.85; margin-top:-4px; }
+  .chips { display:flex; gap:10px; margin-top:4px; }
+  .chip { display:flex; flex-direction:column; align-items:center; gap:2px; padding:8px 16px; border-radius:14px;
+    background:rgba(255,255,255,.055); border:1px solid rgba(243,200,120,.18); min-width:62px; }
+  .chipLbl { font-size:9px; letter-spacing:2px; opacity:.6; }
+  .chipVal { font-family:'Cinzel',serif; font-weight:700; font-size:18px; color:#f3d99a; line-height:1; }
   .homeRow { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
-  .midBtn { pointer-events:auto; font-size:13px; letter-spacing:2px; padding:13px 20px; border-radius:30px;
-    border:1.5px solid rgba(243,200,120,.5); color:#f3d99a; cursor:pointer; transition:transform .12s; }
-  .midBtn:active { transform:scale(.95); }
-  #homePlay { pointer-events:auto; cursor:pointer; margin-top:6px; }
+  .midBtn { pointer-events:auto; display:flex; align-items:center; gap:7px; font-size:12px; letter-spacing:2px;
+    padding:12px 18px; border-radius:30px; border:1.5px solid rgba(243,200,120,.45); color:#f3d99a; cursor:pointer; transition:transform .12s; }
+  .midBtn:active { transform:scale(.94); }
+  .bicon { width:15px; height:15px; }
+  #homePlay { pointer-events:auto; cursor:pointer; margin-top:4px; }
+  .cta.hero { border:none; color:#3a2410; font-weight:700; padding:16px 64px; font-size:19px; letter-spacing:5px;
+    background:linear-gradient(180deg,#ffe79a,#e2a93f); border-radius:40px; animation:heroGlow 2.2s ease-in-out infinite; }
+  @keyframes heroGlow { 0%,100%{box-shadow:0 6px 20px rgba(224,168,63,.4), inset 0 1px 0 rgba(255,255,255,.55);}
+    50%{box-shadow:0 8px 34px rgba(255,212,120,.7), inset 0 1px 0 rgba(255,255,255,.65);} }
+  .cta.hero:active { transform:scale(.96); }
+
+  /* ---------- in-game color grade + loading screen ---------- */
+  #grade { position:fixed; inset:0; z-index:3; pointer-events:none;
+    box-shadow:inset 0 0 160px 40px rgba(8,4,14,.55); background:radial-gradient(ellipse at 50% 42%, rgba(255,160,80,.05), transparent 60%); }
+  #loader { position:fixed; inset:0; z-index:50; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:18px; background:radial-gradient(ellipse at 50% 40%, #2a1b3a, #0c0810); transition:opacity .5s; }
+  #loader.hidden { opacity:0; pointer-events:none; }
+  .loadPyr { width:0; height:0; border-left:26px solid transparent; border-right:26px solid transparent;
+    border-bottom:40px solid #e2b35a; animation:loadpulse 1.1s ease-in-out infinite; filter:drop-shadow(0 0 12px rgba(226,179,90,.5)); }
+  @keyframes loadpulse { 0%,100%{transform:scale(.85);opacity:.6;} 50%{transform:scale(1.05);opacity:1;} }
+  .loadTxt { font-family:'Space Mono',monospace; font-size:12px; letter-spacing:5px; color:#e8c98a; opacity:.8; }
 
   /* ---------- leaderboard / shop panels ---------- */
   .panel { justify-content:flex-start; padding-top:max(46px,calc(env(safe-area-inset-top) + 30px)); gap:16px; }
@@ -190,6 +223,8 @@
 </head>
 <body>
 <div id="app"></div>
+<div id="grade"></div>
+<div id="loader"><div class="loadPyr"></div><div class="loadTxt">LOADING</div></div>
 
 <div id="hud">
   <div><div class="stat" id="lblA">SCORE</div><div class="val" id="score">0</div></div>
@@ -212,38 +247,56 @@
 
 <div class="overlay" id="startScreen">
   <div id="homeArt">
-    <svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
+    <svg viewBox="0 0 400 320" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
       <defs>
         <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#140d26"/><stop offset="0.55" stop-color="#3b2348"/><stop offset="1" stop-color="#9c5a3a"/>
+          <stop offset="0" stop-color="#0d0a1e"/><stop offset="0.42" stop-color="#2b1a40"/>
+          <stop offset="0.72" stop-color="#7a3f52"/><stop offset="1" stop-color="#c97a48"/>
         </linearGradient>
-        <radialGradient id="moon" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0" stop-color="#ffe6b0"/><stop offset="1" stop-color="#ffe6b0" stop-opacity="0"/>
+        <radialGradient id="moonGlow" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stop-color="#ffe9c0" stop-opacity="0.9"/><stop offset="0.4" stop-color="#ffcf9a" stop-opacity="0.3"/><stop offset="1" stop-color="#ffcf9a" stop-opacity="0"/>
         </radialGradient>
+        <radialGradient id="haze" cx="0.5" cy="1" r="0.85">
+          <stop offset="0" stop-color="#ffb45e" stop-opacity="0.6"/><stop offset="1" stop-color="#ffb45e" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="pyrL" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#ecc888"/><stop offset="1" stop-color="#b78c50"/></linearGradient>
+        <linearGradient id="pyrD" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#8a6736"/><stop offset="1" stop-color="#5c4324"/></linearGradient>
       </defs>
-      <rect width="400" height="300" fill="url(#sky)"/>
-      <circle cx="305" cy="74" r="62" fill="url(#moon)"/><circle cx="305" cy="74" r="20" fill="#ffeec4"/>
-      <g fill="#fff" opacity="0.85"><circle cx="40" cy="40" r="1.2"/><circle cx="92" cy="66" r="1"/><circle cx="150" cy="28" r="1.3"/><circle cx="225" cy="48" r="1"/><circle cx="355" cy="36" r="1.2"/><circle cx="120" cy="52" r="0.9"/><circle cx="262" cy="24" r="1.1"/></g>
-      <polyline class="bolt" points="176,0 168,58 186,64 162,150" fill="none" stroke="#dcefff" stroke-width="2.6"/>
-      <polyline class="bolt b2" points="332,0 342,46 327,52 344,118" fill="none" stroke="#eaf3ff" stroke-width="2"/>
-      <polygon points="14,232 92,116 170,232" fill="#caa066"/><polygon points="92,116 170,232 128,232" fill="#a07a48"/>
-      <polygon points="150,236 212,146 274,236" fill="#bd9357"/><polygon points="212,146 274,236 240,236" fill="#9a763f"/>
-      <g fill="#9c7a45"><rect x="244" y="212" width="150" height="28"/><rect x="259" y="188" width="120" height="25"/><rect x="274" y="166" width="90" height="23"/><rect x="289" y="146" width="60" height="21"/><rect x="304" y="129" width="30" height="19"/></g>
-      <rect x="315" y="129" width="20" height="111" fill="#83632f"/>
-      <rect x="0" y="240" width="400" height="60" fill="#7a4a2c"/>
+      <rect width="400" height="320" fill="url(#sky)"/>
+      <g fill="#fff"><circle class="tw" cx="40" cy="38" r="1.3"/><circle class="tw t2" cx="104" cy="64" r="1"/><circle class="tw t3" cx="158" cy="28" r="1.4"/><circle class="tw" cx="232" cy="44" r="1"/><circle class="tw t2" cx="120" cy="50" r="0.9"/><circle class="tw t3" cx="270" cy="22" r="1.1"/><circle class="tw" cx="66" cy="92" r="0.9"/></g>
+      <circle cx="250" cy="90" r="82" fill="url(#moonGlow)"/>
+      <circle cx="250" cy="90" r="30" fill="#ffe7c4"/><circle cx="258" cy="82" r="6" fill="#f1d09c" opacity="0.6"/><circle cx="242" cy="98" r="4" fill="#f1d09c" opacity="0.5"/>
+      <rect x="0" y="150" width="400" height="170" fill="url(#haze)"/>
+      <polyline class="bolt" points="150,0 142,54 160,60 138,150" fill="none" stroke="#dcefff" stroke-width="2.4"/>
+      <polyline class="bolt b2" points="322,0 332,46 316,52 333,118" fill="none" stroke="#eaf3ff" stroke-width="1.8"/>
+      <polygon points="8,252 86,118 86,252" fill="url(#pyrL)"/><polygon points="86,118 164,252 86,252" fill="url(#pyrD)"/>
+      <polygon points="150,256 214,150 214,256" fill="url(#pyrL)"/><polygon points="214,150 278,256 214,256" fill="url(#pyrD)"/>
+      <g>
+        <rect x="250" y="232" width="150" height="26" fill="url(#pyrL)"/><rect x="325" y="232" width="75" height="26" fill="url(#pyrD)"/>
+        <rect x="265" y="209" width="120" height="24" fill="url(#pyrL)"/><rect x="325" y="209" width="60" height="24" fill="url(#pyrD)"/>
+        <rect x="280" y="187" width="90" height="23" fill="url(#pyrL)"/><rect x="325" y="187" width="45" height="23" fill="url(#pyrD)"/>
+        <rect x="295" y="167" width="60" height="21" fill="url(#pyrL)"/><rect x="325" y="167" width="30" height="21" fill="url(#pyrD)"/>
+        <rect x="310" y="149" width="30" height="19" fill="url(#pyrL)"/><rect x="325" y="149" width="15" height="19" fill="url(#pyrD)"/>
+      </g>
+      <rect x="0" y="256" width="400" height="64" fill="#6d4326"/><rect x="0" y="256" width="400" height="64" fill="url(#haze)" opacity="0.35"/>
+      <g fill="#ffdca0"><circle class="mote" cx="120" cy="220" r="1.5"/><circle class="mote m2" cx="300" cy="238" r="1.2"/><circle class="mote m3" cx="196" cy="208" r="1"/></g>
     </svg>
+    <div id="homeFlash"></div>
   </div>
   <div id="homeInner">
     <div class="title homeTitle">PYRAMID<br>STACKER</div>
-    <div class="bestRow homeBest">
-      <div>BEST<b id="bestScore">0</b></div>
-      <div>CLIMB<b id="bestHeight">0m</b></div>
-      <div>COINS<b id="bankCoins">0</b></div>
+    <div class="tagline">BUILD&nbsp;IT&nbsp;·&nbsp;CLIMB&nbsp;IT</div>
+    <div class="chips">
+      <div class="chip"><span class="chipLbl">BEST</span><span class="chipVal" id="bestScore">0</span></div>
+      <div class="chip"><span class="chipLbl">CLIMB</span><span class="chipVal" id="bestHeight">0m</span></div>
+      <div class="chip"><span class="chipLbl">COINS</span><span class="chipVal" id="bankCoins">0</span></div>
     </div>
-    <div class="cta" id="homePlay">PLAY</div>
+    <div class="cta hero" id="homePlay">PLAY</div>
     <div class="homeRow">
-      <div class="midBtn" id="homeLeader">🏆 LEADERBOARD</div>
-      <div class="midBtn" id="homeShop">🛒 SHOP</div>
+      <div class="midBtn" id="homeLeader"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4a5 5 0 0 1-10 0V4z"/><path d="M7 6H4v1.5A3.5 3.5 0 0 0 7.5 11"/><path d="M17 6h3v1.5A3.5 3.5 0 0 1 16.5 11"/><path d="M9.5 18h5"/><path d="M12 14.5V18"/></svg>LEADERBOARD</div>
+      <div class="midBtn" id="homeShop"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12l-1 11H7L6 8z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg>SHOP</div>
     </div>
   </div>
 </div>
@@ -872,7 +925,7 @@ function startRun(){
     const overGap = t.gap || t.weak;
     if (overGap ? (RND() < 0.7) : (RND() < 0.42)){
       const c = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.03, 16),
-        new THREE.MeshStandardMaterial({ color:0xffd24a, emissive:0x6a4a00, metalness:0.7, roughness:0.3 }));
+        new THREE.MeshStandardMaterial({ color:0xffd24a, emissive:0xa87a14, emissiveIntensity:1.5, metalness:0.7, roughness:0.3 }));
       c.rotation.x = Math.PI/2;
       c.position.set(t.pos.x, t.pos.y + (overGap ? 0.5 : 0.22), t.pos.z);
       c.castShadow = true; scene.add(c);
@@ -1444,6 +1497,7 @@ camera.position.set(0,7,11); camera.lookAt(0,2,0);
 $('hud').style.display = 'none';          // hidden until a game starts, so the menu stays clean
 renderHome();          // populate best scores & coin bank on the home screen
 animate();
+requestAnimationFrame(()=>{ const l=$('loader'); if (l){ l.classList.add('hidden'); setTimeout(()=>l.style.display='none', 600); } });   // reveal once ready
 
 addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
 </script>
