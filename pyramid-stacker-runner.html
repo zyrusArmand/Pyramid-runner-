@@ -349,6 +349,13 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- post-processing (true bloom). Loaded best-effort; the game falls back to plain render if blocked. -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
 <script>
 // ============================================================
 //  PYRAMID STACKER + RUNNER
@@ -435,13 +442,31 @@ const sky = new THREE.Mesh(skyGeo, skyMat); scene.add(sky);
 
 const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 120);
 
-scene.add(new THREE.HemisphereLight(0xffd9a8, 0x33203a, 0.7));
-const sun = new THREE.DirectionalLight(0xfff0d0, 1.15);
-sun.position.set(7,16,9); sun.castShadow = true;
-sun.shadow.mapSize.set(1024,1024);
+scene.add(new THREE.HemisphereLight(0xffd9a8, 0x33203a, 0.5));
+const sun = new THREE.DirectionalLight(0xfff0d0, 1.7);            // stronger warm key → punchier contrast
+sun.position.set(9,18,7); sun.castShadow = true;
+sun.shadow.mapSize.set(2048,2048);                               // crisper shadows
 sun.shadow.camera.near=1; sun.shadow.camera.far=60;
 sun.shadow.camera.left=-16; sun.shadow.camera.right=16; sun.shadow.camera.top=16; sun.shadow.camera.bottom=-16;
+sun.shadow.bias = -0.0004;
 scene.add(sun);
+const rim = new THREE.DirectionalLight(0x9a7cff, 0.4);           // cool rim light for depth
+rim.position.set(-9,7,-11); scene.add(rim);
+// glowing sun disc high in the sky — reads as a light source and blooms beautifully
+const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(3.6, 24, 16),
+  new THREE.MeshBasicMaterial({ color:0xffe9b6 }));
+sunDisc.position.set(10, 40, -42); scene.add(sunDisc);
+
+// ---------- true bloom (post-processing) — best-effort, falls back to plain render ----------
+let composer = null;
+try {
+  if (THREE.EffectComposer && THREE.UnrealBloomPass && THREE.RenderPass){
+    composer = new THREE.EffectComposer(renderer);
+    composer.addPass(new THREE.RenderPass(scene, camera));
+    composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.62, 0.5, 0.82));
+    composer.setSize(innerWidth, innerHeight);
+  }
+} catch(e){ composer = null; }
 
 const ground = new THREE.Mesh(new THREE.CircleGeometry(50,48),
   new THREE.MeshStandardMaterial({ color:0x6b4a32, roughness:1 }));
@@ -638,7 +663,7 @@ function spawnBlock(){
   const color = capstone ? 0xf4cf6a : layerColor(S.layer);
 
   let mesh;
-  if (capstone){ mesh = makeBlock(color); mesh.scale.set(0.8,0.8,0.8); mesh.material.emissive = new THREE.Color(0x5a3d00); }
+  if (capstone){ mesh = makeBlock(color); mesh.scale.set(0.8,0.8,0.8); mesh.material.emissive = new THREE.Color(0x8a5e00); mesh.material.emissiveIntensity = 1.6; }
   else mesh = makeSteppedPiece(len, axis, color, center, nForLayer(S.layer));   // real stepped-pyramid stone
 
   mesh.position.copy(center);
@@ -919,17 +944,20 @@ function startRun(){
   }
   // coins: a glinting trail of pickups. Most sit on safe tiles; a few hover over gaps,
   // rewarding a well-timed jump (collect-while-airborne pays a bonus).
+  let lastCoin = -3;
   for (let i = 3; i < tiles.length - 1; i++){
     const t = tiles[i];
     if (t.ob) continue;
     const overGap = t.gap || t.weak;
-    if (overGap ? (RND() < 0.7) : (RND() < 0.42)){
-      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.03, 16),
-        new THREE.MeshStandardMaterial({ color:0xffd24a, emissive:0xa87a14, emissiveIntensity:1.5, metalness:0.7, roughness:0.3 }));
+    if (i - lastCoin < 3) continue;                              // space coins out on the dense steps
+    if (overGap ? (RND() < 0.6) : (RND() < 0.22)){
+      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.018, 14),   // small coin for the tiny climber
+        new THREE.MeshStandardMaterial({ color:0xffd24a, emissive:0xc08a16, emissiveIntensity:1.8, metalness:0.7, roughness:0.3 }));
       c.rotation.x = Math.PI/2;
-      c.position.set(t.pos.x, t.pos.y + (overGap ? 0.5 : 0.22), t.pos.z);
+      c.position.set(t.pos.x, t.pos.y + (overGap ? 0.34 : 0.14), t.pos.z);
       c.castShadow = true; scene.add(c);
       t.coin = { mesh:c, got:false, air:overGap };
+      lastCoin = i;
     }
   }
   // little runner figure — small and nimble
@@ -1476,7 +1504,7 @@ function animate(){
   // gentle glow pulse on capstone + gap markers; coins spin & bob
   const pulse = 0.5 + 0.5*Math.sin(performance.now()*0.004);
   if (S.active && S.active.capstone && S.active.mesh.material.emissive)
-    S.active.mesh.material.emissive.setRGB(0.35*pulse, 0.24*pulse, 0.0);
+    S.active.mesh.material.emissive.setRGB(0.6*pulse+0.2, 0.42*pulse+0.12, 0.0);
   if (S.run) S.run.tiles.forEach(t => {
     if (t.marker) t.marker.material.opacity = 0.5 + 0.4*pulse;
     if (t.coin && !t.coin.got) t.coin.mesh.rotation.z += dt*3.4;
@@ -1491,7 +1519,7 @@ function animate(){
   if (S.phase==='run') updateRun(sdt);
   else updateBuildCam(dt);
 
-  renderer.render(scene, camera);
+  if (composer) composer.render(); else renderer.render(scene, camera);
 }
 // initial idle camera
 camera.position.set(0,7,11); camera.lookAt(0,2,0);
@@ -1501,7 +1529,7 @@ renderHome();          // populate best scores & coin bank on the home screen
 animate();
 requestAnimationFrame(()=>{ const l=$('loader'); if (l){ l.classList.add('hidden'); setTimeout(()=>l.style.display='none', 600); } });   // reveal once ready
 
-addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); if (composer) composer.setSize(innerWidth,innerHeight); });
 </script>
 </body>
 </html>
