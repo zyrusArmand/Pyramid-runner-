@@ -801,6 +801,11 @@ function spawnBlock(){
       // flying it over the top, we slide it straight in through that open face: it swings from
       // outside, through flush, to just into the courtyard. Time the drop to seat it flush.
       const perpAxis = (axis === 'x') ? 'z' : 'x';         // the in/out (depth) axis
+      // if a stone drifted into this slot ALONG the wall, nudge the keystone along the wall to the clear
+      // part, so it still seats flush on the wall face instead of being shoved off it into the courtyard.
+      const alongFix = clampPlacement({ axis, len, center }, center[axis], axis);
+      if (alongFix === null){ scene.remove(mesh); advance(len); return; }
+      center[axis] = alongFix;
       const target = center[perpAxis];                     // flush with the wall plane
       const outward = (target >= 0) ? 1 : -1;              // away from the pyramid's centre (origin)
       const ampOut = 0.8;                                  // how far out it starts; outside = open air
@@ -946,9 +951,11 @@ function swingBounds(axis, len, center, odir, range, spanAxis){
     if ((oLo+oHi)/2 < cc) lo = Math.max(lo, oHi+halfO+0.01);            // stone on the inner side
     else                  hi = Math.min(hi, oLo-halfO-0.01);            // stone on the outer side (e.g. far corner)
   });
+  // the SEAT stays at flush (cc) — only nudged in if a stone actually drifted into the seat — and the
+  // piece swings OUT from there by `range`. (the far wall on the opposite side must NOT pull the seat in.)
   let sLo, sHi;
-  if (odir > 0){ const base = (lo>-Infinity)?lo:cc; sLo = base; sHi = Math.min(base+range, hi); }
-  else         { const base = (hi< Infinity)?hi:cc; sHi = base; sLo = Math.max(base-range, lo); }
+  if (odir > 0){ sLo = Math.max(cc, lo); sHi = Math.min(cc+range, hi); }
+  else         { sHi = Math.min(cc, hi); sLo = Math.max(cc-range, lo); }
   const fit = !(sLo > sHi);
   if (!fit){ sLo = sHi = cc; }                                          // fully blocked — caller leaves a gap
   return { sLo, sHi, fit };
