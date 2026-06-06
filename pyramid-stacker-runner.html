@@ -600,6 +600,31 @@ function makeSteppedPiece(len, axis, color, center, n){
   return g;
 }
 
+// The pyramid's crown: a small stepped pyramid that terraces up on ALL FOUR sides to a peak,
+// matching the stepped stone of every other course (instead of a plain gold cube).
+function makeCapstonePeak(color){
+  const mat = new THREE.MeshStandardMaterial({ color, roughness:0.92, metalness:0.04, emissive:new THREE.Color(0x3a2800) });
+  if (STONE_BUMP){ mat.bumpMap = STONE_BUMP; mat.bumpScale = 0.04; }
+  const g = new THREE.Group();
+  const steps = STEP_N;                                      // 10 steps, same count as every other stone
+  const baseW = BLOCK_SIZE*0.9, topW = baseW*0.12;
+  const totalH = LAYER_HEIGHT*1.8, stepH = totalH/steps;
+  const baseY = -LAYER_HEIGHT*0.47;                          // base lines up with a normal block's bottom here
+  for (let i=0; i<steps; i++){
+    const f = i/(steps-1), w = baseW + (topW-baseW)*f;       // each course recedes on all four sides
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(w, stepH+0.004, w), mat);
+    plate.position.y = baseY + stepH*(i+0.5);
+    plate.receiveShadow = true; plate.castShadow = (i < 2);
+    g.add(plate);
+  }
+  const peak = new THREE.Mesh(new THREE.ConeGeometry(topW*0.85, stepH*1.8, 4), mat);   // pointed crown
+  peak.position.y = baseY + totalH + stepH*0.5; peak.rotation.y = Math.PI/4; peak.castShadow = true;
+  g.add(peak);
+  g.material = mat;                                          // for the active-piece glow pulse
+  scene.add(g);
+  return g;
+}
+
 // Terrace EVERY exposed outer face of a block into 5 boldly receding steps (real pyramid-stair
 // look). Corner stones sit at the ring's edge on two sides, so they get an L of steps that meet
 // at the corner — exactly how a real stepped pyramid corner looks.
@@ -702,25 +727,30 @@ function resetState(){
 }
 
 // ---------- BUILD PHASE ----------
-// a clean glowing rectangle (4 bars, no busy diagonals) marking the slot the keystone slides into
+// Two clean glowing rectangles marking exactly where the keystone should seat: an upright frame
+// at the flush 'stop' plane (nudged in toward the courtyard) + a footprint outline on the floor.
 function addKeystoneGuide(a){
   removeKeystoneGuide();
   const grp = new THREE.Group();
   const mat = new THREE.MeshBasicMaterial({ color:0xffd86a, transparent:true, opacity:0.85 });
-  const h = LAYER_HEIGHT*0.98, w = a.len*BLOCK_SIZE*0.98, t = 0.04;   // frame height, width, bar thickness
-  const along = a.axis;                                  // the wall axis the slot spans
+  const h = LAYER_HEIGHT*0.98, w = a.len*BLOCK_SIZE*0.98, dp = BLOCK_SIZE*0.98, t = 0.04;
+  const along = a.axis, depth = a.perpAxis;              // wall axis the slot spans, and the in/out axis
   const bar = (longAxis, length, pos) => {
     const d = { x:t, y:t, z:t }; d[longAxis] = length;
     const m = new THREE.Mesh(new THREE.BoxGeometry(d.x,d.y,d.z), mat);
     m.position.set(pos.x||0, pos.y||0, pos.z||0); grp.add(m);
   };
-  bar(along, w, { y:  h/2 });                            // top edge
-  bar(along, w, { y: -h/2 });                            // bottom edge
-  const r = { y:0 }, l = { y:0 }; r[along] = w/2; l[along] = -w/2;
-  bar('y', h, r); bar('y', h, l);                        // right / left edges
-  grp.position.copy(a.center);
-  grp.position[a.perpAxis] = a.target;                   // sit on the wall plane
-  grp.material = mat;                                    // shared material → loop tint/opacity still works
+  const P = (alongOff, y, depthOff) => { const o={x:0,y:y,z:0}; o[along]=alongOff; o[depth]=(o[depth]||0)+depthOff; return o; };
+  const back = -a.outward * BLOCK_SIZE*0.46;             // the exact flush stop, in toward the inside of the walls
+  // upright frame at the stop plane
+  bar(along, w, P(0,  h/2, back)); bar(along, w, P(0, -h/2, back));
+  bar('y', h, P( w/2, 0, back));   bar('y', h, P(-w/2, 0, back));
+  // footprint outline flat on the slot floor — shows exactly where the base rests for a perfect
+  const fy = -h/2;
+  bar(along, w, P(0, fy,  dp/2));  bar(along, w, P(0, fy, -dp/2));
+  bar(depth, dp, P( w/2, fy, 0));  bar(depth, dp, P(-w/2, fy, 0));
+  grp.position.copy(a.center);                          // a.center[depth] is already the flush plane
+  grp.material = mat;                                   // shared material → loop tint/opacity still works
   scene.add(grp); S.keyGuide = grp;
 }
 function removeKeystoneGuide(){ if (S.keyGuide){ scene.remove(S.keyGuide); S.keyGuide = null; } }
@@ -747,10 +777,10 @@ function spawnBlock(){
   }
 
   const speed = 1.8 + S.layer*0.18 + RND()*0.15;
-  const color = capstone ? 0xf4cf6a : layerColor(S.layer);
+  const color = layerColor(S.layer);                  // capstone matches the rest of the pyramid's stone
 
   let mesh;
-  if (capstone){ mesh = makeBlock(color); mesh.scale.set(0.8,0.8,0.8); mesh.material.emissive = new THREE.Color(0x5a3d00); }
+  if (capstone){ mesh = makeCapstonePeak(color); }    // stepped crown that comes to a peak
   else mesh = makeSteppedPiece(len, axis, color, center, nForLayer(S.layer));   // real stepped-pyramid stone
 
   mesh.position.copy(center);
