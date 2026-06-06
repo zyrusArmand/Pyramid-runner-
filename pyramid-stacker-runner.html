@@ -818,8 +818,8 @@ function spawnBlock(){
         // closing wall: enclosed between existing blocks — swing only within the open gap, no overshoot
         range = Math.max(0.9, openBeyond * BLOCK_SIZE);
       } else {
-        // reach right out to the far open end so the stone ENTERS from the opposite side of its seat
-        range = Math.max(1.6, openBeyond*BLOCK_SIZE + 1.6);
+        // reach well out to the side so the stone clearly ENTERS from the opposite side of its seat
+        range = Math.min(3.0, Math.max(1.8, openBeyond*BLOCK_SIZE + 1.6));
       }
       // oscillate ONLY within the gap that's actually clear of placed stones at both ends, so the
       // piece can never swing THROUGH a neighbour (this also respects the far corner on the closing wall).
@@ -827,7 +827,7 @@ function spawnBlock(){
       if (!sb.fit){ scene.remove(mesh); advance(len); return; }         // slot blocked — leave a gap, move on
       const seat = (odir>0) ? sb.sLo : sb.sHi;             // perfect (flush) end
       const far  = (odir>0) ? sb.sHi : sb.sLo;             // far/opposite end — where the stone enters from
-      const oSpeed = speed * Math.min(1, 2.2/Math.max(0.6, Math.abs(far-seat)));   // slow the longer sweeps to keep timing fair
+      const oSpeed = speed * 1.5;                          // brisk steady sweep — faster, with a tighter/harder perfect window
       mesh.position[axis] = far;                           // SPAWN at the far/opposite end, then sweep to the seat
       S.active = { mesh, center, axis, speed:oSpeed, phase:Math.PI, mode:'open', odir, seat, far,
                    capstone:false, len, cells, corner, n };
