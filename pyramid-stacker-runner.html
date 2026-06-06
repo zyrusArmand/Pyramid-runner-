@@ -804,11 +804,15 @@ function spawnBlock(){
       const target = center[perpAxis];                     // flush with the wall plane
       const outward = (target >= 0) ? 1 : -1;              // away from the pyramid's centre (origin)
       const ampOut = 0.8;                                  // how far out it starts; outside = open air
-      // it sweeps from outside straight IN to flush with a sharp turn (no dwelling), and never travels
-      // past flush into the courtyard — so it can never touch or merge the neighbouring stones.
+      // sweep only within the depth range that's clear of placed stones at BOTH ends, sharp turn at the
+      // seat (no dwelling). its arc never crosses a placed stone; if the slot is blocked, leave a gap.
+      const kb = swingBounds(perpAxis, len, center, outward, ampOut, axis);   // span axis = the wall axis
+      if (!kb.fit){ scene.remove(mesh); advance(len); return; }
+      const seat = (outward>0) ? kb.sLo : kb.sHi;          // flush-ish end (toward the wall)
+      const far  = (outward>0) ? kb.sHi : kb.sLo;          // outward end (open air)
       mesh.position.copy(center);                          // at slot LEVEL — never lifted above the wall
-      mesh.position[perpAxis] = target + outward*ampOut;
-      S.active = { mesh, center, axis, mode:'keystone', perpAxis, target, outward, ampOut,
+      mesh.position[perpAxis] = far;
+      S.active = { mesh, center, axis, mode:'keystone', perpAxis, target, outward, seat, far,
                    speed: 2.6 + S.layer*0.2, phase:0,
                    capstone:false, len, cells, corner, n };
       addKeystoneGuide(S.active);                          // glowing target frame on the slot
@@ -820,8 +824,13 @@ function spawnBlock(){
       } else {
         range = Math.min(3.2, Math.max(1.6, openBeyond*BLOCK_SIZE + 1.4));  // open air past the end
       }
-      mesh.position[axis] = center[axis] + odir*range;
-      S.active = { mesh, center, axis, speed, phase:Math.PI/2, mode:'open', odir, range,
+      // oscillate ONLY within the gap that's actually clear of placed stones at both ends, so the
+      // piece can never swing THROUGH a neighbour (this also respects the far corner on the closing wall).
+      const sb = swingBounds(axis, len, center, odir, range, axis);   // open piece swings along its span axis
+      if (!sb.fit){ scene.remove(mesh); advance(len); return; }         // slot blocked — leave a gap, move on
+      const sLo = sb.sLo, sHi = sb.sHi;
+      mesh.position[axis] = (odir>0) ? sHi : sLo;          // start at the outer end of the arc
+      S.active = { mesh, center, axis, speed, phase:Math.PI/2, mode:'open', odir, range, sLo, sHi,
                    capstone:false, len, cells, corner, n };
     }
   }
@@ -845,7 +854,15 @@ function drop(){
   const isKey = (a.mode==='keystone');
   const perfect = offN < TIER_PERFECT;
   let restAt = perfect ? a.center[offAxis] : cur;
-  if (!a.capstone) restAt = clampPlacement(a, restAt, offAxis);   // solid stones can never merge
+  if (!a.capstone){
+    restAt = clampPlacement(a, restAt, offAxis);                  // solid stones can never merge
+    if (restAt === null){                                        // no room here — a solid stone can't fit, so it crumbles
+      missStone(a, 'NO FIT');
+      if (S.integrity <= 0){ collapseAll(); endGame(false, 'collapsed'); return; }
+      advance(a.len);
+      return;
+    }
+  }
   a.mesh.position.copy(a.center);
   a.mesh.position[offAxis] = restAt;
   const restOff = restAt - a.center[offAxis];
@@ -911,8 +928,30 @@ function clampPlacement(a, cur, offAxis){
     if (cur <= (oLo+oHi)/2) hi = Math.min(hi, oLo - halfO - 0.01);        // keep the stone on its near side
     else                    lo = Math.max(lo, oHi + halfO + 0.01);
   });
-  if (lo > hi) return cur;                                                // boxed in (shouldn't happen) — leave it
+  if (lo > hi) return null;                                              // no room for a solid stone → caller crumbles it
   return Math.max(lo, Math.min(hi, cur));
+}
+// the centre range [sLo,sHi] a swinging piece may travel without its body crossing ANY placed stone
+// (both ends — so on the closing wall it respects the far corner too), limited to its swing `range`.
+function swingBounds(axis, len, center, odir, range, spanAxis){
+  const perpAx = (axis==='x') ? 'z' : 'x';
+  const halfO  = ((axis  ===spanAxis ? len : 1) * BLOCK_SIZE*0.985)/2;   // piece is `len` long on its span axis
+  const halfPe = ((perpAx===spanAxis ? len : 1) * BLOCK_SIZE*0.985)/2;
+  const cPe = center[perpAx], bPeLo = cPe-halfPe, bPeHi = cPe+halfPe, cc = center[axis];
+  let lo = -Infinity, hi = Infinity;
+  S.layerBoxes.forEach(o => {
+    const oPeLo = (perpAx==='x') ? o.x0 : o.z0, oPeHi = (perpAx==='x') ? o.x1 : o.z1;
+    if (bPeHi <= oPeLo+0.02 || bPeLo >= oPeHi-0.02) return;             // not in the same row across the axis
+    const oLo = (axis==='x') ? o.x0 : o.z0, oHi = (axis==='x') ? o.x1 : o.z1;
+    if ((oLo+oHi)/2 < cc) lo = Math.max(lo, oHi+halfO+0.01);            // stone on the inner side
+    else                  hi = Math.min(hi, oLo-halfO-0.01);            // stone on the outer side (e.g. far corner)
+  });
+  let sLo, sHi;
+  if (odir > 0){ const base = (lo>-Infinity)?lo:cc; sLo = base; sHi = Math.min(base+range, hi); }
+  else         { const base = (hi< Infinity)?hi:cc; sHi = base; sLo = Math.max(base-range, lo); }
+  const fit = !(sLo > sHi);
+  if (!fit){ sLo = sHi = cc; }                                          // fully blocked — caller leaves a gap
+  return { sLo, sHi, fit };
 }
 // is this stone resting on a stone in the layer below? (needs real overlap, not just a touching edge)
 function isSupported(b){
@@ -1679,9 +1718,9 @@ function animate(){
     if (a.mode==='keystone'){
       a.phase += a.speed*dt;
       const tri = 1 - Math.abs(((a.phase/Math.PI) % 2) - 1);   // 0 at flush → 1 fully out → 0, SHARP turn (no dwell)
-      a.mesh.position[a.perpAxis] = a.target + a.outward*a.ampOut*tri;
-      // light the target frame (and the stone) green the instant it lines up flush — your cue to drop
-      const near = Math.abs(a.mesh.position[a.perpAxis] - a.target) < 0.16;
+      a.mesh.position[a.perpAxis] = a.seat + (a.far - a.seat)*tri;
+      // light the target frame (and the stone) green the instant it reaches its seat — your cue to drop
+      const near = Math.abs(a.mesh.position[a.perpAxis] - a.seat) < 0.16;
       const glow = 0.5 + 0.4*Math.abs(Math.sin(performance.now()*0.006));
       if (S.keyGuide){
         if (near) S.keyGuide.material.color.setRGB(0.45,1.0,0.55); else S.keyGuide.material.color.setRGB(1.0,0.85,0.42);
@@ -1691,7 +1730,7 @@ function animate(){
     } else {
       a.phase += a.speed*dt;
       if (a.mode==='sym') a.mesh.position[a.axis] = a.center[a.axis] + Math.sin(a.phase)*a.amp;
-      else a.mesh.position[a.axis] = a.center[a.axis] + a.odir*(a.range/2)*(Math.sin(a.phase)+1);
+      else a.mesh.position[a.axis] = a.sLo + (a.sHi - a.sLo)*(Math.sin(a.phase)+1)/2;
     }
   }
   for (let i=S.falling.length-1;i>=0;i--){ const f=S.falling[i];
