@@ -373,9 +373,9 @@ const LAYER_HEIGHT          = 0.55;  // flatter courses → clean, climbable pyr
 const MISS_DISTANCE         = 0.85;
 const PERFECT_DISTANCE      = 0.14;
 // placement accuracy tiers (normalized offset): exact PERFECT / GREAT / GOOD pay 3 / 2 / 1 coins; looser = MISS
-const TIER_PERFECT          = 0.08;
-const TIER_GREAT            = 0.24;
-const TIER_GOOD             = 0.50;
+const TIER_PERFECT          = 0.045;   // dead-on only — a true perfect seats flush with no gap
+const TIER_GREAT            = 0.20;
+const TIER_GOOD             = 0.45;
 const MAX_PIECE_LEN         = 2;     // pieces span 1–2 cells (longer rectangles)
 const CORNER_CHANCE         = 0.6;   // chance the first piece of a wall is a cornerstone
 const FALL_THRESHOLD        = 0.55;  // above layer 1, a drop this far off its support topples off
@@ -716,7 +716,7 @@ function shake(amt){ S.shakeAmt = Math.max(S.shakeAmt||0, amt); }
 let S = {};
 function resetState(){
   S = { phase:'build', gameOver:false, won:false,
-    wall:0, cellIndex:0, layer:0, capstone:false,
+    wall:0, cellIndex:0, layer:0, capstone:false, wallDrift:0,
     camRot:0, camHeight:0, camR:BASE_BLOCKS_PER_WALL + 5,
     fallen:0, score:0, streak:0, integrity:1, allBlocks:[],
     layerBlocks:[], layerBoxes:[], prevLayerBoxes:[], active:null, falling:[], dropAnims:[],
@@ -803,24 +803,13 @@ function spawnBlock(){
       const perpAxis = (axis === 'x') ? 'z' : 'x';         // the in/out (depth) axis
       const target = center[perpAxis];                     // flush with the wall plane
       const outward = (target >= 0) ? 1 : -1;              // away from the pyramid's centre (origin)
-      const ampOut = 1.8;                                  // outside the wall is always open air
-      // measure how far it can dip inward before its leading face would touch an already-placed stone
-      // that sits in line with it — so on tight upper layers it stops just shy of contact (never merges)
-      const halfA = (len*BLOCK_SIZE*0.985)/2, halfP = (BLOCK_SIZE*0.985)/2;
-      const aLo = center[axis]-halfA, aHi = center[axis]+halfA, inSign = -outward;
-      let safeIn = 1.2;
-      S.layerBoxes.forEach(o => {
-        const oaLo = (axis==='x') ? o.x0 : o.z0, oaHi = (axis==='x') ? o.x1 : o.z1;
-        if (oaHi <= aLo+0.02 || oaLo >= aHi-0.02) return;          // not in line along the wall
-        const opLo = (perpAxis==='x') ? o.x0 : o.z0, opHi = (perpAxis==='x') ? o.x1 : o.z1;
-        const gap = (inSign > 0) ? (opLo - (target + halfP)) : ((target - halfP) - opHi);
-        if (gap < safeIn) safeIn = gap;
-      });
-      const ampIn = Math.max(0, Math.min(0.9, safeIn - 0.05));     // stop just before contact
+      const ampOut = 0.8;                                  // how far out it starts; outside = open air
+      // it sweeps from outside straight IN to flush with a sharp turn (no dwelling), and never travels
+      // past flush into the courtyard — so it can never touch or merge the neighbouring stones.
       mesh.position.copy(center);                          // at slot LEVEL — never lifted above the wall
       mesh.position[perpAxis] = target + outward*ampOut;
-      S.active = { mesh, center, axis, mode:'keystone', perpAxis, target, outward, ampOut, ampIn,
-                   speed: 1.7 + S.layer*0.16, phase:Math.PI/2,
+      S.active = { mesh, center, axis, mode:'keystone', perpAxis, target, outward, ampOut,
+                   speed: 2.6 + S.layer*0.2, phase:0,
                    capstone:false, len, cells, corner, n };
       addKeystoneGuide(S.active);                          // glowing target frame on the slot
     } else {
@@ -850,16 +839,18 @@ function drop(){
   S.active = null;
   const offN = Math.min(1, dist / 1.3);               // 0 = dead-on, 1 = way off
 
-  // place the stone. the keystone ALWAYS seats flush — its depth offset is only a timing cue for the
-  // grade, so a mis-timed slide must never leave it poking out of the wall. other stones stay put.
+  // place the stone where it was dropped (clamped so it can NEVER overlap a neighbour). only a TRUE
+  // perfect snaps exactly flush for a clean, gapless seat — anything less keeps its honest gap.
   const isKey = (a.mode==='keystone');
-  let restAt = isKey ? a.center[offAxis] : cur;         // flush for the keystone, as-dropped otherwise
-  if (!a.capstone) restAt = clampPlacement(a, restAt, offAxis);   // never let it overlap a neighbour
+  let restAt = cur;
+  if (!a.capstone) restAt = clampPlacement(a, restAt, offAxis);   // never overlap a neighbour
+  const perfect = offN < TIER_PERFECT;
+  if (perfect) restAt = a.center[offAxis];                        // dead-on → flush, zero gap
   a.mesh.position.copy(a.center);
   a.mesh.position[offAxis] = restAt;
-  const restOff = restAt - a.center[offAxis];           // actual offset after the no-overlap clamp
+  const restOff = restAt - a.center[offAxis];
 
-  // with the clamp above a stone can't be squished; it can still miss its BASE on layer 2+
+  // a stone can still miss its BASE on layer 2+
   if (!a.capstone){
     const box = pieceBox(a, restAt, offAxis);
     if (S.layer > 0 && !isSupported(box)){                       // nothing beneath it to hold it up
@@ -876,12 +867,20 @@ function drop(){
   S.integrity = Math.max(0, S.integrity - dmg);
   if (weak) Sound.drop();
 
+  // every imperfect stone drifts a little out over the open cells; we tally that drift and let it
+  // consume whole cells as it builds up, so the wall fills its real width instead of crowding /
+  // overflowing. when the cells run out, the next wall simply starts.
+  let extra = 0;
+  if (!isKey){
+    S.wallDrift = (S.wallDrift || 0) + Math.abs(restOff)/BLOCK_SIZE;
+    while (S.wallDrift >= 1){ extra++; S.wallDrift -= 1; }
+  }
   S.allBlocks.push(a.mesh);
   pushCells(a, true, weak, isKey ? 0 : restOff);       // run path follows where the stone actually landed
   updateHUD();
 
   if (S.integrity <= 0){ collapseAll(); endGame(false, 'collapsed'); return; }
-  blockPlaced(a.mesh, offN, a.capstone, a.len);
+  blockPlaced(a.mesh, offN, a.capstone, a.len, a.len + extra);
 }
 
 // footprint (AABB in x/z) of a placed piece
@@ -970,7 +969,7 @@ function pushCells(a, placed, weak, off=0){
   });
 }
 
-function blockPlaced(mesh, instability, capstone, len){
+function blockPlaced(mesh, instability, capstone, len, consumed){
   S.layerBlocks.push(mesh);
   S.squash.push({ mesh, t:0 });                 // satisfying landing squash (juice)
   // accuracy tiers — PERFECT (exact) / GREAT / GOOD pay 3 / 2 / 1 coins; anything looser is a MISS
@@ -1000,7 +999,7 @@ function blockPlaced(mesh, instability, capstone, len){
   updateHUD();
 
   if (capstone){ startRun(); return; }     // pyramid complete!
-  advance(len);
+  advance(consumed || len);                // overshooting stones consume the cells they slid into
 }
 
 function showCombo(n){
@@ -1014,7 +1013,7 @@ function advance(len){
   const n = nForLayer(S.layer);
   S.cellIndex += len;
   if (S.cellIndex >= n){
-    S.cellIndex = 0; S.wall++; S.camRot += Math.PI/2;
+    S.cellIndex = 0; S.wall++; S.camRot += Math.PI/2; S.wallDrift = 0;   // fresh drift budget per wall
     if (S.wall > 3){
       S.wall = 0; S.layer++; S.camHeight += LAYER_HEIGHT; S.layerBlocks = [];
       S.prevLayerBoxes = S.layerBoxes; S.layerBoxes = [];   // remember the finished layer for support checks
@@ -1083,17 +1082,19 @@ function startRun(){
     let fwd = B.clone().sub(A); fwd.y = 0; if (fwd.lengthSq()<1e-4) fwd.set(0,0,1); else fwd.normalize();
     const perp = new THREE.Vector3(-fwd.z, 0, fwd.x);
     if (RND() < 0.5){
-      // a giant golden pendulum hammer overhead — SLIDE under it as it swings up
-      t.ob = { type:'beam', swing:true, phase:RND()*6.28 };
+      // a giant golden hammer head lying ACROSS the path in one lane — SWIPE to a clear lane to dodge
+      const hl = [-1,0,1][Math.floor(RND()*3)];
+      t.ob = { type:'lane', lane:hl, hammer:true, phase:RND()*6.28 };
+      t.perp = perp.clone();
       const ham = new THREE.Group();
       const goldMat = new THREE.MeshStandardMaterial({ color:0xddb24a, metalness:0.6, roughness:0.4 });
-      const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,0.46,6), goldMat);
-      handle.position.y = -0.23; ham.add(handle);
-      const head = new THREE.Mesh(new THREE.BoxGeometry(0.13,0.11,0.11), goldMat);
-      head.position.y = -0.47; head.castShadow = true; ham.add(head);
-      ham.position.set(t.pos.x, t.pos.y + 0.52, t.pos.z);   // pivot above the path; hangs down and swings
-      ham.rotation.y = Math.atan2(fwd.x, fwd.z);
-      scene.add(ham); t.obMesh = ham; t.perp = perp.clone();
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.34,6), goldMat);
+      post.position.y = 0.17; ham.add(post);                              // short upright post
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.34,0.12,0.12), goldMat);  // wide head, turned across the path
+      head.position.y = 0.34; head.castShadow = true; ham.add(head);
+      ham.rotation.y = Math.atan2(perp.x, perp.z);                        // lie the head across the lanes (90°)
+      ham.position.set(t.pos.x + perp.x*hl*0.24, t.pos.y, t.pos.z + perp.z*hl*0.24);
+      scene.add(ham); t.obMesh = ham;
     } else {
       const hl = [-1,0,1][Math.floor(RND()*3)];            // any lane — sometimes dead centre, so you MUST dodge
       t.ob = { type:'lane', lane:hl, moving:false, phase: RND()*6.28 };
@@ -1169,13 +1170,14 @@ function startRun(){
   S.run = { tiles, idx:0, t:0, speed:4.0, jumping:false, jumpT:0, jumpDur:0.5, jumpH:0.95,
             falling:false, fallV:0, yOff:0, startDelay:1.4,
             lane:0, laneX:0, sliding:false, slideT:0, slideDur:0.5,
+            rolling:false, rollT:0, rollDur:0.5, rollDir:1, rollCD:0,
             storms, revives:0, usedAdRevive:false, invuln:0, dead:false, deathReason:'fell' };
   g.position.copy(tiles[0].pos);
 
   // HUD swap
   $('lblA').textContent = 'HEIGHT'; $('lblB').textContent = 'CLIMB';
   $('lives').style.display = 'none';
-  $('meterLabel').textContent = 'SWIPE: ← → MOVE · ↑ JUMP · ↓ SLIDE';
+  $('meterLabel').textContent = 'SWIPE ←→ MOVE · ↑ JUMP · ↓ SLIDE · ↑↑/↓↓ ROLL';
   $('meterBar').style.display = 'none';
   $('vignette').style.opacity = '0';            // danger meter is gone in the run phase
   $('combo').classList.remove('show');
@@ -1184,7 +1186,7 @@ function startRun(){
   showPop('PYRAMID COMPLETE');
   const gaps = tiles.some(t => t.gap);
   setTimeout(()=>{ if (S.phase==='run' && !S.gameOver) showPop(gaps ? 'JUMP THE GAPS!' : 'CLIMB!'); }, 900);
-  if (firstTime){ showHint('TAP / ↑ JUMP · SWIPE ⟷ MOVE · ↓ SLIDE', 5200); }
+  if (firstTime){ showHint('TAP/↑ JUMP · ⟷ MOVE · ↓ SLIDE · DOUBLE ↑↓ ROLL', 5200); }
 }
 
 function runJump(){
@@ -1200,6 +1202,18 @@ function runMove(dir){   // -1 = left, +1 = right (relative to run direction)
   r.lane = Math.max(-1, Math.min(1, r.lane + dir));
   Sound.step();
 }
+function runRoll(dir){   // +1 = forward roll, -1 = backward roll — a quick somersault dodge with brief i-frames
+  const r = S.run; if (!r || r.falling || r.dead || r.startDelay>0) return;
+  if (r.rolling || r.rollCD > 0) return;
+  r.rolling = true; r.rollT = 0; r.rollDir = dir; r.jumping = false; r.sliding = false;
+  r.invuln = Math.max(r.invuln, 0.42);     // dodge i-frames for the length of the roll
+  r.rollCD = 1.1;                          // brief cooldown so it can't be spammed
+  Sound.jump();
+}
+// double-swipe / double-key detection: single = jump/slide, double (within 320ms) = roll
+let _lastUp = 0, _lastDown = 0;
+function upAction(){   const now = performance.now(); if (now-_lastUp   < 320){ _lastUp = 0;   runRoll(1);  } else { _lastUp = now;   runJump();  } }
+function downAction(){ const now = performance.now(); if (now-_lastDown < 320){ _lastDown = 0; runRoll(-1); } else { _lastDown = now; runSlide(); } }
 
 function updateRun(dt){
   const r = S.run, g = S.runner; if (!r) return;
@@ -1273,6 +1287,14 @@ function updateRun(dt){
     if (r.slideT >= r.slideDur) r.sliding = false;
   }
 
+  // dodge roll — a quick somersault with brief i-frames (set in runRoll)
+  if (r.rollCD > 0) r.rollCD -= dt;
+  if (r.rolling){
+    r.rollT += dt;
+    sy *= 0.85; sx *= 1.05;              // tuck into the roll
+    if (r.rollT >= r.rollDur) r.rolling = false;
+  }
+
   // lateral lane movement, perpendicular to the run direction
   const fwd = B.clone().sub(A); fwd.y = 0;
   if (fwd.lengthSq() < 1e-4) fwd.set(0,0,1); else fwd.normalize();
@@ -1296,6 +1318,8 @@ function updateRun(dt){
   // face direction of travel
   const dir = B.clone().sub(A); dir.y = 0;
   if (dir.lengthSq() > 0.0001) g.rotation.y = Math.atan2(dir.x, dir.z);
+  // a roll somersaults the whole body forward/back around the lateral axis
+  g.rotation.x = r.rolling ? r.rollDir * Math.min(r.rollT/r.rollDur, 1) * Math.PI*2 : 0;
 
   // progress HUD
   S.peakY = Math.max(S.peakY||0, base.y);
@@ -1621,8 +1645,8 @@ window.addEventListener('pointerup', e => {
   const TH = 28;
   if (Math.abs(dx) < TH && Math.abs(dy) < TH){ runJump(); return; }     // tap = jump
   if (Math.abs(dx) > Math.abs(dy)) runMove(dx > 0 ? 1 : -1);            // swipe L/R
-  else if (dy < 0) runJump();                                          // swipe up
-  else runSlide();                                                     // swipe down
+  else if (dy < 0) upAction();                                         // swipe up (double = roll forward)
+  else downAction();                                                   // swipe down (double = roll back)
 }, { passive:false });
 window.addEventListener('keydown', e => {
   const k = e.code;
@@ -1632,8 +1656,9 @@ window.addEventListener('keydown', e => {
   if (S.gameOver){ if (!$('overScreen').classList.contains('hidden')) startGame(); return; }
   if (S.phase==='build'){ if (k==='Space'||k==='ArrowUp'||k==='ArrowDown') drop(); return; }
   if (S.phase==='run'){
-    if (k==='Space'||k==='ArrowUp') runJump();
-    else if (k==='ArrowDown') runSlide();
+    if (k==='Space') runJump();
+    else if (k==='ArrowUp') upAction();            // double-tap ↑ = roll forward
+    else if (k==='ArrowDown') downAction();        // double-tap ↓ = roll back
     else if (k==='ArrowLeft') runMove(-1);
     else if (k==='ArrowRight') runMove(1);
   }
@@ -1653,9 +1678,8 @@ function animate(){
     const a = S.active;
     if (a.mode==='keystone'){
       a.phase += a.speed*dt;
-      const s = Math.sin(a.phase);
-      const reach = s >= 0 ? a.ampOut : a.ampIn;          // big swing outside, small dip into courtyard
-      a.mesh.position[a.perpAxis] = a.target + a.outward*reach*s;
+      const tri = 1 - Math.abs(((a.phase/Math.PI) % 2) - 1);   // 0 at flush → 1 fully out → 0, SHARP turn (no dwell)
+      a.mesh.position[a.perpAxis] = a.target + a.outward*a.ampOut*tri;
       // light the target frame (and the stone) green the instant it lines up flush — your cue to drop
       const near = Math.abs(a.mesh.position[a.perpAxis] - a.target) < 0.16;
       const glow = 0.5 + 0.4*Math.abs(Math.sin(performance.now()*0.006));
@@ -1718,8 +1742,8 @@ function animate(){
       t.ob.lane = f > 0.33 ? 1 : (f < -0.33 ? -1 : 0);
       t.obMesh.position.set(t.pos.x + t.perp.x*f*0.24, t.pos.y + 0.15, t.pos.z + t.perp.z*f*0.24);
     }
-    if (t.ob && t.ob.swing && t.obMesh){              // gentle sway — the head stays over the path so SLIDE always reads true
-      t.obMesh.rotation.x = Math.sin(performance.now()*0.0026 + t.ob.phase) * 0.3;
+    if (t.ob && t.ob.hammer && t.obMesh){             // gentle cosmetic sway of the hammer in its lane
+      t.obMesh.rotation.z = Math.sin(performance.now()*0.003 + t.ob.phase) * 0.16;
     }
   });
 
