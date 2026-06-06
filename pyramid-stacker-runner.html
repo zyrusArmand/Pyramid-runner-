@@ -799,7 +799,7 @@ function spawnBlock(){
       center[axis] = alongFix;
       const target = center[perpAxis];                     // flush with the wall plane
       const outward = (target >= 0) ? 1 : -1;              // away from the pyramid's centre (origin)
-      const ampOut = 0.8;                                  // how far out it starts; outside = open air
+      const ampOut = 2.6;                                  // slide in from well outside, like a regular block enters
       // sweep only within the depth range that's clear of placed stones at BOTH ends, sharp turn at the
       // seat (no dwelling). its arc never crosses a placed stone; if the slot is blocked, leave a gap.
       const kb = swingBounds(perpAxis, len, center, outward, ampOut, axis);   // span axis = the wall axis
@@ -809,7 +809,7 @@ function spawnBlock(){
       mesh.position.copy(center);                          // at slot LEVEL — never lifted above the wall
       mesh.position[perpAxis] = far;
       S.active = { mesh, center, axis, mode:'keystone', perpAxis, target, outward, seat, far,
-                   speed: 2.6 + S.layer*0.2, phase:0,
+                   speed: speed * 1.5, phase:Math.PI,      // same brisk sweep as regular blocks
                    capstone:false, len, cells, corner, n };
       addPlaceGuide(S.active);                             // glowing perfect-seat outline
     } else {
