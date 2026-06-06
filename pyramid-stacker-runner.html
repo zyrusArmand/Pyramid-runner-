@@ -578,7 +578,7 @@ function makePiece(len, axis, color, corner){
 function makeSteppedPiece(len, axis, color, center, n){
   const mat = new THREE.MeshStandardMaterial({ color, roughness:0.92, metalness:0.04 });
   if (STONE_BUMP){ mat.bumpMap = STONE_BUMP; mat.bumpScale = 0.04; }    // carved stone surface relief
-  const h = LAYER_HEIGHT*0.94, GAP = 0.985;           // nearly flush — only a hairline crack between stones
+  const h = LAYER_HEIGHT*0.94, GAP = 0.95;            // a clear mortar line so neighbours never look merged
   const xHalf = (axis==='x' ? len*BLOCK_SIZE*GAP : BLOCK_SIZE*GAP)/2;
   const zHalf = (axis==='z' ? len*BLOCK_SIZE*GAP : BLOCK_SIZE*GAP)/2;
   const H = (n*BLOCK_SIZE)/2;
@@ -853,17 +853,17 @@ function drop(){
   // place the stone. the keystone ALWAYS seats flush — its depth offset is only a timing cue for the
   // grade, so a mis-timed slide must never leave it poking out of the wall. other stones stay put.
   const isKey = (a.mode==='keystone');
+  let restAt = isKey ? a.center[offAxis] : cur;         // flush for the keystone, as-dropped otherwise
+  if (!a.capstone) restAt = clampPlacement(a, restAt, offAxis);   // never let it overlap a neighbour
   a.mesh.position.copy(a.center);
-  if (!isKey) a.mesh.position[offAxis] = cur;
-  const restAt = isKey ? a.center[offAxis] : cur;       // flush for the keystone, as-dropped otherwise
+  a.mesh.position[offAxis] = restAt;
+  const restOff = restAt - a.center[offAxis];           // actual offset after the no-overlap clamp
 
-  // a stone only fails two ways: SQUISHED into another stone, or NO BASE under it (layer 2+)
+  // with the clamp above a stone can't be squished; it can still miss its BASE on layer 2+
   if (!a.capstone){
     const box = pieceBox(a, restAt, offAxis);
-    const squished   = boxesOverlap(box);                       // wedged into / overlapping a neighbour
-    const unsupported = S.layer > 0 && !isSupported(box);       // nothing beneath it (HUD layer 2+)
-    if (squished || unsupported){
-      missStone(a, squished ? 'MISS' : 'NO BASE');
+    if (S.layer > 0 && !isSupported(box)){                       // nothing beneath it to hold it up
+      missStone(a, 'NO BASE');
       if (S.integrity <= 0){ collapseAll(); endGame(false, 'collapsed'); return; }
       advance(a.len);
       return;
@@ -877,7 +877,7 @@ function drop(){
   if (weak) Sound.drop();
 
   S.allBlocks.push(a.mesh);
-  pushCells(a, true, weak, isKey ? 0 : off);           // run path follows where the stone actually landed
+  pushCells(a, true, weak, isKey ? 0 : restOff);       // run path follows where the stone actually landed
   updateHUD();
 
   if (S.integrity <= 0){ collapseAll(); endGame(false, 'collapsed'); return; }
@@ -896,6 +896,24 @@ function boxesOverlap(b){
   const tol = 0.12;                                 // allow the hairline crack; bigger overlap = squished
   return S.layerBoxes.some(o =>
     b.x0 < o.x1-tol && b.x1 > o.x0+tol && b.z0 < o.z1-tol && b.z1 > o.z0+tol);
+}
+// push a dropped stone back along its drop axis so it can NEVER overlap a placed neighbour — it
+// comes to rest just touching at most, so two stones can never merge into each other.
+function clampPlacement(a, cur, offAxis){
+  const perpAx = (offAxis==='x') ? 'z' : 'x';
+  const halfO  = ((offAxis===a.axis ? a.len : 1) * BLOCK_SIZE*0.985)/2;   // half-extent along the drop axis
+  const halfPe = ((perpAx ===a.axis ? a.len : 1) * BLOCK_SIZE*0.985)/2;   // half-extent across it
+  const cPe = a.center[perpAx], bPeLo = cPe-halfPe, bPeHi = cPe+halfPe;
+  let lo = -Infinity, hi = Infinity;
+  S.layerBoxes.forEach(o => {
+    const oPeLo = (perpAx==='x') ? o.x0 : o.z0, oPeHi = (perpAx==='x') ? o.x1 : o.z1;
+    if (bPeHi <= oPeLo+0.02 || bPeLo >= oPeHi-0.02) return;               // not in the same row across the axis
+    const oLo = (offAxis==='x') ? o.x0 : o.z0, oHi = (offAxis==='x') ? o.x1 : o.z1;
+    if (cur <= (oLo+oHi)/2) hi = Math.min(hi, oLo - halfO - 0.01);        // keep the stone on its near side
+    else                    lo = Math.max(lo, oHi + halfO + 0.01);
+  });
+  if (lo > hi) return cur;                                                // boxed in (shouldn't happen) — leave it
+  return Math.max(lo, Math.min(hi, cur));
 }
 // is this stone resting on a stone in the layer below? (needs real overlap, not just a touching edge)
 function isSupported(b){
@@ -1052,15 +1070,7 @@ function startRun(){
   S.phase = 'run';
   Sound.cap();
   const tiles = climbPath();   // steep, direct step-by-step climb up the front face
-  // cracked (weak) tiles: tint the block red and float a warning ring above it
-  tiles.forEach(t => {
-    if (!t.weak) return;
-    if (t.mesh && t.mesh.material && !t.mesh.__weakTinted){ t.mesh.material.color.offsetHSL(-0.06, 0.3, -0.05); t.mesh.__weakTinted = true; }
-    const mk = new THREE.Mesh(new THREE.RingGeometry(0.08, 0.2, 18),
-      new THREE.MeshBasicMaterial({ color:0xff5a4a, transparent:true, opacity:0.85, side:THREE.DoubleSide }));
-    mk.rotation.x = -Math.PI/2; mk.position.set(t.pos.x, t.pos.y+0.04, t.pos.z);
-    scene.add(mk); t.marker = mk;
-  });
+  // (cracked stones are safe to climb — only an actual missing stone is a gap you must jump)
   // procedural obstacles: beams to SLIDE under, side pillars to DODGE
   let lastOb = 2;
   for (let i = 5; i < tiles.length - 2; i++){
@@ -1114,7 +1124,7 @@ function startRun(){
   for (let i = 3; i < tiles.length - 1; i++){
     const t = tiles[i];
     if (t.ob) continue;
-    const overGap = t.gap || t.weak;
+    const overGap = t.gap;                                       // only real gaps float coins in the air
     if (i - lastCoin < 3) continue;                              // space coins out on the dense steps
     if (overGap ? (RND() < 0.6) : (RND() < 0.22)){
       const c = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.018, 14),   // small coin for the tiny climber
@@ -1172,8 +1182,8 @@ function startRun(){
   $('coinHud').classList.remove('hidden');
   updateCoinHud(false);
   showPop('PYRAMID COMPLETE');
-  const cracks = tiles.some(t => t.weak);
-  setTimeout(()=>{ if (S.phase==='run' && !S.gameOver) showPop(cracks ? 'JUMP THE CRACKS!' : 'CLIMB!'); }, 900);
+  const gaps = tiles.some(t => t.gap);
+  setTimeout(()=>{ if (S.phase==='run' && !S.gameOver) showPop(gaps ? 'JUMP THE GAPS!' : 'CLIMB!'); }, 900);
   if (firstTime){ showHint('TAP / ↑ JUMP · SWIPE ⟷ MOVE · ↓ SLIDE', 5200); }
 }
 
@@ -1407,7 +1417,7 @@ function updateCoinHud(pulse){
 }
 
 // a tile you can't safely stand on: a hole, or a cracked (weak) block
-function tileUnsafe(t){ return t.gap || t.weak; }
+function tileUnsafe(t){ return t.gap; }     // only a real missing stone (gap) must be jumped
 function crumbleTile(t){
   if (t.marker){ scene.remove(t.marker); t.marker = null; }
   const m = t.mesh;
