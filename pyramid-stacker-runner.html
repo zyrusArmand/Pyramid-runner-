@@ -839,13 +839,16 @@ function drop(){
   S.active = null;
   const offN = Math.min(1, dist / 1.3);               // 0 = dead-on, 1 = way off
 
-  // place the stone exactly where it was dropped
+  // place the stone. the keystone ALWAYS seats flush — its depth offset is only a timing cue for the
+  // grade, so a mis-timed slide must never leave it poking out of the wall. other stones stay put.
+  const isKey = (a.mode==='keystone');
   a.mesh.position.copy(a.center);
-  a.mesh.position[offAxis] = cur;
+  if (!isKey) a.mesh.position[offAxis] = cur;
+  const restAt = isKey ? a.center[offAxis] : cur;       // flush for the keystone, as-dropped otherwise
 
   // a stone only fails two ways: SQUISHED into another stone, or NO BASE under it (layer 2+)
   if (!a.capstone){
-    const box = pieceBox(a, cur, offAxis);
+    const box = pieceBox(a, restAt, offAxis);
     const squished   = boxesOverlap(box);                       // wedged into / overlapping a neighbour
     const unsupported = S.layer > 0 && !isSupported(box);       // nothing beneath it (HUD layer 2+)
     if (squished || unsupported){
@@ -857,13 +860,13 @@ function drop(){
     S.layerBoxes.push(box);
   }
 
-  const weak = dist > 0.34;                            // a noticeably-off (but valid) drop sets a crack
+  const weak = !isKey && dist > 0.34;                  // keystone seats clean; never a crack
   const dmg = (weak ? offN : offN*0.4) * S.layer * 0.04;
   S.integrity = Math.max(0, S.integrity - dmg);
   if (weak) Sound.drop();
 
   S.allBlocks.push(a.mesh);
-  pushCells(a, true, weak, off);                       // run path follows where the stone actually landed
+  pushCells(a, true, weak, isKey ? 0 : off);           // run path follows where the stone actually landed
   updateHUD();
 
   if (S.integrity <= 0){ collapseAll(); endGame(false, 'collapsed'); return; }
@@ -1072,13 +1075,20 @@ function startRun(){
       scene.add(ham); t.obMesh = ham; t.perp = perp.clone();
     } else {
       const hl = RND()<0.5 ? -1 : 1;
-      const moving = false;                                // static side-lane pillar — a readable hazard you dodge
-      t.ob = { type:'lane', lane:hl, moving, phase: RND()*6.28 };
+      t.ob = { type:'lane', lane:hl, moving:false, phase: RND()*6.28 };
       t.perp = perp.clone();
-      const pil = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.3, 0.15),
-        new THREE.MeshStandardMaterial({ color: moving?0xff7a2a:0xd23a3a, emissive: moving?0x4a1e00:0x3a0a0a, roughness:0.6 }));
-      pil.position.set(t.pos.x + perp.x*hl*0.24, t.pos.y + 0.15, t.pos.z + perp.z*hl*0.24);
-      pil.castShadow = true; scene.add(pil); t.obMesh = pil;
+      // themed temple SPIKE TRAP in this lane — dodge to another lane
+      const trap = new THREE.Group();
+      const stoneMat = new THREE.MeshStandardMaterial({ color:0x6b5436, roughness:0.95 });
+      const spikeMat = new THREE.MeshStandardMaterial({ color:0xc9a24a, emissive:0x2a1500, metalness:0.5, roughness:0.4 });
+      const base = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.06, 0.22), stoneMat);
+      base.position.y = 0.03; base.castShadow = true; trap.add(base);
+      for (const [sx,sz,sh] of [[-0.06,-0.05,0.22],[0.06,-0.05,0.22],[0,0.06,0.28],[0,-0.02,0.18]]){
+        const sp = new THREE.Mesh(new THREE.ConeGeometry(0.035, sh, 5), spikeMat);
+        sp.position.set(sx, 0.06 + sh/2, sz); sp.castShadow = true; trap.add(sp);
+      }
+      trap.position.set(t.pos.x + perp.x*hl*0.24, t.pos.y + 0.02, t.pos.z + perp.z*hl*0.24);
+      scene.add(trap); t.obMesh = trap;
     }
     lastOb = i;
   }
