@@ -578,7 +578,7 @@ function makePiece(len, axis, color, corner){
 function makeSteppedPiece(len, axis, color, center, n){
   const mat = new THREE.MeshStandardMaterial({ color, roughness:0.92, metalness:0.04 });
   if (STONE_BUMP){ mat.bumpMap = STONE_BUMP; mat.bumpScale = 0.04; }    // carved stone surface relief
-  const h = LAYER_HEIGHT*0.94, GAP = 0.99;            // near-full cell: a PERFECT (flush) seat shows no gap,
+  const h = LAYER_HEIGHT*0.94, GAP = 0.999;           // full cell: a PERFECT (flush) seat shows NO gap at all,
                                                       // while a drifted stone still leaves a real visible gap
   const xHalf = (axis==='x' ? len*BLOCK_SIZE*GAP : BLOCK_SIZE*GAP)/2;
   const zHalf = (axis==='z' ? len*BLOCK_SIZE*GAP : BLOCK_SIZE*GAP)/2;
@@ -825,10 +825,11 @@ function spawnBlock(){
       // piece can never swing THROUGH a neighbour (this also respects the far corner on the closing wall).
       const sb = swingBounds(axis, len, center, odir, range, axis);   // open piece swings along its span axis
       if (!sb.fit){ scene.remove(mesh); advance(len); return; }         // slot blocked — leave a gap, move on
-      const sLo = sb.sLo, sHi = sb.sHi;
-      const oSpeed = speed * Math.min(1, 2.2/(sHi-sLo || 1));           // slow the bigger sweeps so timing stays fair
-      mesh.position[axis] = (odir>0) ? sHi : sLo;          // SPAWN at the far/opposite end, then sweep to the seat
-      S.active = { mesh, center, axis, speed:oSpeed, phase:Math.PI/2, mode:'open', odir, range, sLo, sHi,
+      const seat = (odir>0) ? sb.sLo : sb.sHi;             // perfect (flush) end
+      const far  = (odir>0) ? sb.sHi : sb.sLo;             // far/opposite end — where the stone enters from
+      const oSpeed = speed * Math.min(1, 2.2/Math.max(0.6, Math.abs(far-seat)));   // slow the longer sweeps to keep timing fair
+      mesh.position[axis] = far;                           // SPAWN at the far/opposite end, then sweep to the seat
+      S.active = { mesh, center, axis, speed:oSpeed, phase:Math.PI, mode:'open', odir, seat, far,
                    capstone:false, len, cells, corner, n };
       addPlaceGuide(S.active);                             // glowing perfect-seat outline for this stone
     }
@@ -924,8 +925,8 @@ function clampPlacement(a, cur, offAxis){
     const oPeLo = (perpAx==='x') ? o.x0 : o.z0, oPeHi = (perpAx==='x') ? o.x1 : o.z1;
     if (bPeHi <= oPeLo+0.02 || bPeLo >= oPeHi-0.02) return;               // not in the same row across the axis
     const oLo = (offAxis==='x') ? o.x0 : o.z0, oHi = (offAxis==='x') ? o.x1 : o.z1;
-    if (cur <= (oLo+oHi)/2) hi = Math.min(hi, oLo - halfO - 0.01);        // keep the stone on its near side
-    else                    lo = Math.max(lo, oHi + halfO + 0.01);
+    if (cur <= (oLo+oHi)/2) hi = Math.min(hi, oLo - halfO - 0.015);       // rest exactly on the cell grid (1.0 spacing)
+    else                    lo = Math.max(lo, oHi + halfO + 0.015);
   });
   if (lo > hi) return null;                                              // no room for a solid stone → caller crumbles it
   return Math.max(lo, Math.min(hi, cur));
@@ -942,8 +943,8 @@ function swingBounds(axis, len, center, odir, range, spanAxis){
     const oPeLo = (perpAx==='x') ? o.x0 : o.z0, oPeHi = (perpAx==='x') ? o.x1 : o.z1;
     if (bPeHi <= oPeLo+0.02 || bPeLo >= oPeHi-0.02) return;             // not in the same row across the axis
     const oLo = (axis==='x') ? o.x0 : o.z0, oHi = (axis==='x') ? o.x1 : o.z1;
-    if ((oLo+oHi)/2 < cc) lo = Math.max(lo, oHi+halfO+0.01);            // stone on the inner side
-    else                  hi = Math.min(hi, oLo-halfO-0.01);            // stone on the outer side (e.g. far corner)
+    if ((oLo+oHi)/2 < cc) lo = Math.max(lo, oHi+halfO+0.015);           // stone on the inner side (cell-grid spacing)
+    else                  hi = Math.min(hi, oLo-halfO-0.015);           // stone on the outer side (e.g. far corner)
   });
   // the SEAT stays at flush (cc) — only nudged in if a stone actually drifted into the seat — and the
   // piece swings OUT from there by `range`. (the far wall on the opposite side must NOT pull the seat in.)
@@ -1717,13 +1718,14 @@ function animate(){
   if (S.active && S.phase==='build'){
     const a = S.active;
     a.phase += a.speed*dt;
-    if (a.mode==='keystone'){
-      const tri = 1 - Math.abs(((a.phase/Math.PI) % 2) - 1);   // 0 at flush → 1 fully out → 0, SHARP turn (no dwell)
-      a.mesh.position[a.perpAxis] = a.seat + (a.far - a.seat)*tri;
+    if (a.mode==='keystone' || a.mode==='open'){
+      // steady sweep from the far/opposite end IN to the perfect seat, with a SHARP turn at the seat
+      // (no dwelling there) — so it clearly enters from the far side and a PERFECT is hard to nail.
+      const ax = (a.mode==='keystone') ? a.perpAxis : a.axis;
+      const tri = 1 - Math.abs(((a.phase/Math.PI) % 2) - 1);   // 0 at the seat → 1 fully out → 0
+      a.mesh.position[ax] = a.seat + (a.far - a.seat)*tri;
     } else if (a.mode==='sym'){
       a.mesh.position[a.axis] = a.center[a.axis] + Math.sin(a.phase)*a.amp;
-    } else {
-      a.mesh.position[a.axis] = a.sLo + (a.sHi - a.sLo)*(Math.sin(a.phase)+1)/2;
     }
     if (a.mode === 'open' || a.mode === 'keystone'){
       const ax = (a.mode==='keystone') ? a.perpAxis : a.axis;
