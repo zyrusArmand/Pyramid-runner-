@@ -697,6 +697,18 @@ function resetState(){
 }
 
 // ---------- BUILD PHASE ----------
+// the glowing target frame the keystone slides into (so lining it up is obvious)
+function addKeystoneGuide(a){
+  removeKeystoneGuide();
+  const along = a.len*BLOCK_SIZE*0.99, d = BLOCK_SIZE*0.99, h = LAYER_HEIGHT*0.99;
+  const dims = a.axis==='x' ? [along,h,d] : [d,h,along];
+  const g = new THREE.Mesh(new THREE.BoxGeometry(dims[0],dims[1],dims[2]),
+    new THREE.MeshBasicMaterial({ color:0xffd86a, wireframe:true, transparent:true, opacity:0.85 }));
+  g.position.copy(a.center);
+  scene.add(g); S.keyGuide = g;
+}
+function removeKeystoneGuide(){ if (S.keyGuide){ scene.remove(S.keyGuide); S.keyGuide = null; } }
+
 function spawnBlock(){
   const capstone = S.capstone;
   let center, axis, len = 1, cells = [], corner = false;
@@ -738,17 +750,22 @@ function spawnBlock(){
     const odir = (S.wall===0 || S.wall===3) ? 1 : -1;     // toward unfilled cells
     const openBeyond = n - S.cellIndex - len;             // empty cells past this piece
     if (S.wall===3 && openBeyond <= 0){
-      // FINISHER — the single block that completes the whole layer: lift one step up and sweep
-      const u0 = gridPos(S.wall, 0,   n, S.layer)[axis];
-      const u1 = gridPos(S.wall, n-1, n, S.layer)[axis];
-      const M = 1.2;                                       // overshoot into air past each end
-      const lo = Math.min(u0,u1) - M, hi = Math.max(u0,u1) + M;
-      const liftY = center.y + LAYER_HEIGHT;               // exactly one step above the layer
-      mesh.position.y = liftY;
-      mesh.position[axis] = lo;
-      S.active = { mesh, center, axis, mode:'finisher', lo, hi, u:lo,
-                   vel: 3.2 + S.layer*0.45, liftY,
+      // KEYSTONE — the block that closes the ring. Its slot is boxed in on the sides, but the
+      // OUTER wall face (toward the camera) and the inner courtyard are open air. So instead of
+      // flying it over the top, we slide it straight in through that open face: it swings from
+      // outside, through flush, to just into the courtyard. Time the drop to seat it flush.
+      const perpAxis = (axis === 'x') ? 'z' : 'x';         // the in/out (depth) axis
+      const target = center[perpAxis];                     // flush with the wall plane
+      const outward = (target >= 0) ? 1 : -1;              // away from the pyramid's centre (origin)
+      const H = (n*BLOCK_SIZE)/2;
+      const ampOut = 1.8;                                  // lots of open air outside the wall
+      const ampIn  = Math.max(0.4, Math.min(0.9, H - 0.6));// limited room in the courtyard
+      mesh.position.copy(center);                          // at slot LEVEL — never lifted above the wall
+      mesh.position[perpAxis] = target + outward*ampOut;
+      S.active = { mesh, center, axis, mode:'keystone', perpAxis, target, outward, ampOut, ampIn,
+                   speed: 1.7 + S.layer*0.16, phase:Math.PI/2,
                    capstone:false, len, cells, corner, n };
+      addKeystoneGuide(S.active);                          // glowing target frame on the slot
     } else {
       let range;
       if (S.wall === 3){
@@ -767,19 +784,22 @@ function spawnBlock(){
 function drop(){
   if (S.phase!=='build' || S.gameOver || !S.active) return;
   const a = S.active;
-  const cur = (a.mode==='finisher') ? a.u : a.mesh.position[a.axis];
-  const off = cur - a.center[a.axis];                 // how far from dead-centre, signed
+  if (S.keyGuide) removeKeystoneGuide();              // clear the keystone target frame
+  if (a.mode==='keystone' && a.mesh.material && a.mesh.material.emissive) a.mesh.material.emissive.setRGB(0,0,0);
+  const offAxis = (a.mode==='keystone') ? a.perpAxis : a.axis;   // keystone is timed on the depth axis
+  const cur = a.mesh.position[offAxis];
+  const off = cur - a.center[offAxis];                // how far from flush / dead-centre, signed
   const dist = Math.abs(off);
   S.active = null;
   const offN = Math.min(1, dist / 1.3);               // 0 = dead-on, 1 = way off
 
   // place the stone exactly where it was dropped
   a.mesh.position.copy(a.center);
-  a.mesh.position[a.axis] = cur;
+  a.mesh.position[offAxis] = cur;
 
   // a stone only fails two ways: SQUISHED into another stone, or NO BASE under it (layer 2+)
   if (!a.capstone){
-    const box = pieceBox(a, cur);
+    const box = pieceBox(a, cur, offAxis);
     const squished   = boxesOverlap(box);                       // wedged into / overlapping a neighbour
     const unsupported = S.layer > 0 && !isSupported(box);       // nothing beneath it (HUD layer 2+)
     if (squished || unsupported){
@@ -798,10 +818,6 @@ function drop(){
 
   S.allBlocks.push(a.mesh);
   pushCells(a, true, weak, off);                       // run path follows where the stone actually landed
-  if (a.mode === 'finisher'){                          // the stone that closes a layer drops into place
-    a.mesh.position.y = a.liftY;
-    S.dropAnims.push({ mesh:a.mesh, y0:a.liftY, y1:a.center.y, t:0 });
-  }
   updateHUD();
 
   if (S.integrity <= 0){ collapseAll(); endGame(false, 'collapsed'); return; }
@@ -809,9 +825,10 @@ function drop(){
 }
 
 // footprint (AABB in x/z) of a placed piece
-function pieceBox(a, cur){
+function pieceBox(a, cur, offAxis){
+  offAxis = offAxis || a.axis;                       // which axis `cur` is measured on (keystone = depth)
   const halfA = (a.len*BLOCK_SIZE*0.985)/2, halfP = (BLOCK_SIZE*0.985)/2;
-  const c = { x:a.center.x, z:a.center.z }; c[a.axis] = cur;
+  const c = { x:a.center.x, z:a.center.z }; c[offAxis] = cur;
   const hx = a.axis==='x' ? halfA : halfP, hz = a.axis==='z' ? halfA : halfP;
   return { x0:c.x-hx, x1:c.x+hx, z0:c.z-hz, z1:c.z+hz };
 }
@@ -1542,12 +1559,19 @@ function animate(){
 
   if (S.active && S.phase==='build'){
     const a = S.active;
-    if (a.mode==='finisher'){
-      a.u += a.vel*dt;
-      if (a.u >= a.hi){ a.u = a.hi; a.vel = -Math.abs(a.vel); }
-      else if (a.u <= a.lo){ a.u = a.lo; a.vel = Math.abs(a.vel); }
-      a.mesh.position[a.axis] = a.u;
-      a.mesh.position.y = a.liftY;
+    if (a.mode==='keystone'){
+      a.phase += a.speed*dt;
+      const s = Math.sin(a.phase);
+      const reach = s >= 0 ? a.ampOut : a.ampIn;          // big swing outside, small dip into courtyard
+      a.mesh.position[a.perpAxis] = a.target + a.outward*reach*s;
+      // light the target frame (and the stone) green the instant it lines up flush — your cue to drop
+      const near = Math.abs(a.mesh.position[a.perpAxis] - a.target) < 0.16;
+      const glow = 0.5 + 0.4*Math.abs(Math.sin(performance.now()*0.006));
+      if (S.keyGuide){
+        if (near) S.keyGuide.material.color.setRGB(0.45,1.0,0.55); else S.keyGuide.material.color.setRGB(1.0,0.85,0.42);
+        S.keyGuide.material.opacity = near ? 0.95 : glow;
+      }
+      if (a.mesh.material && a.mesh.material.emissive) a.mesh.material.emissive.setRGB(0, near?0.28:0, near?0.08:0);
     } else {
       a.phase += a.speed*dt;
       if (a.mode==='sym') a.mesh.position[a.axis] = a.center[a.axis] + Math.sin(a.phase)*a.amp;
