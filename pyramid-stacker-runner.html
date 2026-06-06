@@ -728,22 +728,18 @@ function resetState(){
 }
 
 // ---------- BUILD PHASE ----------
-// A clean glowing box outline matching the EXACT footprint, height and shape of the stone about to be
-// placed, shown at its perfect (flush) seat — line the stone up inside it for a PERFECT.
+// A clean glowing footprint outline (just the base rectangle, flat on the course) matching the exact
+// footprint of the stone about to be placed, at its perfect (flush) seat — line the stone up in it for a PERFECT.
 function addPlaceGuide(a){
   removeKeystoneGuide();
   const grp = new THREE.Group();
-  const mat = new THREE.MeshBasicMaterial({ color:0xffd86a, transparent:true, opacity:0.6 });
+  const mat = new THREE.MeshBasicMaterial({ color:0xffd86a, transparent:true, opacity:0.7 });
   const sx = (a.axis==='x' ? a.len : 1) * BLOCK_SIZE*0.99;     // footprint matches this stone's size
   const sz = (a.axis==='z' ? a.len : 1) * BLOCK_SIZE*0.99;
-  const h = LAYER_HEIGHT*0.94, t = 0.03;                       // thin glowing edges
-  const hx = sx/2, hz = sz/2, hy = h/2;
-  const bar = (dx,dy,dz, px,py,pz) => { const m = new THREE.Mesh(new THREE.BoxGeometry(dx,dy,dz), mat); m.position.set(px,py,pz); grp.add(m); };
-  for (const ex of [-hx,hx]) for (const ez of [-hz,hz]) bar(t,h,t, ex,0,ez);   // 4 vertical edges
-  for (const ey of [-hy,hy]){
-    bar(sx,t,t, 0,ey,-hz); bar(sx,t,t, 0,ey, hz);                              // top & bottom edges along x
-    bar(t,t,sz, -hx,ey,0); bar(t,t,sz,  hx,ey,0);                             // top & bottom edges along z
-  }
+  const t = 0.04, hx = sx/2, hz = sz/2, fy = -LAYER_HEIGHT*0.94/2;   // flat on the base of where the stone sits
+  const bar = (dx,dz, px,pz) => { const m = new THREE.Mesh(new THREE.BoxGeometry(dx,t,dz), mat); m.position.set(px,fy,pz); grp.add(m); };
+  bar(sx,t, 0,-hz); bar(sx,t, 0, hz);                          // edges running along x
+  bar(t,sz, -hx,0); bar(t,sz,  hx,0);                          // edges running along z
   grp.position.copy(a.center);                                 // a.center is the exact perfect seat
   grp.material = mat;                                          // shared → loop recolours green on a perfect line-up
   scene.add(grp); S.keyGuide = grp;
@@ -822,15 +818,17 @@ function spawnBlock(){
         // closing wall: enclosed between existing blocks — swing only within the open gap, no overshoot
         range = Math.max(0.9, openBeyond * BLOCK_SIZE);
       } else {
-        range = Math.min(3.2, Math.max(1.6, openBeyond*BLOCK_SIZE + 1.4));  // open air past the end
+        // reach right out to the far open end so the stone ENTERS from the opposite side of its seat
+        range = Math.max(1.6, openBeyond*BLOCK_SIZE + 1.6);
       }
       // oscillate ONLY within the gap that's actually clear of placed stones at both ends, so the
       // piece can never swing THROUGH a neighbour (this also respects the far corner on the closing wall).
       const sb = swingBounds(axis, len, center, odir, range, axis);   // open piece swings along its span axis
       if (!sb.fit){ scene.remove(mesh); advance(len); return; }         // slot blocked — leave a gap, move on
       const sLo = sb.sLo, sHi = sb.sHi;
-      mesh.position[axis] = (odir>0) ? sHi : sLo;          // start at the outer end of the arc
-      S.active = { mesh, center, axis, speed, phase:Math.PI/2, mode:'open', odir, range, sLo, sHi,
+      const oSpeed = speed * Math.min(1, 2.2/(sHi-sLo || 1));           // slow the bigger sweeps so timing stays fair
+      mesh.position[axis] = (odir>0) ? sHi : sLo;          // SPAWN at the far/opposite end, then sweep to the seat
+      S.active = { mesh, center, axis, speed:oSpeed, phase:Math.PI/2, mode:'open', odir, range, sLo, sHi,
                    capstone:false, len, cells, corner, n };
       addPlaceGuide(S.active);                             // glowing perfect-seat outline for this stone
     }
