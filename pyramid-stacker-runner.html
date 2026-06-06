@@ -372,6 +372,10 @@ const BLOCK_SIZE            = 1;
 const LAYER_HEIGHT          = 0.55;  // flatter courses → clean, climbable pyramid steps
 const MISS_DISTANCE         = 0.85;
 const PERFECT_DISTANCE      = 0.14;
+// placement accuracy tiers (normalized offset): exact PERFECT / GREAT / GOOD pay 3 / 2 / 1 coins; looser = MISS
+const TIER_PERFECT          = 0.08;
+const TIER_GREAT            = 0.24;
+const TIER_GOOD             = 0.50;
 const MAX_PIECE_LEN         = 2;     // pieces span 1–2 cells (longer rectangles)
 const CORNER_CHANCE         = 0.6;   // chance the first piece of a wall is a cornerstone
 const FALL_THRESHOLD        = 0.55;  // above layer 1, a drop this far off its support topples off
@@ -657,6 +661,7 @@ const Sound = {
     o.connect(g).connect(this.ctx.destination); o.start(t); o.stop(t+dur+0.02);
   },
   place(){ this.blip(420, 0.09, 'triangle', 0.14); },
+  great(){ this.blip(560, 0.12, 'triangle', 0.14, 740); },
   perfect(n){ const base=660; [0,4,7,12].slice(0, Math.min(2+n,4)).forEach((s,i)=> setTimeout(()=>this.blip(base*Math.pow(2,s/12),0.16,'sine',0.16),i*55)); },
   drop(){ this.blip(180, 0.32, 'sawtooth', 0.2, 60); },
   jump(){ this.blip(520, 0.14, 'square', 0.1, 880); },
@@ -803,7 +808,7 @@ function drop(){
     const squished   = boxesOverlap(box);                       // wedged into / overlapping a neighbour
     const unsupported = S.layer > 0 && !isSupported(box);       // nothing beneath it (HUD layer 2+)
     if (squished || unsupported){
-      missStone(a, squished ? 'SQUISHED' : 'NO BASE');
+      missStone(a, squished ? 'MISS' : 'NO BASE');
       if (S.integrity <= 0){ collapseAll(); endGame(false, 'collapsed'); return; }
       advance(a.len);
       return;
@@ -895,15 +900,30 @@ function pushCells(a, placed, weak, off=0){
 function blockPlaced(mesh, instability, capstone, len){
   S.layerBlocks.push(mesh);
   S.squash.push({ mesh, t:0 });                 // satisfying landing squash (juice)
-  if (instability < PERFECT_DISTANCE){
+  // accuracy tiers — PERFECT (exact) / GREAT / GOOD pay 3 / 2 / 1 coins; anything looser is a MISS
+  let tier, coins, baseScore;
+  if      (instability < TIER_PERFECT){ tier='PERFECT'; coins=3; baseScore=100; }
+  else if (instability < TIER_GREAT)  { tier='GREAT';   coins=2; baseScore=70;  }
+  else if (instability < TIER_GOOD)   { tier='GOOD';    coins=1; baseScore=45;  }
+  else                                { tier='MISS';    coins=0; baseScore=15;  }
+
+  if (tier === 'PERFECT'){
+    // exact hit ONLY — the full reaction: emoji pop + phone buzz + chime + sparkle
     S.streak++; S.bestPerfect = Math.max(S.bestPerfect, S.streak);
-    S.score += (100 + S.streak*25) * len;
-    S.coins += 1; bank += 1; Store.set('coins', bank); updateCoinHud(true);   // +1 coin per perfect placement
-    showPop(S.streak>2?`PERFECT x${S.streak}`:'PERFECT');
-    Sound.perfect(S.streak); sparkle(mesh.position.clone().add(new THREE.Vector3(0,0.5,0)));
+    S.score += (baseScore + S.streak*25) * len;
+    showPop(S.streak>2 ? `PERFECT ×${S.streak} 🔥` : 'PERFECT 💯');
+    Sound.perfect(S.streak); buzz([16,28,16]);
+    sparkle(mesh.position.clone().add(new THREE.Vector3(0,0.5,0)));
     if (S.streak >= 2) flash();
     showCombo(S.streak);
-  } else { S.streak = 0; S.score += 40 * len; Sound.place(); showCombo(0); }
+  } else {
+    S.streak = 0; showCombo(0);
+    S.score += baseScore * len;
+    if      (tier === 'GREAT'){ showPop('GREAT'); Sound.great(); }
+    else if (tier === 'GOOD') { showPop('GOOD');  Sound.land();  }
+    else                      { showPop('MISS');  Sound.drop();  }
+  }
+  if (coins > 0){ S.coins += coins; bank += coins; Store.set('coins', bank); updateCoinHud(true); }
   updateHUD();
 
   if (capstone){ startRun(); return; }     // pyramid complete!
@@ -1378,6 +1398,7 @@ function updateHUD(){
   $('vignette').style.opacity = (S.phase==='build' && integ < 0.4) ? String((0.4-integ)/0.4 * 0.9) : '0';
 }
 function showPop(t){ const p=$('pop'); p.textContent=t; p.classList.remove('show'); void p.offsetWidth; p.classList.add('show'); }
+function buzz(pattern){ try { if (navigator.vibrate) navigator.vibrate(pattern); } catch(e){} }   // phone haptics (perfect only)
 
 function startGame(){
   resetState();
