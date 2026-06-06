@@ -578,7 +578,8 @@ function makePiece(len, axis, color, corner){
 function makeSteppedPiece(len, axis, color, center, n){
   const mat = new THREE.MeshStandardMaterial({ color, roughness:0.92, metalness:0.04 });
   if (STONE_BUMP){ mat.bumpMap = STONE_BUMP; mat.bumpScale = 0.04; }    // carved stone surface relief
-  const h = LAYER_HEIGHT*0.94, GAP = 0.95;            // a clear mortar line so neighbours never look merged
+  const h = LAYER_HEIGHT*0.94, GAP = 0.99;            // near-full cell: a PERFECT (flush) seat shows no gap,
+                                                      // while a drifted stone still leaves a real visible gap
   const xHalf = (axis==='x' ? len*BLOCK_SIZE*GAP : BLOCK_SIZE*GAP)/2;
   const zHalf = (axis==='z' ? len*BLOCK_SIZE*GAP : BLOCK_SIZE*GAP)/2;
   const H = (n*BLOCK_SIZE)/2;
@@ -727,30 +728,24 @@ function resetState(){
 }
 
 // ---------- BUILD PHASE ----------
-// Two clean glowing rectangles marking exactly where the keystone should seat: an upright frame
-// at the flush 'stop' plane (nudged in toward the courtyard) + a footprint outline on the floor.
-function addKeystoneGuide(a){
+// A clean glowing box outline matching the EXACT footprint, height and shape of the stone about to be
+// placed, shown at its perfect (flush) seat — line the stone up inside it for a PERFECT.
+function addPlaceGuide(a){
   removeKeystoneGuide();
   const grp = new THREE.Group();
-  const mat = new THREE.MeshBasicMaterial({ color:0xffd86a, transparent:true, opacity:0.85 });
-  const h = LAYER_HEIGHT*0.98, w = a.len*BLOCK_SIZE*0.98, dp = BLOCK_SIZE*0.98, t = 0.04;
-  const along = a.axis, depth = a.perpAxis;              // wall axis the slot spans, and the in/out axis
-  const bar = (longAxis, length, pos) => {
-    const d = { x:t, y:t, z:t }; d[longAxis] = length;
-    const m = new THREE.Mesh(new THREE.BoxGeometry(d.x,d.y,d.z), mat);
-    m.position.set(pos.x||0, pos.y||0, pos.z||0); grp.add(m);
-  };
-  const P = (alongOff, y, depthOff) => { const o={x:0,y:y,z:0}; o[along]=alongOff; o[depth]=(o[depth]||0)+depthOff; return o; };
-  const back = -a.outward * BLOCK_SIZE*0.46;             // the exact flush stop, in toward the inside of the walls
-  // upright frame at the stop plane
-  bar(along, w, P(0,  h/2, back)); bar(along, w, P(0, -h/2, back));
-  bar('y', h, P( w/2, 0, back));   bar('y', h, P(-w/2, 0, back));
-  // footprint outline flat on the slot floor — shows exactly where the base rests for a perfect
-  const fy = -h/2;
-  bar(along, w, P(0, fy,  dp/2));  bar(along, w, P(0, fy, -dp/2));
-  bar(depth, dp, P( w/2, fy, 0));  bar(depth, dp, P(-w/2, fy, 0));
-  grp.position.copy(a.center);                          // a.center[depth] is already the flush plane
-  grp.material = mat;                                   // shared material → loop tint/opacity still works
+  const mat = new THREE.MeshBasicMaterial({ color:0xffd86a, transparent:true, opacity:0.6 });
+  const sx = (a.axis==='x' ? a.len : 1) * BLOCK_SIZE*0.99;     // footprint matches this stone's size
+  const sz = (a.axis==='z' ? a.len : 1) * BLOCK_SIZE*0.99;
+  const h = LAYER_HEIGHT*0.94, t = 0.03;                       // thin glowing edges
+  const hx = sx/2, hz = sz/2, hy = h/2;
+  const bar = (dx,dy,dz, px,py,pz) => { const m = new THREE.Mesh(new THREE.BoxGeometry(dx,dy,dz), mat); m.position.set(px,py,pz); grp.add(m); };
+  for (const ex of [-hx,hx]) for (const ez of [-hz,hz]) bar(t,h,t, ex,0,ez);   // 4 vertical edges
+  for (const ey of [-hy,hy]){
+    bar(sx,t,t, 0,ey,-hz); bar(sx,t,t, 0,ey, hz);                              // top & bottom edges along x
+    bar(t,t,sz, -hx,ey,0); bar(t,t,sz,  hx,ey,0);                             // top & bottom edges along z
+  }
+  grp.position.copy(a.center);                                 // a.center is the exact perfect seat
+  grp.material = mat;                                          // shared → loop recolours green on a perfect line-up
   scene.add(grp); S.keyGuide = grp;
 }
 function removeKeystoneGuide(){ if (S.keyGuide){ scene.remove(S.keyGuide); S.keyGuide = null; } }
@@ -820,7 +815,7 @@ function spawnBlock(){
       S.active = { mesh, center, axis, mode:'keystone', perpAxis, target, outward, seat, far,
                    speed: 2.6 + S.layer*0.2, phase:0,
                    capstone:false, len, cells, corner, n };
-      addKeystoneGuide(S.active);                          // glowing target frame on the slot
+      addPlaceGuide(S.active);                             // glowing perfect-seat outline
     } else {
       let range;
       if (S.wall === 3){
@@ -837,6 +832,7 @@ function spawnBlock(){
       mesh.position[axis] = (odir>0) ? sHi : sLo;          // start at the outer end of the arc
       S.active = { mesh, center, axis, speed, phase:Math.PI/2, mode:'open', odir, range, sLo, sHi,
                    capstone:false, len, cells, corner, n };
+      addPlaceGuide(S.active);                             // glowing perfect-seat outline for this stone
     }
   }
 }
@@ -844,8 +840,8 @@ function spawnBlock(){
 function drop(){
   if (S.phase!=='build' || S.gameOver || !S.active) return;
   const a = S.active;
-  if (S.keyGuide) removeKeystoneGuide();              // clear the keystone target frame
-  if (a.mode==='keystone' && a.mesh.material && a.mesh.material.emissive) a.mesh.material.emissive.setRGB(0,0,0);
+  if (S.keyGuide) removeKeystoneGuide();              // clear the perfect-seat outline
+  if (a.mesh.material && a.mesh.material.emissive) a.mesh.material.emissive.setRGB(0,0,0);   // clear the green glow
   const offAxis = (a.mode==='keystone') ? a.perpAxis : a.axis;   // keystone is timed on the depth axis
   const cur = a.mesh.position[offAxis];
   const off = cur - a.center[offAxis];                // how far from flush / dead-centre, signed
@@ -1722,29 +1718,27 @@ function animate(){
 
   if (S.active && S.phase==='build'){
     const a = S.active;
+    a.phase += a.speed*dt;
     if (a.mode==='keystone'){
-      a.phase += a.speed*dt;
       const tri = 1 - Math.abs(((a.phase/Math.PI) % 2) - 1);   // 0 at flush → 1 fully out → 0, SHARP turn (no dwell)
       a.mesh.position[a.perpAxis] = a.seat + (a.far - a.seat)*tri;
-      // light the target frame (and the stone) green the instant it reaches its seat — your cue to drop
-      const near = Math.abs(a.mesh.position[a.perpAxis] - a.seat) < 0.16;
-      const glow = 0.5 + 0.4*Math.abs(Math.sin(performance.now()*0.006));
-      if (S.keyGuide){
-        if (near) S.keyGuide.material.color.setRGB(0.45,1.0,0.55); else S.keyGuide.material.color.setRGB(1.0,0.85,0.42);
-        S.keyGuide.material.opacity = near ? 0.95 : glow;
-      }
-      if (a.mesh.material && a.mesh.material.emissive) a.mesh.material.emissive.setRGB(0, near?0.28:0, near?0.08:0);
+    } else if (a.mode==='sym'){
+      a.mesh.position[a.axis] = a.center[a.axis] + Math.sin(a.phase)*a.amp;
     } else {
-      a.phase += a.speed*dt;
-      if (a.mode==='sym') a.mesh.position[a.axis] = a.center[a.axis] + Math.sin(a.phase)*a.amp;
-      else a.mesh.position[a.axis] = a.sLo + (a.sHi - a.sLo)*(Math.sin(a.phase)+1)/2;
+      a.mesh.position[a.axis] = a.sLo + (a.sHi - a.sLo)*(Math.sin(a.phase)+1)/2;
     }
-    // hard guarantee: clamp the LIVE position every frame so a swinging stone can NEVER overlap a
-    // placed one on screen, regardless of the swing maths (it visibly stops on contact).
     if (a.mode === 'open' || a.mode === 'keystone'){
       const ax = (a.mode==='keystone') ? a.perpAxis : a.axis;
+      // hard guarantee: clamp the LIVE position every frame so a swinging stone can NEVER overlap a placed one
       const safe = clampPlacement(a, a.mesh.position[ax], ax);
       if (safe !== null) a.mesh.position[ax] = safe;
+      // light the perfect-seat outline (and the stone) GREEN the instant it lines up dead-on for a PERFECT
+      const near = Math.abs(a.mesh.position[ax] - a.center[ax]) / 1.3 < TIER_PERFECT;
+      if (S.keyGuide){
+        if (near) S.keyGuide.material.color.setRGB(0.4,1.0,0.5); else S.keyGuide.material.color.setRGB(1.0,0.85,0.42);
+        S.keyGuide.material.opacity = near ? 0.95 : 0.6;
+      }
+      if (a.mesh.material && a.mesh.material.emissive) a.mesh.material.emissive.setRGB(0, near?0.28:0, near?0.08:0);
     }
   }
   for (let i=S.falling.length-1;i>=0;i--){ const f=S.falling[i];
