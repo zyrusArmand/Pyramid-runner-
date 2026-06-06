@@ -34,7 +34,7 @@
     background:linear-gradient(90deg,#6fe3a0,#e8d35f); transition:width .25s,background .25s; }
 
   #pop { position:fixed; top:38%; left:50%; transform:translate(-50%,-50%) scale(.6);
-    font-family:'Cinzel',serif; font-weight:700; font-size:34px; color:#ffe9a8;
+    font-family:'Cinzel',serif; font-weight:700; font-size:34px; color:#ffe9a8; text-align:center; white-space:nowrap;
     text-shadow:0 0 18px rgba(255,210,120,.9); opacity:0; pointer-events:none; z-index:6; }
   #pop.show { animation:popfx .6s ease-out; }
   @keyframes popfx { 0%{opacity:0;transform:translate(-50%,-50%) scale(.5);}
@@ -702,15 +702,26 @@ function resetState(){
 }
 
 // ---------- BUILD PHASE ----------
-// the glowing target frame the keystone slides into (so lining it up is obvious)
+// a clean glowing rectangle (4 bars, no busy diagonals) marking the slot the keystone slides into
 function addKeystoneGuide(a){
   removeKeystoneGuide();
-  const along = a.len*BLOCK_SIZE*0.99, d = BLOCK_SIZE*0.99, h = LAYER_HEIGHT*0.99;
-  const dims = a.axis==='x' ? [along,h,d] : [d,h,along];
-  const g = new THREE.Mesh(new THREE.BoxGeometry(dims[0],dims[1],dims[2]),
-    new THREE.MeshBasicMaterial({ color:0xffd86a, wireframe:true, transparent:true, opacity:0.85 }));
-  g.position.copy(a.center);
-  scene.add(g); S.keyGuide = g;
+  const grp = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color:0xffd86a, transparent:true, opacity:0.85 });
+  const h = LAYER_HEIGHT*0.98, w = a.len*BLOCK_SIZE*0.98, t = 0.04;   // frame height, width, bar thickness
+  const along = a.axis;                                  // the wall axis the slot spans
+  const bar = (longAxis, length, pos) => {
+    const d = { x:t, y:t, z:t }; d[longAxis] = length;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(d.x,d.y,d.z), mat);
+    m.position.set(pos.x||0, pos.y||0, pos.z||0); grp.add(m);
+  };
+  bar(along, w, { y:  h/2 });                            // top edge
+  bar(along, w, { y: -h/2 });                            // bottom edge
+  const r = { y:0 }, l = { y:0 }; r[along] = w/2; l[along] = -w/2;
+  bar('y', h, r); bar('y', h, l);                        // right / left edges
+  grp.position.copy(a.center);
+  grp.position[a.perpAxis] = a.target;                   // sit on the wall plane
+  grp.material = mat;                                    // shared material → loop tint/opacity still works
+  scene.add(grp); S.keyGuide = grp;
 }
 function removeKeystoneGuide(){ if (S.keyGuide){ scene.remove(S.keyGuide); S.keyGuide = null; } }
 
@@ -911,7 +922,7 @@ function blockPlaced(mesh, instability, capstone, len){
     // exact hit ONLY — the full reaction: emoji pop + phone buzz + chime + sparkle
     S.streak++; S.bestPerfect = Math.max(S.bestPerfect, S.streak);
     S.score += (baseScore + S.streak*25) * len;
-    showPop(S.streak>2 ? `PERFECT ×${S.streak} 🔥` : 'PERFECT 💯');
+    showPop(S.streak>2 ? `PERFECT ×${S.streak}` : 'PERFECT');
     Sound.perfect(S.streak); buzz([16,28,16]);
     sparkle(mesh.position.clone().add(new THREE.Vector3(0,0.5,0)));
     if (S.streak >= 2) flash();
