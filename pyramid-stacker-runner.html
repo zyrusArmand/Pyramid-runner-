@@ -1219,25 +1219,8 @@ function addPlaceGuide(a){
 }
 function removeKeystoneGuide(){ if (S.keyGuide){ scene.remove(S.keyGuide); S.keyGuide = null; } }
 
-// faint translucent outline of the FULL ring for the current layer, so you can see exactly where each
-// block — and especially each corner — is meant to land
-function updateGhostRing(){
-  if (S.ghostRing && S.ghostLayer === S.layer) return;
-  if (S.ghostRing){ scene.remove(S.ghostRing); S.ghostRing = null; }
-  const L = S.layer, n = nForLayer(L); if (n <= 0){ S.ghostLayer = L; return; }
-  const H = (n*BLOCK_SIZE)/2, y = L*LAYER_HEIGHT, hh = LAYER_HEIGHT*0.9, t = BLOCK_SIZE*0.98, span = n*BLOCK_SIZE;
-  const g = new THREE.Group();
-  const mat = new THREE.MeshBasicMaterial({ color:0xffe6a0, transparent:true, opacity:0.12, depthWrite:false });
-  const wall = (wx, wz, ax) => { const m = new THREE.Mesh(new THREE.BoxGeometry(ax==='x'?span:t, hh, ax==='x'?t:span), mat);
-    m.position.set(wx, y, wz); g.add(m); };
-  wall(0, H, 'x'); wall(0, -H, 'x'); wall(H, 0, 'z'); wall(-H, 0, 'z');   // the four target walls
-  scene.add(g); S.ghostRing = g; S.ghostLayer = L;
-}
-function clearGhostRing(){ if (S.ghostRing){ scene.remove(S.ghostRing); S.ghostRing = null; } S.ghostLayer = -1; }
-
 function spawnBlock(){
   const capstone = S.capstone;
-  if (capstone) clearGhostRing(); else updateGhostRing();
   let center, axis, len = 1, cells = [], corner = false;
 
   if (capstone){
@@ -1688,14 +1671,15 @@ function climbPath(){
   return tiles;
 }
 
-// three glowing lane ribbons running up the face — the only paths you may climb. Each is a bright neon
-// core inside a soft glow halo (centre lane brightest), kept visually distinct so the 3 dodge-lanes read clearly.
+// three subtle glowing lane ribbons running up the face — the only paths you may climb. Each is a soft neon
+// core inside a faint glow halo (centre lane brightest), trimmed to stay ON the pyramid (no overshoot).
 function addLaneGuides(tiles){
   const guides = [];
-  const cx = tiles[0].pos.x, P0 = tiles[0].pos, P1 = tiles[tiles.length-1].pos;
+  const cx = tiles[0].pos.x, base = tiles[0].pos, top = tiles[tiles.length-1].pos;
+  const P0 = base.clone().lerp(top, 0.04), P1 = base.clone().lerp(top, 0.9);   // trim ends so ribbons don't run off the pyramid
   const dy = P1.y - P0.y, dz = P1.z - P0.z, L = Math.hypot(dy, dz) || 1;
   const ang = Math.atan2(-dy, dz);                          // tilt the ribbon to lie along the slope
-  const midY = (P0.y + P1.y)/2 + 0.05, midZ = (P0.z + P1.z)/2;
+  const midY = (P0.y + P1.y)/2 + 0.04, midZ = (P0.z + P1.z)/2;
   const strip = (lane, w, col, op) => {
     const mat = new THREE.MeshBasicMaterial({ color:col, transparent:true, opacity:op,
       depthWrite:false, blending:THREE.AdditiveBlending });
@@ -1705,20 +1689,10 @@ function addLaneGuides(tiles){
   };
   [-1,0,1].forEach(lane => {
     const centre = lane===0;
-    strip(lane, 0.22, centre?0xffd24a:0xffb43a, centre?0.16:0.11);   // soft outer glow halo
-    strip(lane, 0.05, centre?0xfff2c0:0xffe49a, centre?0.7:0.5);     // bright neon core line
-  });
-  // a bright shimmer that scrolls UP each lane, giving the ribbons a sense of energy/flow
-  const flows = [];
-  [-1,0,1].forEach(lane => {
-    const mat = new THREE.MeshBasicMaterial({ color:0xfff6d2, transparent:true, opacity:0.0,
-      depthWrite:false, blending:THREE.AdditiveBlending });
-    const m = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.012, Math.min(0.5, L*0.12)), mat);
-    m.rotation.x = ang; scene.add(m); flows.push({ mesh:m, lane });
+    strip(lane, 0.2,  centre?0xffd24a:0xffb43a, centre?0.085:0.055);   // faint outer glow halo
+    strip(lane, 0.045,centre?0xffeec0:0xffe49a, centre?0.34:0.24);     // soft neon core line
   });
   S.run.laneGuides = guides;
-  S.run.laneFlows = flows;
-  S.run.laneGeom = { P0:P0.clone(), P1:P1.clone(), cx };
 }
 
 // a tiny camera-facing symbol (⚡🛡⏱) drawn on a canvas sprite, so each power-up reads at a glance.
@@ -1736,19 +1710,12 @@ function makeGlyph(ch){
   } catch(e){ return null; }
 }
 
-function startRun(){
-  S.phase = 'run';
-  clearGhostRing();
-  Sound.cap();
-  // BUILD → CLIMB: the quality of the pyramid you built shapes the climb. A clean build means a
-  // safer path and richer coins; a sloppy one means a treacherous climb.
-  const stars = pyramidRating(); S.buildStars = stars;
-  missionEvent('stars', stars); missionEvent('builds', 1);   // goals: build quality + pyramids built
-  const hazardMul = stars>=5 ? 0.4 : stars>=4 ? 0.65 : stars>=3 ? 1.0 : stars>=2 ? 1.35 : 1.7;   // fewer hazards on a clean build
-  S.climbCoinMul = stars>=5 ? 2 : stars>=4 ? 1.6 : stars>=3 ? 1.2 : stars>=2 ? 1.0 : 0.7;        // richer coins on a clean build
-  const tiles = climbPath();   // steep, direct step-by-step climb up the front face
-  // (cracked stones are safe to climb — only an actual missing stone is a gap you must jump)
-  // procedural obstacles: beams to SLIDE under, side pillars to DODGE
+// Spawn the climb's hazards, coins, power-ups and lane guides. Deferred until the player taps START CLIMB,
+// so none of it appears (or animates / makes sound) behind the rating/preview screen.
+function loadRunDressing(){
+  const r = S.run; if (!r || r.dressed) return; r.dressed = true;
+  const tiles = r.tiles, hazardMul = r.hazardMul;
+  // procedural obstacles: swinging hammers to time + sliding spike traps to dodge
   let lastOb = 2;
   for (let i = 5; i < tiles.length - 2; i++){
     const t = tiles[i];
@@ -1789,12 +1756,6 @@ function startRun(){
     }
     lastOb = i;
   }
-  // HAZARD: sandstorm stretches — fog closes in, harder to read the path ahead
-  const storms = [];
-  const stormChance = biomeFor(gameLevel).storm;          // each biome storms at its own rate (blizzards, calm oasis, etc.)
-  for (let i = 8; i < tiles.length - 6; i++){
-    if (RND() < stormChance){ storms.push([i, Math.min(i + 6 + Math.floor(RND()*5), tiles.length-2)]); i += 11; }
-  }
   // coins: a glinting trail of pickups. Most sit on safe tiles; a few hover over gaps,
   // rewarding a well-timed jump (collect-while-airborne pays a bonus).
   let lastCoin = -3;
@@ -1834,6 +1795,25 @@ function startRun(){
     t.power = { type, mesh:grp, core, ring, glyph, got:false };
     lastPow = i;
   }
+  addLaneGuides(tiles);                                  // the three glowing paths you're restricted to
+}
+
+function startRun(){
+  S.phase = 'run';
+  Sound.cap();
+  // BUILD → CLIMB: the quality of the pyramid you built shapes the climb. A clean build means a
+  // safer path and richer coins; a sloppy one means a treacherous climb.
+  const stars = pyramidRating(); S.buildStars = stars;
+  missionEvent('stars', stars); missionEvent('builds', 1);   // goals: build quality + pyramids built
+  const hazardMul = stars>=5 ? 0.4 : stars>=4 ? 0.65 : stars>=3 ? 1.0 : stars>=2 ? 1.35 : 1.7;   // fewer hazards on a clean build
+  S.climbCoinMul = stars>=5 ? 2 : stars>=4 ? 1.6 : stars>=3 ? 1.2 : stars>=2 ? 1.0 : 0.7;        // richer coins on a clean build
+  const tiles = climbPath();   // steep, direct step-by-step climb up the front face
+  // HAZARD: sandstorm stretches — fog closes in, harder to read the path ahead
+  const storms = [];
+  const stormChance = biomeFor(gameLevel).storm;          // each biome storms at its own rate (blizzards, calm oasis, etc.)
+  for (let i = 8; i < tiles.length - 6; i++){
+    if (RND() < stormChance){ storms.push([i, Math.min(i + 6 + Math.floor(RND()*5), tiles.length-2)]); i += 11; }
+  }
   // ---- rigged little climber: torso, head, arms & legs pivoted at the shoulders/hips ----
   const g = makeRunner();
   g.scale.set(RUN_SCALE, RUN_SCALE, RUN_SCALE); scene.add(g);   // tiny climber
@@ -1847,9 +1827,10 @@ function startRun(){
             falling:false, fallV:0, yOff:0, startDelay:0.6, awaitStart:true,
             lane:0, laneX:0, sliding:false, slideT:0, slideDur:0.5,
             rolling:false, rollT:0, rollDur:0.5, rollDir:1, rollCD:0,
-            magnet:0, shield:0, slow:0, bubble:null,
+            magnet:0, shield:0, slow:0, bubble:null, hazardMul, dressed:false,
             storms, revives:0, usedAdRevive:false, invuln:0, dead:false, deathReason:'fell' };
-  addLaneGuides(tiles);                                  // the three glowing paths you're restricted to (+ scrolling shimmer)
+  // NB: obstacles / coins / power-ups / lane guides are NOT created yet — only when the climb starts
+  // (loadRunDressing in beginClimb), so the rating screen shows a clean pyramid with nothing moving on it.
   g.position.copy(tiles[0].pos);
 
   // HUD swap
@@ -1867,6 +1848,7 @@ function startRun(){
 function beginClimb(){
   const r = S.run; if (!r || !r.awaitStart) return;
   r.awaitStart = false;
+  loadRunDressing();                                  // NOW spawn obstacles / coins / power-ups / lanes
   $('ratingOverlay').classList.remove('show');
   // bring the run HUD back for the actual climb
   $('hud').style.display='flex'; $('coinHud').classList.remove('hidden');
@@ -2578,15 +2560,6 @@ function animate(){
     S.active.mesh.material.emissive.setRGB(0.35*pulse, 0.24*pulse, 0.0);
   if (S.run && S.run.laneGuides){                                        // the neon lane ribbons breathe gently
     S.run.laneGuides.forEach(gd => gd.material.opacity = gd.baseOp * (0.7 + 0.45*pulse)); }
-  if (S.run && S.run.laneFlows && S.run.laneGeom){                       // a shimmer scrolls up each lane
-    const G = S.run.laneGeom;
-    S.run.laneFlows.forEach(fl => {
-      const tt = ((performance.now()*0.00028 + fl.lane*0.27) % 1 + 1) % 1;   // 0→1 looping, staggered per lane
-      fl.mesh.position.set(G.cx + fl.lane*0.24,
-        G.P0.y + (G.P1.y-G.P0.y)*tt + 0.06, G.P0.z + (G.P1.z-G.P0.z)*tt);
-      fl.mesh.material.opacity = 0.6 * Math.sin(tt*Math.PI);                 // fade in/out at the ends
-    });
-  }
   if (S.run) S.run.tiles.forEach((t, ti) => {
     if (t.marker) t.marker.material.opacity = 0.5 + 0.4*pulse;
     if (t.coin && !t.coin.got) t.coin.mesh.rotation.z += dt*3.4;
