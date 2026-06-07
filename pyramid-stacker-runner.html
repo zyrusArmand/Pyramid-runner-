@@ -1669,19 +1669,25 @@ function climbPath(){
   return tiles;
 }
 
-// three softly glowing lane ribbons running up the face — the only paths you may climb (centre lane brightest)
+// three glowing lane ribbons running up the face — the only paths you may climb. Each is a bright neon
+// core inside a soft glow halo (centre lane brightest), kept visually distinct so the 3 dodge-lanes read clearly.
 function addLaneGuides(tiles){
   const guides = [];
   const cx = tiles[0].pos.x, P0 = tiles[0].pos, P1 = tiles[tiles.length-1].pos;
   const dy = P1.y - P0.y, dz = P1.z - P0.z, L = Math.hypot(dy, dz) || 1;
   const ang = Math.atan2(-dy, dz);                          // tilt the ribbon to lie along the slope
   const midY = (P0.y + P1.y)/2 + 0.05, midZ = (P0.z + P1.z)/2;
+  const strip = (lane, w, col, op) => {
+    const mat = new THREE.MeshBasicMaterial({ color:col, transparent:true, opacity:op,
+      depthWrite:false, blending:THREE.AdditiveBlending });
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.01, L), mat);
+    m.position.set(cx + lane*0.24, midY, midZ); m.rotation.x = ang;
+    m.baseOp = op; scene.add(m); guides.push(m);
+  };
   [-1,0,1].forEach(lane => {
-    const mat = new THREE.MeshBasicMaterial({ color: lane===0?0xffe6a0:0xffce72,
-      transparent:true, opacity: lane===0?0.3:0.18, depthWrite:false });
-    const strip = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.012, L), mat);
-    strip.position.set(cx + lane*0.24, midY, midZ); strip.rotation.x = ang;
-    scene.add(strip); guides.push(strip);
+    const centre = lane===0;
+    strip(lane, 0.22, centre?0xffd24a:0xffb43a, centre?0.16:0.11);   // soft outer glow halo
+    strip(lane, 0.05, centre?0xfff2c0:0xffe49a, centre?0.7:0.5);     // bright neon core line
   });
   return guides;
 }
@@ -1718,7 +1724,7 @@ function startRun(){
       arm.position.y = 0.17; ham.add(arm);                                // arm rises from a ground pivot
       const head = new THREE.Mesh(new THREE.BoxGeometry(0.13,0.11,0.13), goldMat);  // heavy head at the top of the arm
       head.position.y = 0.36; head.castShadow = true; ham.add(head);
-      ham.position.set(t.pos.x, t.pos.y - 0.02, t.pos.z);                 // pivots at the path centre, sweeps all lanes
+      ham.position.set(t.pos.x, t.pos.y - 0.1, t.pos.z);                  // pivot sunk into the stone, sweeps all lanes
       scene.add(ham); t.obMesh = ham;
     } else {
       // themed temple SPIKE TRAP — base sunk into the stone, spikes slide left↔right at their own speed
@@ -2523,8 +2529,8 @@ function animate(){
   const pulse = 0.5 + 0.5*Math.sin(performance.now()*0.004);
   if (S.active && S.active.capstone && S.active.mesh.material.emissive)
     S.active.mesh.material.emissive.setRGB(0.35*pulse, 0.24*pulse, 0.0);
-  if (S.run && S.run.laneGuides){ const op = 0.16 + 0.1*pulse;          // the lane ribbons breathe gently
-    S.run.laneGuides.forEach((gd,i) => gd.material.opacity = (i===1 ? op+0.1 : op)); }
+  if (S.run && S.run.laneGuides){                                        // the neon lane ribbons breathe gently
+    S.run.laneGuides.forEach(gd => gd.material.opacity = gd.baseOp * (0.7 + 0.45*pulse)); }
   if (S.run) S.run.tiles.forEach(t => {
     if (t.marker) t.marker.material.opacity = 0.5 + 0.4*pulse;
     if (t.coin && !t.coin.got) t.coin.mesh.rotation.z += dt*3.4;
