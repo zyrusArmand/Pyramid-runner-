@@ -377,7 +377,7 @@ const LAYER_HEIGHT          = 0.55;  // flatter courses → clean, climbable pyr
 const MISS_DISTANCE         = 0.85;
 const PERFECT_DISTANCE      = 0.14;
 // placement accuracy tiers (normalized offset): exact PERFECT / GREAT / GOOD pay 3 / 2 / 1 coins; looser = MISS
-const TIER_PERFECT          = 0.045;   // dead-on only — a true perfect seats flush with no gap
+const TIER_PERFECT          = 0.06;    // dead-on window for a flush, gapless perfect (a touch forgiving)
 const TIER_GREAT            = 0.20;
 const TIER_GOOD             = 0.45;
 const MAX_PIECE_LEN         = 2;     // pieces span 1–2 cells (longer rectangles)
@@ -447,6 +447,10 @@ const DDA = {
   obstacleW(){ return Math.max(0.4, 1 + (this.s()-0.5)*0.7); },  // more run obstacles when sharp, fewer when struggling
 };
 function perfectThreshold(){ return TIER_PERFECT * DDA.perfectW(); }   // the live PERFECT cutoff
+
+// ---------- level progression: each pyramid you finish bumps the level and ups the pace ----------
+let gameLevel = 1;
+function levelSpeed(){ return 1 + (gameLevel-1)*0.08; }   // +8% pace per level
 
 const app = document.getElementById('app');
 
@@ -835,7 +839,7 @@ function spawnBlock(){
       mesh.position.copy(center);                          // at slot LEVEL — never lifted above the wall
       mesh.position[perpAxis] = far;
       S.active = { mesh, center, axis, mode:'keystone', perpAxis, target, outward, seat, far,
-                   speed: speed * 1.5 * DDA.buildSpeed(), phase:Math.PI,   // same brisk (adaptive) sweep as regular blocks
+                   speed: speed * 1.25 * DDA.buildSpeed() * levelSpeed(), phase:Math.PI,   // sweep (adaptive + per-level)
                    capstone:false, len, cells, corner, n };
       addPlaceGuide(S.active);                             // glowing perfect-seat outline
     } else {
@@ -853,7 +857,7 @@ function spawnBlock(){
       if (!sb.fit){ scene.remove(mesh); advance(len); return; }         // slot blocked — leave a gap, move on
       const seat = (odir>0) ? sb.sLo : sb.sHi;             // perfect (flush) end
       const far  = (odir>0) ? sb.sHi : sb.sLo;             // far/opposite end — where the stone enters from
-      const oSpeed = speed * 1.5 * DDA.buildSpeed();       // brisk steady sweep (adaptive: faster when you're sharp)
+      const oSpeed = speed * 1.25 * DDA.buildSpeed() * levelSpeed();   // steady sweep (adaptive + faster each level)
       mesh.position[axis] = far;                           // SPAWN at the far/opposite end, then sweep to the seat
       S.active = { mesh, center, axis, speed:oSpeed, phase:Math.PI, mode:'open', odir, seat, far,
                    capstone:false, len, cells, corner, n };
@@ -1316,11 +1320,11 @@ function updateRun(dt){
   if (r.invuln > 0) r.invuln -= dt;                // brief grace after a revive
 
   // advance along the path — the climb steadily quickens to keep the pressure on
-  r.speed = (4.0 + Math.min(r.idx * 0.03, 2.5)) * DDA.runSpeed();   // adaptive: a touch faster when you're sharp
+  r.speed = (3.6 + Math.min(r.idx * 0.03, 2.5)) * DDA.runSpeed() * levelSpeed();   // adaptive + faster each level
   r.t += r.speed * dt / 1;
   while (r.t >= 1){
     r.t -= 1; r.idx++;
-    if (r.idx >= r.tiles.length-1){ Sound.win(); endGame(true); return; }
+    if (r.idx >= r.tiles.length-1){ Sound.win(); nextLevel(); return; }   // reached the summit → next level, faster
     Sound.step();
     if (r.invuln <= 0 && tileUnsafe(r.tiles[r.idx])){
       if (!r.jumping){ crumbleTile(r.tiles[r.idx]); startFall(); return; }
@@ -1558,7 +1562,7 @@ function applyShake(){
 
 // ---------- HUD / screens ----------
 function updateHUD(){
-  $('score').textContent = S.score; $('layer').textContent = S.layer+1;
+  $('score').textContent = S.score; $('layer').textContent = gameLevel;   // right stat = current LEVEL during the build
   const integ = Math.max(0, S.integrity);
   $('meterFill').style.width = (integ*100)+'%';
   $('meterFill').style.background = integ>0.4 ? 'linear-gradient(90deg,#6fe3a0,#e8d35f)' : 'linear-gradient(90deg,#e8a35f,#e85f5f)';
@@ -1568,6 +1572,7 @@ function showPop(t){ const p=$('pop'); p.textContent=t; p.classList.remove('show
 function buzz(pattern){ try { if (navigator.vibrate) navigator.vibrate(pattern); } catch(e){} }   // phone haptics (perfect only)
 
 function startGame(){
+  gameLevel = 1;
   resetState();
   [...scene.children].forEach(o => { if (o.__env || o===ground || o===sky) return; if (o.isMesh) scene.remove(o); if (o.isGroup) scene.remove(o); });
   S.phase='build';
@@ -1575,7 +1580,7 @@ function startGame(){
   atMenu = false;
   $('startScreen').classList.add('hidden'); $('overScreen').classList.add('hidden');
   $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden');
-  $('lblA').textContent='SCORE'; $('lblB').textContent='LAYER';
+  $('lblA').textContent='SCORE'; $('lblB').textContent='LEVEL';
   $('lives').style.display='none'; $('meterLabel').textContent='STRUCTURAL INTEGRITY'; $('meterBar').style.display='block';
   $('meterWrap').style.opacity='1';
   $('coinHud').classList.remove('hidden'); $('combo').classList.remove('show'); $('vignette').style.opacity='0';
@@ -1584,6 +1589,27 @@ function startGame(){
   $('reviveScreen').classList.add('hidden'); $('adModal').classList.add('hidden'); $('hint').classList.remove('show');
   $('menuBtn').style.display = 'block';
   if (firstTime) showHint('TAP to drop · land each block CENTERED for PERFECT', 5000);
+  updateHUD(); spawnBlock();
+}
+
+// reached the summit → start the NEXT pyramid: keep score/coins, bump the level, everything a bit faster
+function nextLevel(){
+  gameLevel++;
+  DDA.note(0.85);                                          // finishing a pyramid means you're playing well
+  const keepScore = S.score, keepCoins = S.coins, keepBest = S.bestPerfect||0;
+  resetState();
+  S.score = keepScore + 150 + gameLevel*50;               // level-clear bonus
+  S.coins = keepCoins; S.bestPerfect = keepBest;
+  [...scene.children].forEach(o => { if (o.__env || o===ground || o===sky) return; if (o.isMesh||o.isGroup) scene.remove(o); });
+  S.phase = 'build';
+  $('lblA').textContent='SCORE'; $('lblB').textContent='LEVEL';
+  $('lives').style.display='none'; $('meterLabel').textContent='STRUCTURAL INTEGRITY'; $('meterBar').style.display='block';
+  $('meterWrap').style.opacity='1';
+  $('coinHud').classList.remove('hidden'); $('combo').classList.remove('show'); $('vignette').style.opacity='0';
+  $('hud').style.display='flex';
+  $('storm').style.opacity='0'; scene.fog.near=16; scene.fog.far=46; S.stormA=0;
+  $('reviveScreen').classList.add('hidden'); $('hint').classList.remove('show'); $('menuBtn').style.display='block';
+  showPop('LEVEL ' + gameLevel);
   updateHUD(); spawnBlock();
 }
 
