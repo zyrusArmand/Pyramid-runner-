@@ -82,12 +82,13 @@
   #flash.show { animation:flashfx .32s ease-out; }
   @keyframes flashfx { 0%{opacity:.5;} 100%{opacity:0;} }
   #ratingOverlay { position:fixed; inset:0; z-index:8; display:none; flex-direction:column; align-items:center;
-    justify-content:center; gap:12px; pointer-events:none; opacity:0; transition:opacity .4s; text-align:center; }
+    justify-content:flex-start; padding-top:9vh; gap:8px; pointer-events:none; opacity:0; transition:opacity .4s; text-align:center; }
   #ratingOverlay.show { display:flex; opacity:1; }
-  #ratingTint { position:absolute; inset:0; }
+  #ratingTint { position:absolute; inset:0; pointer-events:none; }
   #ratingStars { font-size:clamp(36px,12vw,68px); letter-spacing:7px; z-index:1; text-shadow:0 2px 18px rgba(0,0,0,.7); }
   #ratingPhrase { font-family:'Cinzel',serif; font-weight:700; font-size:clamp(20px,6vw,34px); letter-spacing:3px; z-index:1; text-shadow:0 2px 14px rgba(0,0,0,.8); }
   #ratingSub { font-size:12px; letter-spacing:4px; opacity:.75; color:#f6e9d2; z-index:1; }
+  #climbBtn { position:absolute; bottom:max(40px,calc(env(safe-area-inset-bottom) + 26px)); z-index:1; pointer-events:auto; }
   @keyframes ratePop { 0%{transform:scale(.55);opacity:0;} 45%{transform:scale(1.14);opacity:1;} 100%{transform:scale(1);opacity:1;} }
   #ratingOverlay.show #ratingStars, #ratingOverlay.show #ratingPhrase { animation:ratePop .55s ease-out; }
 
@@ -262,9 +263,10 @@
 <div id="flash"></div>
 <div id="ratingOverlay">
   <div id="ratingTint"></div>
+  <div id="ratingSub">PYRAMID COMPLETE</div>
   <div id="ratingStars"></div>
   <div id="ratingPhrase"></div>
-  <div id="ratingSub">PYRAMID COMPLETE</div>
+  <div class="cta hero" id="climbBtn">START CLIMB ▲</div>
 </div>
 <div id="pop">PERFECT</div>
 <div id="hint"></div>
@@ -1134,15 +1136,16 @@ function showRating(){
   $('ratingStars').textContent = '★'.repeat(stars) + '☆'.repeat(5-stars);
   $('ratingStars').style.color = r.col;
   $('ratingPhrase').textContent = r.phrase; $('ratingPhrase').style.color = r.col;
+  // VIGNETTE tint — clear in the middle so you can see the whole pyramid you built behind it
   const tint = $('ratingTint');
-  if (stars<=2)      tint.style.background = 'radial-gradient(ellipse at 50% 44%, rgba(150,22,10,.55), rgba(8,0,0,.78) 70%)';  // fire/storm
-  else if (stars>=4) tint.style.background = 'radial-gradient(ellipse at 50% 38%, rgba(255,205,90,.45), rgba(40,22,0,.55) 72%)'; // sun
-  else               tint.style.background = 'radial-gradient(ellipse at 50% 45%, rgba(40,32,20,.5), rgba(8,6,12,.62) 70%)';
+  if (stars<=2)      tint.style.background = 'radial-gradient(ellipse at 50% 50%, transparent 22%, rgba(120,16,8,.55) 92%)';   // fire/storm
+  else if (stars>=4) tint.style.background = 'radial-gradient(ellipse at 50% 42%, rgba(255,205,90,.20) 0%, transparent 36%, rgba(50,28,0,.5) 92%)'; // sun
+  else               tint.style.background = 'radial-gradient(ellipse at 50% 50%, transparent 24%, rgba(15,10,18,.55) 92%)';
   $('ratingOverlay').classList.add('show');
   if (stars<=2){ Sound.fail(); for (let k=0;k<3;k++) setTimeout(()=>{ flash(); shake(0.55); }, 120 + k*240); }   // lightning + bad noise
   else if (stars>=4){ Sound.glory(); flash(); }                                                                  // sun flash + fanfare
   else { Sound.cap(); }
-  setTimeout(()=> $('ratingOverlay').classList.remove('show'), 2200);
+  // stays up — the player taps START CLIMB when ready (see beginClimb)
 }
 
 function advance(len){
@@ -1304,7 +1307,7 @@ function startRun(){
   sh.rotation.x = -Math.PI/2; scene.add(sh); S.shadow = sh;
 
   S.run = { tiles, idx:0, t:0, speed:4.0, jumping:false, jumpT:0, jumpDur:0.5, jumpH:0.95,
-            falling:false, fallV:0, yOff:0, startDelay:2.6,
+            falling:false, fallV:0, yOff:0, startDelay:0.6, awaitStart:true,
             lane:0, laneX:0, sliding:false, slideT:0, slideDur:0.5,
             rolling:false, rollT:0, rollDur:0.5, rollDir:1, rollCD:0,
             storms, revives:0, usedAdRevive:false, invuln:0, dead:false, deathReason:'fell' };
@@ -1319,9 +1322,15 @@ function startRun(){
   $('combo').classList.remove('show');
   $('coinHud').classList.remove('hidden');
   updateCoinHud(false);
-  showRating();                                          // 1–5 star rating of the pyramid you just built
-  const gaps = tiles.some(t => t.gap);
-  setTimeout(()=>{ if (S.phase==='run' && !S.gameOver) showPop(gaps ? 'JUMP THE GAPS!' : 'CLIMB!'); }, 2400);
+  showRating();                                          // hold on the pyramid + 1–5 star rating; wait for START CLIMB
+}
+// player tapped START CLIMB on the rating screen → drop into the climb
+function beginClimb(){
+  const r = S.run; if (!r || !r.awaitStart) return;
+  r.awaitStart = false;
+  $('ratingOverlay').classList.remove('show');
+  const gaps = r.tiles.some(t => t.gap);
+  showPop(gaps ? 'JUMP THE GAPS!' : 'CLIMB!');
   if (firstTime){ showHint('TAP/↑ JUMP · ⟷ MOVE · ↓ SLIDE · DOUBLE ↑↓ ROLL', 5200); }
 }
 
@@ -1353,6 +1362,8 @@ function downAction(){ const now = performance.now(); if (now-_lastDown < 320){ 
 
 function updateRun(dt){
   const r = S.run, g = S.runner; if (!r) return;
+
+  if (r.awaitStart){ overviewCam(dt); placeShadow(g, r); return; }   // holding on the rating screen; show the whole pyramid
 
   if (r.falling){
     r.fallV -= 12*dt; g.position.y += r.fallV*dt; g.rotation.z += dt*4;
@@ -1584,6 +1595,13 @@ function crumbleTile(t){
   if (m && !m.__fell){ m.__fell = true; crumbleStone(m); }
 }
 
+// pull back to frame the WHOLE finished pyramid while the rating + START CLIMB button are shown
+function overviewCam(dt){
+  const want = new THREE.Vector3(Math.sin(0.62)*8.5, 5.2, Math.cos(0.62)*8.5);
+  camera.position.lerp(want, Math.min(1, dt*2.4));
+  camera.lookAt(0, 0.9, 0);
+  applyShake();
+}
 function followCam(dt, falling){
   const r = S.run, g = S.runner;
   const A = r.tiles[r.idx].pos, B = r.tiles[Math.min(r.idx+1,r.tiles.length-1)].pos;
@@ -1795,6 +1813,7 @@ btn('menuBtn',       goMenu);
 btn('menuFromOver',  goMenu);
 btn('retryBtn',      ()=>startGame());
 btn('restartBtn',    ()=>startGame());   // in-game restart (back to level 1)
+btn('climbBtn',      beginClimb);        // start the climb from the rating screen
 function goMenu(){ endRevivePrompt(); $('adModal').classList.add('hidden'); showStart(); }   // quit to main menu mid-game
 
 window.addEventListener('pointerdown', e => {
