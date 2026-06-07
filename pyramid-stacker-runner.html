@@ -886,6 +886,11 @@ function drop(){
   const isKey = (a.mode==='keystone');
   const perfect = offN < perfectThreshold();
   let restAt = perfect ? ref : cur;
+  // cap how far a stone may drift from its seat, so one bad drop can't fling it deep into the NEXT wall
+  // (which is what shoved the corner piece for several turns) — the wall just flows with a small gap.
+  const DRIFT_CAP = 0.3;
+  if (restAt > ref + DRIFT_CAP) restAt = ref + DRIFT_CAP;
+  else if (restAt < ref - DRIFT_CAP) restAt = ref - DRIFT_CAP;
   if (!a.capstone){
     restAt = clampPlacement(a, restAt, offAxis);                  // solid stones can never merge
     if (restAt === null){                                        // no room here — a solid stone can't fit, so it crumbles
