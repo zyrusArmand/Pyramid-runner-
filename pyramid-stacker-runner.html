@@ -78,9 +78,18 @@
   #vignette { position:fixed; inset:0; z-index:4; pointer-events:none; opacity:0;
     box-shadow:inset 0 0 120px 40px rgba(200,30,30,.65); transition:opacity .2s; }
   /* perfect / collect flash */
-  #flash { position:fixed; inset:0; z-index:7; pointer-events:none; opacity:0; background:#fff; }
+  #flash { position:fixed; inset:0; z-index:9; pointer-events:none; opacity:0; background:#fff; }
   #flash.show { animation:flashfx .32s ease-out; }
   @keyframes flashfx { 0%{opacity:.5;} 100%{opacity:0;} }
+  #ratingOverlay { position:fixed; inset:0; z-index:8; display:none; flex-direction:column; align-items:center;
+    justify-content:center; gap:12px; pointer-events:none; opacity:0; transition:opacity .4s; text-align:center; }
+  #ratingOverlay.show { display:flex; opacity:1; }
+  #ratingTint { position:absolute; inset:0; }
+  #ratingStars { font-size:clamp(36px,12vw,68px); letter-spacing:7px; z-index:1; text-shadow:0 2px 18px rgba(0,0,0,.7); }
+  #ratingPhrase { font-family:'Cinzel',serif; font-weight:700; font-size:clamp(20px,6vw,34px); letter-spacing:3px; z-index:1; text-shadow:0 2px 14px rgba(0,0,0,.8); }
+  #ratingSub { font-size:12px; letter-spacing:4px; opacity:.75; color:#f6e9d2; z-index:1; }
+  @keyframes ratePop { 0%{transform:scale(.55);opacity:0;} 45%{transform:scale(1.14);opacity:1;} 100%{transform:scale(1);opacity:1;} }
+  #ratingOverlay.show #ratingStars, #ratingOverlay.show #ratingPhrase { animation:ratePop .55s ease-out; }
 
   /* shop / skins on the start screen */
   #meta { margin-top:26px; display:flex; flex-direction:column; align-items:center; gap:14px; }
@@ -251,6 +260,12 @@
 <div id="vignette"></div>
 <div id="storm"></div>
 <div id="flash"></div>
+<div id="ratingOverlay">
+  <div id="ratingTint"></div>
+  <div id="ratingStars"></div>
+  <div id="ratingPhrase"></div>
+  <div id="ratingSub">PYRAMID COMPLETE</div>
+</div>
 <div id="pop">PERFECT</div>
 <div id="hint"></div>
 
@@ -730,6 +745,8 @@ const Sound = {
   step(){ this.blip(240, 0.05, 'sine', 0.05); },
   cap(){ [0,7,12,16,19].forEach((s,i)=> setTimeout(()=>this.blip(523*Math.pow(2,s/12),0.5,'triangle',0.16),i*90)); },
   win(){ [0,5,7,12,17,19,24].forEach((s,i)=> setTimeout(()=>this.blip(523*Math.pow(2,s/12),0.4,'sine',0.16),i*110)); },
+  fail(){ [0,-3,-7,-12].forEach((s,i)=> setTimeout(()=>this.blip(294*Math.pow(2,s/12),0.34,'sawtooth',0.2,120),i*135)); },   // ominous descending — dishonor
+  glory(){ [0,4,7,12,16,19,24].forEach((s,i)=> setTimeout(()=>this.blip(392*Math.pow(2,s/12),0.45,'triangle',0.17),i*95)); }, // big ascending fanfare
   coin(n=0){ this.blip(880*Math.pow(2,Math.min(n,8)/24), 0.10, 'square', 0.10, 1320); },
   heart(){ this.blip(70, 0.16, 'sine', 0.22, 45); },
   buy(){ [0,7,12].forEach((s,i)=> setTimeout(()=>this.blip(523*Math.pow(2,s/12),0.2,'triangle',0.14),i*70)); }
@@ -758,6 +775,7 @@ function resetState(){
     layerBlocks:[], layerBoxes:[], prevLayerBoxes:[], active:null, falling:[], dropAnims:[],
     fx:[], squash:[], shakeAmt:0, shadow:null,
     coins:0, timeScale:1, heartT:0, bestPerfect:0, coinsDoubled:false,
+    buildQual:0, buildCount:0,    // sum of per-block placement quality & count → the pyramid's star rating
     pathSlots:[],          // ordered per-cell {pos, placed} for the runner
     run:null, runner:null };
 }
@@ -1032,6 +1050,7 @@ function missStone(a, label){
   crumbleStone(a.mesh);
   Sound.drop(); shake(0.35);
   S.integrity = Math.max(0, S.integrity - 0.06);
+  S.buildQual += 0; S.buildCount++;                  // a crumbled/gap stone counts against the pyramid rating
   S.streak = 0; showCombo(0); showPop(label || 'MISS');
   pushCells(a, false, false, 0);                    // its cells become a gap in the run path
   updateHUD();
@@ -1066,6 +1085,8 @@ function blockPlaced(mesh, instability, capstone, len, consumed){
   else                                { tier='MISS';    coins=0; baseScore=15;  }
   // feed the adaptive-difficulty skill estimate (perfect = sharp, miss = struggling)
   DDA.note(tier==='PERFECT' ? 1 : tier==='GREAT' ? 0.7 : tier==='GOOD' ? 0.4 : 0.1);
+  // tally placement quality for the end-of-pyramid star rating
+  S.buildQual += (tier==='PERFECT' ? 1 : tier==='GREAT' ? 0.75 : tier==='GOOD' ? 0.5 : 0.15); S.buildCount++;
 
   if (tier === 'PERFECT'){
     // exact hit ONLY — the full reaction: emoji pop + phone buzz + chime + sparkle
@@ -1096,6 +1117,33 @@ function showCombo(n){
   else c.classList.remove('show');
 }
 function flash(){ const f=$('flash'); f.classList.remove('show'); void f.offsetWidth; f.classList.add('show'); }
+
+// ---------- end-of-pyramid STAR RATING (1–5) based on how well you placed your stones ----------
+const RATINGS = [ null,
+  { phrase:'YOU BRING DISHONOR',   col:'#ff6a5a' },   // ★
+  { phrase:'THE PHARAOH SCOWLS',   col:'#ffa24a' },   // ★★
+  { phrase:'A PASSABLE TOMB',      col:'#ffe07a' },   // ★★★
+  { phrase:'FIT FOR A KING',       col:'#9fe9c0' },   // ★★★★
+  { phrase:'A WONDER OF THE AGES', col:'#ffe6a0' } ]; // ★★★★★
+function pyramidRating(){
+  const q = S.buildCount ? S.buildQual / S.buildCount : 0.5;
+  return q>=0.9 ? 5 : q>=0.72 ? 4 : q>=0.52 ? 3 : q>=0.32 ? 2 : 1;
+}
+function showRating(){
+  const stars = pyramidRating(), r = RATINGS[stars];
+  $('ratingStars').textContent = '★'.repeat(stars) + '☆'.repeat(5-stars);
+  $('ratingStars').style.color = r.col;
+  $('ratingPhrase').textContent = r.phrase; $('ratingPhrase').style.color = r.col;
+  const tint = $('ratingTint');
+  if (stars<=2)      tint.style.background = 'radial-gradient(ellipse at 50% 44%, rgba(150,22,10,.55), rgba(8,0,0,.78) 70%)';  // fire/storm
+  else if (stars>=4) tint.style.background = 'radial-gradient(ellipse at 50% 38%, rgba(255,205,90,.45), rgba(40,22,0,.55) 72%)'; // sun
+  else               tint.style.background = 'radial-gradient(ellipse at 50% 45%, rgba(40,32,20,.5), rgba(8,6,12,.62) 70%)';
+  $('ratingOverlay').classList.add('show');
+  if (stars<=2){ Sound.fail(); for (let k=0;k<3;k++) setTimeout(()=>{ flash(); shake(0.55); }, 120 + k*240); }   // lightning + bad noise
+  else if (stars>=4){ Sound.glory(); flash(); }                                                                  // sun flash + fanfare
+  else { Sound.cap(); }
+  setTimeout(()=> $('ratingOverlay').classList.remove('show'), 2200);
+}
 
 function advance(len){
   const n = nForLayer(S.layer);
@@ -1256,7 +1304,7 @@ function startRun(){
   sh.rotation.x = -Math.PI/2; scene.add(sh); S.shadow = sh;
 
   S.run = { tiles, idx:0, t:0, speed:4.0, jumping:false, jumpT:0, jumpDur:0.5, jumpH:0.95,
-            falling:false, fallV:0, yOff:0, startDelay:1.4,
+            falling:false, fallV:0, yOff:0, startDelay:2.6,
             lane:0, laneX:0, sliding:false, slideT:0, slideDur:0.5,
             rolling:false, rollT:0, rollDur:0.5, rollDir:1, rollCD:0,
             storms, revives:0, usedAdRevive:false, invuln:0, dead:false, deathReason:'fell' };
@@ -1271,9 +1319,9 @@ function startRun(){
   $('combo').classList.remove('show');
   $('coinHud').classList.remove('hidden');
   updateCoinHud(false);
-  showPop('PYRAMID COMPLETE');
+  showRating();                                          // 1–5 star rating of the pyramid you just built
   const gaps = tiles.some(t => t.gap);
-  setTimeout(()=>{ if (S.phase==='run' && !S.gameOver) showPop(gaps ? 'JUMP THE GAPS!' : 'CLIMB!'); }, 900);
+  setTimeout(()=>{ if (S.phase==='run' && !S.gameOver) showPop(gaps ? 'JUMP THE GAPS!' : 'CLIMB!'); }, 2400);
   if (firstTime){ showHint('TAP/↑ JUMP · ⟷ MOVE · ↓ SLIDE · DOUBLE ↑↓ ROLL', 5200); }
 }
 
@@ -1585,6 +1633,7 @@ function buzz(pattern){ try { if (navigator.vibrate) navigator.vibrate(pattern);
 
 function startGame(){
   gameLevel = 1;
+  $('ratingOverlay').classList.remove('show');
   resetState();
   [...scene.children].forEach(o => { if (o.__env || o===ground || o===sky) return; if (o.isMesh) scene.remove(o); if (o.isGroup) scene.remove(o); });
   S.phase='build';
@@ -1629,6 +1678,7 @@ function nextLevel(){
 let shopTab = 'chars';
 function showStart(){            // the main "home" menu (cover art + PLAY / LEADERBOARD / SHOP)
   atMenu = true;
+  $('ratingOverlay').classList.remove('show');
   S.phase = null; S.gameOver = false;
   $('overScreen').classList.add('hidden');
   $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden');
