@@ -98,6 +98,9 @@
   #dailyBtn { pointer-events:auto; font-size:11px; letter-spacing:2px; padding:9px 20px; border-radius:30px;
     border:1.5px solid rgba(111,227,160,.5); color:#9fe9c0; cursor:pointer; transition:all .18s; }
   #dailyBtn.on { background:rgba(111,227,160,.18); border-color:#9fe9c0; color:#d6ffe9; }
+  #ddaBtn { pointer-events:auto; margin-top:14px; font-size:11px; letter-spacing:2px; padding:9px 20px; border-radius:30px;
+    border:1.5px solid rgba(243,200,120,.4); color:#e9c98a; cursor:pointer; transition:all .18s; }
+  #ddaBtn.on { background:rgba(243,200,120,.16); border-color:#f3c878; color:#ffe6b0; }
 
   /* in-game main-menu button (top-left) */
   #menuBtn { position:fixed; left:14px; top:calc(max(16px,env(safe-area-inset-top)) + 2px); z-index:6;
@@ -298,6 +301,7 @@
       <div class="midBtn" id="homeLeader"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4a5 5 0 0 1-10 0V4z"/><path d="M7 6H4v1.5A3.5 3.5 0 0 0 7.5 11"/><path d="M17 6h3v1.5A3.5 3.5 0 0 1 16.5 11"/><path d="M9.5 18h5"/><path d="M12 14.5V18"/></svg>LEADERBOARD</div>
       <div class="midBtn" id="homeShop"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12l-1 11H7L6 8z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg>SHOP</div>
     </div>
+    <div id="ddaBtn">ADAPTIVE DIFFICULTY: ON</div>
   </div>
 </div>
 
@@ -423,6 +427,26 @@ let ownedChars  = Store.get('ownedChars', ['explorer']);
 let curChar     = Store.get('char', 'explorer');
 function stone(){ return STONES[curStone] || STONES.sand; }
 function character(){ return CHARACTERS[curChar] || CHARACTERS.explorer; }
+
+// ---------- adaptive difficulty (DDA) — watches how cleanly & precisely you play and gently nudges the
+// knobs: harder when you're crushing it, easier when you're struggling. A single eased "skill" value
+// (persisted) drives every knob, and when OFF skill reads a neutral 0.5 so nothing changes. ----------
+const DDA = {
+  on: Store.get('dda', 1) !== 0,                                  // default ON
+  skill: Math.max(0.1, Math.min(0.9, Store.get('skill', 0.5))),  // 0 = struggling … 1 = crushing it (persists)
+  note(perf){                                                    // perf 0..1 for the latest action; eased, never snaps
+    if (!this.on) return;
+    this.skill += (perf - this.skill) * 0.10;
+    this.skill = Math.max(0.08, Math.min(0.92, this.skill));
+    Store.set('skill', this.skill);
+  },
+  s(){ return this.on ? this.skill : 0.5; },                      // effective skill (neutral 0.5 when OFF → no change)
+  buildSpeed(){ return 1 + (this.s()-0.5)*0.5; },                // brisker block sweep when you're sharp
+  perfectW(){  return 1 + (0.5-this.s())*0.7; },                 // wider PERFECT window when struggling, tighter when sharp
+  runSpeed(){  return 1 + (this.s()-0.5)*0.3; },                 // slightly faster climb when sharp
+  obstacleW(){ return Math.max(0.4, 1 + (this.s()-0.5)*0.7); },  // more run obstacles when sharp, fewer when struggling
+};
+function perfectThreshold(){ return TIER_PERFECT * DDA.perfectW(); }   // the live PERFECT cutoff
 
 const app = document.getElementById('app');
 
@@ -809,7 +833,7 @@ function spawnBlock(){
       mesh.position.copy(center);                          // at slot LEVEL — never lifted above the wall
       mesh.position[perpAxis] = far;
       S.active = { mesh, center, axis, mode:'keystone', perpAxis, target, outward, seat, far,
-                   speed: speed * 1.5, phase:Math.PI,      // same brisk sweep as regular blocks
+                   speed: speed * 1.5 * DDA.buildSpeed(), phase:Math.PI,   // same brisk (adaptive) sweep as regular blocks
                    capstone:false, len, cells, corner, n };
       addPlaceGuide(S.active);                             // glowing perfect-seat outline
     } else {
@@ -827,7 +851,7 @@ function spawnBlock(){
       if (!sb.fit){ scene.remove(mesh); advance(len); return; }         // slot blocked — leave a gap, move on
       const seat = (odir>0) ? sb.sLo : sb.sHi;             // perfect (flush) end
       const far  = (odir>0) ? sb.sHi : sb.sLo;             // far/opposite end — where the stone enters from
-      const oSpeed = speed * 1.5;                          // brisk steady sweep — faster, with a tighter/harder perfect window
+      const oSpeed = speed * 1.5 * DDA.buildSpeed();       // brisk steady sweep (adaptive: faster when you're sharp)
       mesh.position[axis] = far;                           // SPAWN at the far/opposite end, then sweep to the seat
       S.active = { mesh, center, axis, speed:oSpeed, phase:Math.PI, mode:'open', odir, seat, far,
                    capstone:false, len, cells, corner, n };
@@ -852,7 +876,7 @@ function drop(){
   // the no-overlap clamp is applied LAST, so a stone can NEVER end up inside a neighbour — even if an
   // earlier stone drifted into this one's cell (then a "perfect" simply seats touching it instead).
   const isKey = (a.mode==='keystone');
-  const perfect = offN < TIER_PERFECT;
+  const perfect = offN < perfectThreshold();
   let restAt = perfect ? a.center[offAxis] : cur;
   if (!a.capstone){
     restAt = clampPlacement(a, restAt, offAxis);                  // solid stones can never merge
@@ -1015,10 +1039,12 @@ function blockPlaced(mesh, instability, capstone, len, consumed){
   S.squash.push({ mesh, t:0 });                 // satisfying landing squash (juice)
   // accuracy tiers — PERFECT (exact) / GREAT / GOOD pay 3 / 2 / 1 coins; anything looser is a MISS
   let tier, coins, baseScore;
-  if      (instability < TIER_PERFECT){ tier='PERFECT'; coins=3; baseScore=100; }
+  if      (instability < perfectThreshold()){ tier='PERFECT'; coins=3; baseScore=100; }
   else if (instability < TIER_GREAT)  { tier='GREAT';   coins=2; baseScore=70;  }
   else if (instability < TIER_GOOD)   { tier='GOOD';    coins=1; baseScore=45;  }
   else                                { tier='MISS';    coins=0; baseScore=15;  }
+  // feed the adaptive-difficulty skill estimate (perfect = sharp, miss = struggling)
+  DDA.note(tier==='PERFECT' ? 1 : tier==='GREAT' ? 0.7 : tier==='GOOD' ? 0.4 : 0.1);
 
   if (tier === 'PERFECT'){
     // exact hit ONLY — the full reaction: emoji pop + phone buzz + chime + sparkle
@@ -1118,7 +1144,7 @@ function startRun(){
     if (t.gap || t.weak || i - lastOb < 4) continue;
     if ((tiles[i-1] && (tiles[i-1].gap || tiles[i-1].weak)) ||
         (tiles[i-2] && (tiles[i-2].gap || tiles[i-2].weak))) continue;   // leave landing room after a jump
-    if (RND() > 0.18) continue;
+    if (RND() > 0.18 * DDA.obstacleW()) continue;          // adaptive: more obstacles when sharp, fewer when struggling
     const A = tiles[i].pos, B = tiles[Math.min(i+1, tiles.length-1)].pos;
     let fwd = B.clone().sub(A); fwd.y = 0; if (fwd.lengthSq()<1e-4) fwd.set(0,0,1); else fwd.normalize();
     const perp = new THREE.Vector3(-fwd.z, 0, fwd.x);
@@ -1285,7 +1311,7 @@ function updateRun(dt){
   if (r.invuln > 0) r.invuln -= dt;                // brief grace after a revive
 
   // advance along the path — the climb steadily quickens to keep the pressure on
-  r.speed = 4.0 + Math.min(r.idx * 0.03, 2.5);
+  r.speed = (4.0 + Math.min(r.idx * 0.03, 2.5)) * DDA.runSpeed();   // adaptive: a touch faster when you're sharp
   r.t += r.speed * dt / 1;
   while (r.t >= 1){
     r.t -= 1; r.idx++;
@@ -1574,6 +1600,7 @@ function renderHome(){
   $('bestScore').textContent  = bestScore;
   $('bestHeight').textContent = (bestHeight||0).toFixed(0)+'m';
   $('bankCoins').textContent  = bank;
+  const d = $('ddaBtn'); d.textContent = 'ADAPTIVE DIFFICULTY: ' + (DDA.on ? 'ON' : 'OFF'); d.classList.toggle('on', DDA.on);
 }
 function showLeader(){ $('startScreen').classList.add('hidden'); $('leaderPanel').classList.remove('hidden'); renderLeader(); }
 function showShop(){ $('startScreen').classList.add('hidden'); $('shopPanel').classList.remove('hidden'); renderShop(); }
@@ -1620,6 +1647,7 @@ function pickStone(key){ buyOrEquip(key, STONES, ownedStones, 'ownedStones', k =
 function endGame(won, how){
   if (S.gameOver) return;
   S.gameOver = true; S.won = won; S.phase = 'over';
+  DDA.note(won ? 0.9 : (how==='collapsed' ? 0.15 : 0.3));   // run outcome feeds the adaptive skill estimate
   $('reviveScreen').classList.add('hidden'); $('menuBtn').style.display = 'none';
   $('hud').style.display = 'none'; $('coinHud').classList.add('hidden');
   // coins were already banked as they were collected; just save records here
@@ -1664,6 +1692,7 @@ btn('shopBack',      backHome);
 btn('tabChars',      ()=>{ shopTab='chars';  renderShop(); });
 btn('tabStones',     ()=>{ shopTab='stones'; renderShop(); });
 btn('dailyBtn',      ()=>{ dailyMode = !dailyMode; renderLeader(); });
+btn('ddaBtn',        ()=>{ DDA.on = !DDA.on; Store.set('dda', DDA.on?1:0); renderHome(); });
 btn('shareBtn',      shareScore);
 btn('dblBtn',        doubleCoins);
 btn('reviveCoins',   reviveWithCoins);
@@ -1733,7 +1762,7 @@ function animate(){
       const safe = clampPlacement(a, a.mesh.position[ax], ax);
       if (safe !== null) a.mesh.position[ax] = safe;
       // light the perfect-seat outline (and the stone) GREEN the instant it lines up dead-on for a PERFECT
-      const near = Math.abs(a.mesh.position[ax] - a.center[ax]) / 1.3 < TIER_PERFECT;
+      const near = Math.abs(a.mesh.position[ax] - a.center[ax]) / 1.3 < perfectThreshold();
       if (S.keyGuide){
         if (near) S.keyGuide.material.color.setRGB(0.4,1.0,0.5); else S.keyGuide.material.color.setRGB(1.0,0.85,0.42);
         S.keyGuide.material.opacity = near ? 0.95 : 0.6;
