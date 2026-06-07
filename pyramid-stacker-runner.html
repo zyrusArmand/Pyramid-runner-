@@ -545,7 +545,7 @@ const TIER_GOOD             = 0.45;
 const MAX_PIECE_LEN         = 2;     // pieces span 1–2 cells (longer rectangles)
 const CORNER_CHANCE         = 0.6;   // chance the first piece of a wall is a cornerstone
 const FALL_THRESHOLD        = 0.55;  // above layer 1, a drop this far off its support topples off
-const RUN_SCALE             = 0.26;  // tiny climber → the pyramid feels massive on the run up
+const RUN_SCALE             = 0.2;   // tiny climber → the pyramid feels massive on the run up
 
 // ---------- seeded RNG (so the Daily Challenge is identical for everyone, every day) ----------
 let __seed = 0, __seeded = false;
@@ -1669,6 +1669,23 @@ function climbPath(){
   return tiles;
 }
 
+// three softly glowing lane ribbons running up the face — the only paths you may climb (centre lane brightest)
+function addLaneGuides(tiles){
+  const guides = [];
+  const cx = tiles[0].pos.x, P0 = tiles[0].pos, P1 = tiles[tiles.length-1].pos;
+  const dy = P1.y - P0.y, dz = P1.z - P0.z, L = Math.hypot(dy, dz) || 1;
+  const ang = Math.atan2(-dy, dz);                          // tilt the ribbon to lie along the slope
+  const midY = (P0.y + P1.y)/2 + 0.05, midZ = (P0.z + P1.z)/2;
+  [-1,0,1].forEach(lane => {
+    const mat = new THREE.MeshBasicMaterial({ color: lane===0?0xffe6a0:0xffce72,
+      transparent:true, opacity: lane===0?0.3:0.18, depthWrite:false });
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.012, L), mat);
+    strip.position.set(cx + lane*0.24, midY, midZ); strip.rotation.x = ang;
+    scene.add(strip); guides.push(strip);
+  });
+  return guides;
+}
+
 function startRun(){
   S.phase = 'run';
   Sound.cap();
@@ -1692,34 +1709,31 @@ function startRun(){
     let fwd = B.clone().sub(A); fwd.y = 0; if (fwd.lengthSq()<1e-4) fwd.set(0,0,1); else fwd.normalize();
     const perp = new THREE.Vector3(-fwd.z, 0, fwd.x);
     if (RND() < 0.5){
-      // a giant golden hammer head lying ACROSS the path in one lane — SWIPE to a clear lane to dodge
-      const hl = [-1,0,1][Math.floor(RND()*3)];
-      t.ob = { type:'lane', lane:hl, hammer:true, phase:RND()*6.28 };
+      // a giant pendulum hammer that WIPES side to side, slamming the ground on each side — time your run
+      t.ob = { type:'lane', lane:99, hammer:true, phase:RND()*6.28, spd:0.0021 + RND()*0.0022 };
       t.perp = perp.clone();
       const ham = new THREE.Group();
       const goldMat = new THREE.MeshStandardMaterial({ color:0xddb24a, metalness:0.6, roughness:0.4 });
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.34,6), goldMat);
-      post.position.y = 0.17; ham.add(post);                              // short upright post
-      const head = new THREE.Mesh(new THREE.BoxGeometry(0.34,0.12,0.12), goldMat);  // wide head, turned across the path
-      head.position.y = 0.34; head.castShadow = true; ham.add(head);
-      ham.rotation.y = Math.atan2(perp.x, perp.z);                        // lie the head across the lanes (90°)
-      ham.position.set(t.pos.x + perp.x*hl*0.24, t.pos.y, t.pos.z + perp.z*hl*0.24);
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.016,0.022,0.34,8), goldMat);
+      arm.position.y = 0.17; ham.add(arm);                                // arm rises from a ground pivot
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.13,0.11,0.13), goldMat);  // heavy head at the top of the arm
+      head.position.y = 0.36; head.castShadow = true; ham.add(head);
+      ham.position.set(t.pos.x, t.pos.y - 0.02, t.pos.z);                 // pivots at the path centre, sweeps all lanes
       scene.add(ham); t.obMesh = ham;
     } else {
-      const hl = [-1,0,1][Math.floor(RND()*3)];            // any lane — sometimes dead centre, so you MUST dodge
-      t.ob = { type:'lane', lane:hl, moving:false, phase: RND()*6.28 };
+      // themed temple SPIKE TRAP — base sunk into the stone, spikes slide left↔right at their own speed
+      t.ob = { type:'lane', lane:0, moving:true, phase: RND()*6.28, spd:0.0016 + RND()*0.003, yOff:0 };
       t.perp = perp.clone();
-      // themed temple SPIKE TRAP in this lane — dodge to another lane
       const trap = new THREE.Group();
-      const stoneMat = new THREE.MeshStandardMaterial({ color:0x6b5436, roughness:0.95 });
       const spikeMat = new THREE.MeshStandardMaterial({ color:0xc9a24a, emissive:0x2a1500, metalness:0.5, roughness:0.4 });
-      const base = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.04, 0.15), stoneMat);
-      base.position.y = 0.02; base.castShadow = true; trap.add(base);
-      for (const [sx,sz,sh] of [[-0.04,-0.035,0.14],[0.04,-0.035,0.14],[0,0.04,0.18],[0,-0.01,0.12]]){
-        const sp = new THREE.Mesh(new THREE.ConeGeometry(0.024, sh, 5), spikeMat);
-        sp.position.set(sx, 0.04 + sh/2, sz); sp.castShadow = true; trap.add(sp);
+      const base = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.05, 0.16),                 // base buried just under the tread
+        new THREE.MeshStandardMaterial({ color:0x4a3a26, roughness:1 }));
+      base.position.y = -0.035; trap.add(base);
+      for (const [sx,sz,sh] of [[-0.045,-0.04,0.12],[0.045,-0.04,0.12],[0,0.045,0.15],[0,-0.01,0.1]]){
+        const sp = new THREE.Mesh(new THREE.ConeGeometry(0.022, sh, 5), spikeMat);
+        sp.position.set(sx, sh/2 - 0.005, sz); sp.castShadow = true; trap.add(sp);   // spikes emerge from the surface
       }
-      trap.position.set(t.pos.x + perp.x*hl*0.24, t.pos.y + 0.02, t.pos.z + perp.z*hl*0.24);
+      trap.position.set(t.pos.x, t.pos.y, t.pos.z);
       scene.add(trap); t.obMesh = trap;
     }
     lastOb = i;
@@ -1739,10 +1753,10 @@ function startRun(){
     const overGap = t.gap;                                       // only real gaps float coins in the air
     if (i - lastCoin < 3) continue;                              // space coins out on the dense steps
     if (overGap ? (RND() < 0.6) : (RND() < 0.22)){
-      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.018, 14),   // small coin for the tiny climber
+      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.014, 14),   // small coin for the tiny climber
         new THREE.MeshStandardMaterial({ color:0xffd24a, emissive:0x6a4a00, metalness:0.7, roughness:0.3 }));
       c.rotation.x = Math.PI/2;
-      c.position.set(t.pos.x, t.pos.y + (overGap ? 0.34 : 0.14), t.pos.z);
+      c.position.set(t.pos.x, t.pos.y + (overGap ? 0.3 : 0.12), t.pos.z);
       c.castShadow = true; scene.add(c);
       t.coin = { mesh:c, got:false, air:overGap };
       lastCoin = i;
@@ -1757,13 +1771,13 @@ function startRun(){
     const type = ['magnet','shield','slow'][Math.floor(RND()*3)];
     const col = type==='magnet' ? 0x46d6ff : type==='shield' ? 0x57e08a : 0xc59cff;
     const grp = new THREE.Group();
-    const core = new THREE.Mesh(new THREE.SphereGeometry(0.075,18,14),
+    const core = new THREE.Mesh(new THREE.SphereGeometry(0.055,18,14),
       new THREE.MeshStandardMaterial({ color:col, emissive:col, emissiveIntensity:0.9, metalness:0.3, roughness:0.3 }));
     core.castShadow = true; grp.add(core);
-    const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.13,0.014,22),
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.095,0.095,0.011,22),
       new THREE.MeshStandardMaterial({ color:col, emissive:col, transparent:true, opacity:0.55, depthWrite:false }));
     ring.rotation.x = Math.PI/2; grp.add(ring);
-    grp.position.set(t.pos.x, t.pos.y + 0.24, t.pos.z); scene.add(grp);
+    grp.position.set(t.pos.x, t.pos.y + 0.2, t.pos.z); scene.add(grp);
     t.power = { type, mesh:grp, core, ring, got:false };
     lastPow = i;
   }
@@ -1776,12 +1790,13 @@ function startRun(){
     new THREE.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:0.32 }));
   sh.rotation.x = -Math.PI/2; scene.add(sh); S.shadow = sh;
 
-  S.run = { tiles, idx:0, t:0, speed:4.0, jumping:false, jumpT:0, jumpDur:0.5, jumpH:0.95,
+  S.run = { tiles, idx:0, t:0, speed:4.0, jumping:false, jumpT:0, jumpDur:0.42, jumpH:0.42,
             falling:false, fallV:0, yOff:0, startDelay:0.6, awaitStart:true,
             lane:0, laneX:0, sliding:false, slideT:0, slideDur:0.5,
             rolling:false, rollT:0, rollDur:0.5, rollDir:1, rollCD:0,
             magnet:0, shield:0, slow:0, bubble:null,
             storms, revives:0, usedAdRevive:false, invuln:0, dead:false, deathReason:'fell' };
+  S.run.laneGuides = addLaneGuides(tiles);               // the three glowing paths you're restricted to
   g.position.copy(tiles[0].pos);
 
   // HUD swap
@@ -1946,13 +1961,20 @@ function updateRun(dt){
     const bs = 1 + 0.06*Math.sin(performance.now()*0.008); r.bubble.scale.set(bs, bs, bs); }
   placeShadow(g, r);
 
-  // ---- rig animation: legs & arms pump while running, tuck on a jump, kick out on a slide ----
+  // ---- rig animation: a human-ish climbing gait — knee drives up, opposite arm pumps, body bobs on each step ----
   if (g.legL){
-    r.stride = (r.stride||0) + dt * r.speed * 2.0;
-    const sw = Math.sin(r.stride) * 0.9;
-    if (r.jumping){ g.legL.rotation.x = -1.0; g.legR.rotation.x = -0.55; g.armL.rotation.x = -2.2; g.armR.rotation.x = -2.2; }
+    r.stride = (r.stride||0) + dt * r.speed * 2.2;
+    if (r.jumping){ g.legL.rotation.x = -1.0; g.legR.rotation.x = -0.55; g.armL.rotation.x = -2.2; g.armR.rotation.x = -2.2;
+      g.legL.rotation.z = 0; g.legR.rotation.z = 0; }
     else if (r.sliding){ g.legL.rotation.x = 1.3; g.legR.rotation.x = 0.95; g.armL.rotation.x = 0.7; g.armR.rotation.x = 0.7; }
-    else { g.legL.rotation.x = sw; g.legR.rotation.x = -sw; g.armL.rotation.x = -sw*0.8; g.armR.rotation.x = sw*0.8; }
+    else {
+      const a = Math.sin(r.stride), b = Math.sin(r.stride + Math.PI);
+      g.legL.rotation.x = a*0.95 + Math.max(0,a)*0.4;          // the forward leg reaches & lifts the knee higher
+      g.legR.rotation.x = b*0.95 + Math.max(0,b)*0.4;
+      g.armL.rotation.x = -a*0.9;  g.armR.rotation.x = -b*0.9; // arms pump opposite the legs
+      g.armL.rotation.z = 0.12; g.armR.rotation.z = -0.12;     // elbows tucked in a touch
+      g.position.y += Math.abs(Math.sin(r.stride)) * 0.02;     // light up/down bob with each stride
+    }
   }
 
   // face direction of travel
@@ -2125,9 +2147,12 @@ function followCam(dt, falling){
   const A = r.tiles[r.idx].pos, B = r.tiles[Math.min(r.idx+1,r.tiles.length-1)].pos;
   let dir = B.clone().sub(A); dir.y = 0;
   if (dir.lengthSq() < 0.0001) dir.set(0,0,1); else dir.normalize();
-  const want = g.position.clone().addScaledVector(dir, -1.5); want.y = g.position.y + 0.95;
+  // a LOW chase cam, just behind & barely above the climber — like someone scrambling up right behind him,
+  // but tilted up the slope so you still see what's coming right in front
+  const want = g.position.clone().addScaledVector(dir, -1.05); want.y = g.position.y + 0.26;
   camera.position.lerp(want, Math.min(1, dt*4));
-  camera.lookAt(g.position.x, g.position.y + 0.12, g.position.z);
+  const look = g.position.clone().addScaledVector(dir, 0.8);   // aim up the slope, ahead of the runner
+  camera.lookAt(look.x, look.y + 0.24, look.z);
   applyShake();
 }
 
@@ -2498,19 +2523,26 @@ function animate(){
   const pulse = 0.5 + 0.5*Math.sin(performance.now()*0.004);
   if (S.active && S.active.capstone && S.active.mesh.material.emissive)
     S.active.mesh.material.emissive.setRGB(0.35*pulse, 0.24*pulse, 0.0);
+  if (S.run && S.run.laneGuides){ const op = 0.16 + 0.1*pulse;          // the lane ribbons breathe gently
+    S.run.laneGuides.forEach((gd,i) => gd.material.opacity = (i===1 ? op+0.1 : op)); }
   if (S.run) S.run.tiles.forEach(t => {
     if (t.marker) t.marker.material.opacity = 0.5 + 0.4*pulse;
     if (t.coin && !t.coin.got) t.coin.mesh.rotation.z += dt*3.4;
     if (t.power && !t.power.got){ t.power.mesh.rotation.y += dt*1.8;
-      t.power.mesh.position.y = t.pos.y + 0.24 + 0.03*Math.sin(performance.now()*0.004); }
-    // moving pillars sweep between lanes — keep the mesh and its live hit-lane in sync
+      t.power.mesh.position.y = t.pos.y + 0.2 + 0.03*Math.sin(performance.now()*0.004); }
+    // spikes / pillars slide between lanes at their own speed — keep the mesh and live hit-lane in sync
     if (t.ob && t.ob.moving && t.obMesh && t.perp){
-      const f = Math.sin(performance.now()*0.0024 + t.ob.phase);
+      const f = Math.sin(performance.now()*(t.ob.spd||0.0024) + t.ob.phase);
       t.ob.lane = f > 0.33 ? 1 : (f < -0.33 ? -1 : 0);
-      t.obMesh.position.set(t.pos.x + t.perp.x*f*0.24, t.pos.y + 0.15, t.pos.z + t.perp.z*f*0.24);
+      const yo = (t.ob.yOff !== undefined) ? t.ob.yOff : 0.15;
+      t.obMesh.position.set(t.pos.x + t.perp.x*f*0.24, t.pos.y + yo, t.pos.z + t.perp.z*f*0.24);
     }
-    if (t.ob && t.ob.hammer && t.obMesh){             // gentle cosmetic sway of the hammer in its lane
-      t.obMesh.rotation.z = Math.sin(performance.now()*0.003 + t.ob.phase) * 0.16;
+    if (t.ob && t.ob.hammer && t.obMesh){             // pendulum hammer wipes side to side, slamming the ground each side
+      const th = Math.sin(performance.now()*(t.ob.spd||0.003) + t.ob.phase) * 1.4;   // ±80° sweep
+      t.obMesh.rotation.z = th;
+      const offset = -0.34 * Math.sin(th);             // where the head currently is across the lanes
+      t.ob.lane = (Math.cos(th) < 0.72)                // only deadly while the head is swung DOWN near a side
+        ? Math.max(-1, Math.min(1, Math.round(offset/0.24))) : 99;
     }
   });
 
