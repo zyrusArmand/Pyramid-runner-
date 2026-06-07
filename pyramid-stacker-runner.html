@@ -764,7 +764,9 @@ function addPlaceGuide(a){
   const bar = (dx,dz, px,pz) => { const m = new THREE.Mesh(new THREE.BoxGeometry(dx,t,dz), mat); m.position.set(px,fy,pz); grp.add(m); };
   bar(sx,t, 0,-hz); bar(sx,t, 0, hz);                          // edges running along x
   bar(t,sz, -hx,0); bar(t,sz,  hx,0);                          // edges running along z
-  grp.position.copy(a.center);                                 // a.center is the exact perfect seat
+  grp.position.copy(a.center);
+  const oax = (a.mode==='keystone') ? a.perpAxis : a.axis;     // show the outline at the FLUSH seat (flows with the wall)
+  if (a.seat !== undefined) grp.position[oax] = a.seat;
   grp.material = mat;                                          // shared → loop recolours green on a perfect line-up
   scene.add(grp); S.keyGuide = grp;
 }
@@ -867,17 +869,19 @@ function drop(){
   if (a.mesh.material && a.mesh.material.emissive) a.mesh.material.emissive.setRGB(0,0,0);   // clear the green glow
   const offAxis = (a.mode==='keystone') ? a.perpAxis : a.axis;   // keystone is timed on the depth axis
   const cur = a.mesh.position[offAxis];
-  const off = cur - a.center[offAxis];                // how far from flush / dead-centre, signed
+  // the perfect target is the FLUSH SEAT (snug against the actual previous stone), which flows with the
+  // wall — not the rigid grid cell. so an earlier off-placement no longer blocks the next piece/corner.
+  const ref = (a.seat !== undefined) ? a.seat : a.center[offAxis];
+  const off = cur - ref;                              // how far from the flush seat, signed
   const dist = Math.abs(off);
   S.active = null;
   const offN = Math.min(1, dist / 1.3);               // 0 = dead-on, 1 = way off
 
-  // a TRUE perfect aims for a flush, gapless seat; everything else stays where dropped. Either way
-  // the no-overlap clamp is applied LAST, so a stone can NEVER end up inside a neighbour — even if an
-  // earlier stone drifted into this one's cell (then a "perfect" simply seats touching it instead).
+  // a TRUE perfect snaps to the flush seat (snug against the previous stone, no gap); else it stays put.
+  // the no-overlap clamp is applied LAST, so a stone can NEVER end up inside a neighbour.
   const isKey = (a.mode==='keystone');
   const perfect = offN < perfectThreshold();
-  let restAt = perfect ? a.center[offAxis] : cur;
+  let restAt = perfect ? ref : cur;
   if (!a.capstone){
     restAt = clampPlacement(a, restAt, offAxis);                  // solid stones can never merge
     if (restAt === null){                                        // no room here — a solid stone can't fit, so it crumbles
@@ -1761,8 +1765,8 @@ function animate(){
       // hard guarantee: clamp the LIVE position every frame so a swinging stone can NEVER overlap a placed one
       const safe = clampPlacement(a, a.mesh.position[ax], ax);
       if (safe !== null) a.mesh.position[ax] = safe;
-      // light the perfect-seat outline (and the stone) GREEN the instant it lines up dead-on for a PERFECT
-      const near = Math.abs(a.mesh.position[ax] - a.center[ax]) / 1.3 < perfectThreshold();
+      // light the perfect-seat outline (and the stone) GREEN the instant it reaches the flush seat for a PERFECT
+      const near = Math.abs(a.mesh.position[ax] - (a.seat !== undefined ? a.seat : a.center[ax])) / 1.3 < perfectThreshold();
       if (S.keyGuide){
         if (near) S.keyGuide.material.color.setRGB(0.4,1.0,0.5); else S.keyGuide.material.color.setRGB(1.0,0.85,0.42);
         S.keyGuide.material.opacity = near ? 0.95 : 0.6;
