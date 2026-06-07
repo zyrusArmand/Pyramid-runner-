@@ -127,6 +127,13 @@
   #ddaBtn { margin-top:14px; }
   #ddaBtn.on, #musicBtn.on { background:rgba(243,200,120,.16); border-color:#f3c878; color:#ffe6b0; }
   #homeToggles { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+  #homeGoals { margin-top:16px; width:min(340px,86vw); display:flex; flex-direction:column; gap:7px; }
+  .goalsHdr { font-size:11px; letter-spacing:3px; color:#cdb083; opacity:.9; margin-bottom:1px; }
+  .goal { background:rgba(255,255,255,.045); border:1px solid rgba(243,200,120,.18); border-radius:10px; padding:7px 11px; }
+  .goalRow { display:flex; justify-content:space-between; align-items:center; font-size:11.5px; letter-spacing:.5px; color:#f0e3c8; }
+  .goalRew { color:#ffd24a; font-weight:700; }
+  .goalBar { margin-top:5px; height:5px; border-radius:5px; background:rgba(255,255,255,.1); overflow:hidden; }
+  .goalBar > div { height:100%; background:linear-gradient(90deg,#6fe3a0,#e8d35f); border-radius:5px; transition:width .3s; }
 
   /* in-game main-menu button (top-left) */
   #menuBtn { position:fixed; left:14px; top:calc(max(16px,env(safe-area-inset-top)) + 2px); z-index:6;
@@ -347,6 +354,7 @@
       <div id="ddaBtn">ADAPTIVE DIFFICULTY: ON</div>
       <div id="musicBtn">MUSIC: ON</div>
     </div>
+    <div id="homeGoals"></div>
   </div>
 </div>
 
@@ -437,6 +445,7 @@ function srand(){ __seed = (Math.imul(__seed, 1664525) + 1013904223) >>> 0; retu
 function RND(){ return __seeded ? srand() : Math.random(); }
 function dailySeed(){ const d = new Date(); return (d.getFullYear()*10000 + (d.getMonth()+1)*100 + d.getDate()) >>> 0; }
 function todayKey(){ const d = new Date(); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; }
+function dayKey(off){ const d = new Date(); d.setDate(d.getDate()-off); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; }
 
 // ---------- persistence (best score / climb, coin bank, owned + selected skins) ----------
 const Store = {
@@ -449,6 +458,43 @@ let bestHeight= Store.get('height', 0);
 let scores    = Store.get('scores', []);          // local leaderboard (top 10)
 let firstTime = !Store.get('tut', 0);             // show the onboarding hints once
 let dailyMode = false;
+
+// ---------- rotating GOALS (missions) + daily play STREAK ----------
+const MISSION_POOL = [
+  { id:'s4',  desc:'Build a 4★ pyramid',          type:'stars',    goal:4,  reward:60  },
+  { id:'s5',  desc:'Build a flawless 5★ pyramid', type:'stars',    goal:5,  reward:130 },
+  { id:'l3',  desc:'Reach level 3',               type:'level',    goal:3,  reward:80  },
+  { id:'l5',  desc:'Reach level 5',               type:'level',    goal:5,  reward:150 },
+  { id:'c80', desc:'Grab 80 coins in one run',    type:'runCoins', goal:80, reward:70  },
+  { id:'st6', desc:'Land a 6× PERFECT streak',    type:'streak',   goal:6,  reward:90  },
+  { id:'st10',desc:'Land a 10× PERFECT streak',   type:'streak',   goal:10, reward:170 },
+  { id:'b3',  desc:'Build 3 pyramids',            type:'builds',   goal:3,  reward:60  },
+];
+let missions = Store.get('missions', null);
+function missionDef(id){ return MISSION_POOL.find(m=>m.id===id); }
+function newMission(exclude){ const o = MISSION_POOL.filter(m=>!exclude.includes(m.id)); const d = o[Math.floor(Math.random()*o.length)] || MISSION_POOL[0]; return { id:d.id, prog:0 }; }
+function ensureMissions(){ if (!Array.isArray(missions) || missions.length!==3){ missions=[]; while(missions.length<3) missions.push(newMission(missions.map(m=>m.id))); Store.set('missions', missions); } }
+ensureMissions();
+function missionEvent(type, value){
+  ensureMissions(); let changed=false;
+  missions.forEach((m,idx)=>{
+    const d = missionDef(m.id); if (!d || d.type!==type) return;
+    const np = (d.type==='builds') ? m.prog+value : Math.max(m.prog, value);
+    if (np!==m.prog){ m.prog=np; changed=true; }
+    if (m.prog>=d.goal){ bank+=d.reward; Store.set('coins',bank); if (typeof updateCoinHud==='function') updateCoinHud(true);
+      showHint('✦ GOAL DONE  +'+d.reward+' COINS · '+d.desc, 3200); missions[idx]=newMission(missions.map(x=>x.id)); changed=true; }
+  });
+  if (changed) Store.set('missions', missions);
+}
+let dailyStreak = Store.get('dstreak', 0);
+function checkDailyStreak(){
+  const last = Store.get('dday',''), today = todayKey();
+  if (last===today) return;
+  dailyStreak = (last===dayKey(1)) ? dailyStreak+1 : 1;
+  Store.set('dstreak', dailyStreak); Store.set('dday', today);
+  const reward = Math.min(20 + dailyStreak*10, 120); bank += reward; Store.set('coins', bank);
+  setTimeout(()=> showHint('🔥 DAY '+dailyStreak+' · DAILY BONUS +'+reward+' COINS', 3600), 700);
+}
 
 // ---------- cosmetics: STONE themes (block palette) + CHARACTER costumes (runner), bought with coins ----------
 const STONES = {
@@ -1138,7 +1184,7 @@ function blockPlaced(mesh, instability, capstone, len, consumed){
 
   if (tier === 'PERFECT'){
     // exact hit ONLY — the full reaction: emoji pop + phone buzz + chime + sparkle
-    S.streak++; S.bestPerfect = Math.max(S.bestPerfect, S.streak);
+    S.streak++; S.bestPerfect = Math.max(S.bestPerfect, S.streak); missionEvent('streak', S.streak);   // goal: perfect streak
     S.score += (baseScore + S.streak*25) * len;
     showPop(S.streak>2 ? `PERFECT ×${S.streak}` : 'PERFECT');
     Sound.perfect(S.streak); buzz([16,28,16]);
@@ -1283,6 +1329,7 @@ function startRun(){
   // BUILD → CLIMB: the quality of the pyramid you built shapes the climb. A clean build means a
   // safer path and richer coins; a sloppy one means a treacherous climb.
   const stars = pyramidRating(); S.buildStars = stars;
+  missionEvent('stars', stars); missionEvent('builds', 1);   // goals: build quality + pyramids built
   const hazardMul = stars>=5 ? 0.4 : stars>=4 ? 0.65 : stars>=3 ? 1.0 : stars>=2 ? 1.35 : 1.7;   // fewer hazards on a clean build
   S.climbCoinMul = stars>=5 ? 2 : stars>=4 ? 1.6 : stars>=3 ? 1.2 : stars>=2 ? 1.0 : 0.7;        // richer coins on a clean build
   const tiles = climbPath();   // steep, direct step-by-step climb up the front face
@@ -1655,6 +1702,7 @@ function collectCoin(t, r){
   const bonus = Math.round((t.coin.air ? 2 : 1) * (S.climbCoinMul || 1));   // airborne grabs pay double; better builds pay more
   S.coins += bonus; S.score += 50 * bonus;
   bank += bonus; Store.set('coins', bank);    // bank instantly so coins persist even if you quit mid-run
+  missionEvent('runCoins', S.coins);          // goal: coins in one run
   Sound.coin(S.coins);
   sparkle(t.coin.mesh.position.clone());
   scene.remove(t.coin.mesh);
@@ -1729,6 +1777,7 @@ function buzz(pattern){ try { if (navigator.vibrate) navigator.vibrate(pattern);
 
 function startGame(){
   gameLevel = 1;
+  checkDailyStreak();                          // first game of the day → streak bump + bonus coins
   $('ratingOverlay').classList.remove('show');
   resetState();
   [...scene.children].forEach(o => { if (o.__env || o===ground || o===sky) return; if (o.isMesh) scene.remove(o); if (o.isGroup) scene.remove(o); });
@@ -1752,6 +1801,7 @@ function startGame(){
 // reached the summit → start the NEXT pyramid: keep score/coins, bump the level, everything a bit faster
 function nextLevel(){
   gameLevel++;
+  missionEvent('level', gameLevel);                        // goal: reach a level
   DDA.note(0.85);                                          // finishing a pyramid means you're playing well
   const keepScore = S.score, keepCoins = S.coins, keepBest = S.bestPerfect||0;
   resetState();
@@ -1791,6 +1841,18 @@ function renderHome(){
   $('bankCoins').textContent  = bank;
   const d = $('ddaBtn'); d.textContent = 'ADAPTIVE DIFFICULTY: ' + (DDA.on ? 'ON' : 'OFF'); d.classList.toggle('on', DDA.on);
   const mb = $('musicBtn'); mb.textContent = 'MUSIC: ' + (Music.on ? 'ON' : 'OFF'); mb.classList.toggle('on', Music.on);
+  renderGoals();
+}
+function renderGoals(){
+  ensureMissions();
+  let html = '<div class="goalsHdr">DAILY GOALS' + (dailyStreak>0 ? '  ·  DAY ' + dailyStreak + ' 🔥' : '') + '</div>';
+  missions.forEach(m => {
+    const d = missionDef(m.id); if (!d) return;
+    const pct = Math.min(100, Math.round(m.prog / d.goal * 100));
+    html += '<div class="goal"><div class="goalRow"><span>' + d.desc + '</span><span class="goalRew">+' + d.reward + '</span></div>'
+          + '<div class="goalBar"><div style="width:' + pct + '%"></div></div></div>';
+  });
+  $('homeGoals').innerHTML = html;
 }
 function showLeader(){ $('startScreen').classList.add('hidden'); $('leaderPanel').classList.remove('hidden'); renderLeader(); }
 function showShop(){ $('startScreen').classList.add('hidden'); $('shopPanel').classList.remove('hidden'); renderShop(); }
