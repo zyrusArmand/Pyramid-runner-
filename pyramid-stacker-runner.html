@@ -835,6 +835,7 @@ function applyBiome(level){
   scene.fog.color.setHex(b.fog);
   sun.color.setHex(b.sun);
   hemi.color.setHex(b.hSky); hemi.groundColor.setHex(b.hGnd);
+  if (sunCore){ sunCore.material.color.setHex(b.sun); sunHalo.material.color.setHex(b.skyBot); }
 }
 
 // ---------- true bloom (post-processing) — best-effort, falls back to plain render ----------
@@ -917,6 +918,22 @@ function makeColumn(x,z,h){
 for (let i=0;i<6;i++){  const a=Math.random()*6.28, d=12+Math.random()*16; makePalm(Math.sin(a)*d, Math.cos(a)*d, 0.8+Math.random()*0.5); }
 for (let i=0;i<16;i++){ const a=Math.random()*6.28, d=9+Math.random()*24;  makeRock(Math.sin(a)*d, Math.cos(a)*d, 0.4+Math.random()*0.7); }
 for (let i=0;i<5;i++){  const a=Math.random()*6.28, d=15+Math.random()*15; makeColumn(Math.sin(a)*d, Math.cos(a)*d, 1.4+Math.random()*2.2); }
+
+// ---------- the Giza skyline: great pyramids on the horizon + a hazy sun/moon ----------
+function makeFarPyramid(x,z,s){                          // a 4-sided silhouette pyramid, hazed by fog for depth
+  const m = new THREE.Mesh(new THREE.ConeGeometry(s, s*1.4, 4),
+    new THREE.MeshStandardMaterial({ color:0x6f4f31, roughness:1, bumpMap:STONE_BUMP||undefined, bumpScale:0.03 }));
+  m.rotation.y = Math.PI/4; m.position.set(x, -1.4 + s*1.4/2, z); m.__env = true; scene.add(m);
+}
+[[-45,-30,13],[43,-41,16],[-53,16,11],[51,28,12],[6,-55,15],[-22,-51,10],[35,47,9],[18,-44,8]]
+  .forEach(p => makeFarPyramid(p[0],p[1],p[2]));
+
+let sunCore = new THREE.Mesh(new THREE.SphereGeometry(4.2, 28, 18),     // a sphere always reads as a round disk from any angle
+  new THREE.MeshBasicMaterial({ color:0xffe7b0, fog:false }));
+sunCore.position.set(-26, 27, -46); sunCore.__env = true; scene.add(sunCore);
+let sunHalo = new THREE.Mesh(new THREE.SphereGeometry(9, 28, 18),
+  new THREE.MeshBasicMaterial({ color:0xffcf86, transparent:true, opacity:0.22, depthWrite:false, fog:false }));
+sunHalo.position.copy(sunCore.position); sunHalo.__env = true; scene.add(sunHalo);
 
 // ---------- helpers ----------
 const $ = id => document.getElementById(id);
