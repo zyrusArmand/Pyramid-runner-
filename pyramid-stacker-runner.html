@@ -149,6 +149,13 @@
     letter-spacing:3px; max-width:92vw; line-height:1.1; text-shadow:0 2px 12px rgba(0,0,0,.7); }
   #introBtn { margin-top:30px; pointer-events:auto; }
   #introOverlay.show #introLevel { animation:ratePop .55s ease-out; }
+  /* victory "NEXT LEVEL" prompt — sits over the spun-around pyramid, no full overlay */
+  #nextLevelWrap { position:fixed; left:0; right:0; bottom:max(40px,calc(env(safe-area-inset-bottom) + 30px)); z-index:9;
+    display:none; flex-direction:column; align-items:center; gap:14px; pointer-events:none; }
+  #nextLevelWrap.show { display:flex; animation:ratePop .5s ease-out; }
+  #nextLevelTitle { font-family:'Cinzel',serif; font-weight:700; font-size:clamp(20px,6vw,30px); letter-spacing:3px;
+    color:#ffe9a8; text-shadow:0 2px 16px rgba(0,0,0,.8), 0 0 22px rgba(255,200,110,.5); }
+  #nextLevelBtn { pointer-events:auto; }
 
   /* shop / skins on the start screen */
   #meta { margin-top:26px; display:flex; flex-direction:column; align-items:center; gap:14px; }
@@ -409,6 +416,10 @@
   <div id="introLevel">LEVEL 2</div>
   <div id="introName">CRIMSON DUNES</div>
   <div class="cta hero" id="introBtn">START STACKING ▼</div>
+</div>
+<div id="nextLevelWrap">
+  <div id="nextLevelTitle">PYRAMID CONQUERED</div>
+  <div class="cta hero" id="nextLevelBtn">NEXT LEVEL ▶</div>
 </div>
 <div id="pop">PERFECT</div>
 <div id="hint"></div>
@@ -1951,21 +1962,28 @@ function updateRun(dt){
   }
   if (r.dead){ followCam(dt, false); return; }     // frozen while the revive prompt is up
 
-  if (r.celebrating > 0){                           // VICTORY: standing on the flat summit, arms thrown overhead
-    r.celebrating -= dt;
+  if (r.celebrating){                               // VICTORY: planted on the summit, fists pumping overhead
+    r.celebT = (r.celebT || 0) + dt;
     const top = r.tiles[r.tiles.length-1].pos;
-    const bob = Math.abs(Math.sin(performance.now()*0.012)) * 0.05;   // little victory hops
-    g.position.set(top.x, top.y + bob, top.z);
+    g.position.set(top.x, top.y, top.z);                              // feet planted — no jumping
     g.scale.set(RUN_SCALE, RUN_SCALE, RUN_SCALE);
     if (g.legL){
-      g.armL.rotation.x = -2.8; g.armR.rotation.x = -2.8;             // both arms straight up over the head
-      g.armL.rotation.z = 0.35; g.armR.rotation.z = -0.35;            // spread in a V
+      const pump = Math.sin(r.celebT*7) * 0.5 + 0.5;                  // 0..1 rhythmic fist pump
+      g.armL.rotation.x = -2.45 - pump*0.55; g.armR.rotation.x = -2.45 - pump*0.55;
+      g.armL.rotation.z = 0.3; g.armR.rotation.z = -0.3;              // fists up in a V, pumping
       g.legL.rotation.x = 0; g.legR.rotation.x = 0;
     }
-    g.rotation.y += dt*1.2;                                            // slow triumphant spin
+    g.rotation.y += dt*0.6;                                            // slow show-off turn
     placeShadow(g, r);
-    followCam(dt, false);
-    if (r.celebrating <= 0) nextLevel();
+    // camera: start close on the climber, spiral once around the whole pyramid, ease to a stop at a 3/4 angle
+    const DUR = 4.6, p = Math.min(r.celebT / DUR, 1), e = p*p*(3-2*p);
+    const topY = top.y, midY = topY*0.5, startA = 0.7;
+    const a = startA + e*Math.PI*2;                                    // one full revolution
+    const R = 1.7 + (8.6-1.7)*e, camY = (topY+0.45) + ((midY+2.9) - (topY+0.45))*e;
+    camera.position.set(Math.sin(a)*R, camY, Math.cos(a)*R);
+    camera.lookAt(0, topY + (midY-topY)*e, 0);
+    applyShake();
+    if (p >= 1 && !r.celebDone){ r.celebDone = true; $('nextLevelWrap').classList.add('show'); }   // spiral done → offer NEXT LEVEL
     return;
   }
 
@@ -1991,10 +2009,12 @@ function updateRun(dt){
   r.t += r.speed * dt / 1;
   while (r.t >= 1){
     r.t -= 1; r.idx++;
-    if (r.idx >= r.tiles.length-1){     // reached the summit → stand on the flat top & celebrate, then next level
-      r.idx = r.tiles.length-1; r.t = 0; r.celebrating = 1.5; Sound.win();
+    if (r.idx >= r.tiles.length-1){     // reached the summit → celebrate on the flat top, then offer NEXT LEVEL
+      r.idx = r.tiles.length-1; r.t = 0; r.celebrating = true; r.celebT = 0; r.celebDone = false; Sound.win();
       g.position.copy(r.tiles[r.idx].pos); placeShadow(g, r);
-      spawnDust(g.position.clone(), 0xffe6a0, 16, 2.4, 2.4); flash(); shake(0.3);
+      spawnDust(g.position.clone(), 0xffe6a0, 18, 2.6, 2.6); flash(); shake(0.3);
+      $('hud').style.display='none'; $('coinHud').classList.add('hidden'); $('combo').classList.remove('show');
+      $('meterWrap').style.opacity='0'; $('menuBtn').style.display='none'; $('restartBtn').style.display='none';
       return;
     }
     Sound.step();
@@ -2312,7 +2332,7 @@ function startGame(){
   gameLevel = 1;
   applyBiome(gameLevel);                        // level-1 biome: sky / fog / light
   checkDailyStreak();                          // first game of the day → streak bump + bonus coins
-  $('ratingOverlay').classList.remove('show');
+  $('ratingOverlay').classList.remove('show'); $('nextLevelWrap').classList.remove('show'); $('introOverlay').classList.remove('show');
   resetState();
   [...scene.children].forEach(o => { if (o.__env || o===ground || o===sky) return; if (o.isMesh) scene.remove(o); if (o.isGroup) scene.remove(o); });
   S.phase='build';
@@ -2333,7 +2353,9 @@ function startGame(){
 }
 
 // reached the summit → start the NEXT pyramid: keep score/coins, bump the level, everything a bit faster
+// tapped NEXT LEVEL after the victory celebration → build the next pyramid
 function nextLevel(){
+  $('nextLevelWrap').classList.remove('show');
   gameLevel++;
   applyBiome(gameLevel);                                   // shift the biome (sky / fog / light) for the new level
   missionEvent('level', gameLevel);                        // goal: reach a level
@@ -2343,16 +2365,17 @@ function nextLevel(){
   S.score = keepScore + 150 + gameLevel*50;               // level-clear bonus
   S.coins = keepCoins; S.bestPerfect = keepBest;
   [...scene.children].forEach(o => { if (o.__env || o===ground || o===sky) return; if (o.isMesh||o.isGroup) scene.remove(o); });
-  S.phase = 'intro';                                       // hold on the intro card; building starts on tap
+  S.phase = 'build';
   $('storm').style.opacity='0'; scene.fog.near=16; scene.fog.far=46; S.stormA=0;
-  $('hud').style.display='none'; $('meterWrap').style.opacity='0';
-  $('combo').classList.remove('show'); $('vignette').style.opacity='0';
+  $('lblA').textContent='SCORE'; $('lblB').textContent='LEVEL';
+  $('lives').style.display='none'; $('meterLabel').textContent='STRUCTURAL INTEGRITY'; $('meterBar').style.display='block';
+  $('meterWrap').style.opacity='1'; $('vignette').style.opacity='0';
+  $('coinHud').classList.remove('hidden'); $('combo').classList.remove('show');
+  $('hud').style.display='flex';
   $('reviveScreen').classList.add('hidden'); $('hint').classList.remove('show');
-  $('menuBtn').style.display='none'; $('restartBtn').style.display='none';
-  const b = biomeFor(gameLevel);
-  $('introLevel').textContent = 'LEVEL ' + gameLevel;
-  $('introName').textContent = b.name;
-  $('introOverlay').classList.add('show');                 // → beginBuild() when the player taps START STACKING
+  $('menuBtn').style.display='block'; $('restartBtn').style.display='block';
+  showPop('LEVEL ' + gameLevel + ' · ' + biomeFor(gameLevel).name);   // quick banner of the new level/biome
+  updateHUD(); spawnBlock();
 }
 
 // player tapped START STACKING on the level-intro card → drop into the build phase
@@ -2377,6 +2400,7 @@ function showStart(){            // the main "home" menu (cover art + PLAY / LEA
   S.phase = null; S.gameOver = false;
   $('overScreen').classList.add('hidden');
   $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden');
+  $('nextLevelWrap').classList.remove('show'); $('introOverlay').classList.remove('show');
   $('startScreen').classList.remove('hidden');
   $('coinHud').classList.add('hidden'); $('combo').classList.remove('show'); $('vignette').style.opacity='0';
   $('menuBtn').style.display = 'none'; $('restartBtn').style.display='none'; $('reviveScreen').classList.add('hidden');
@@ -2561,6 +2585,7 @@ btn('restartBtn',    ()=>startGame());   // in-game restart (back to level 1)
 btn('climbBtn',      beginClimb);        // start the climb from the rating screen
 btn('introBtn',      beginBuild);        // start building from the between-level intro card
 btn('introOverlay',  beginBuild);        // …or tap anywhere on the card
+btn('nextLevelBtn',  nextLevel);         // advance after the victory celebration
 function goMenu(){ endRevivePrompt(); $('adModal').classList.add('hidden'); showStart(); }   // quit to main menu mid-game
 
 window.addEventListener('pointerdown', e => {
