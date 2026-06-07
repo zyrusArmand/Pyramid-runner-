@@ -85,6 +85,10 @@
     justify-content:flex-start; padding-top:9vh; gap:8px; pointer-events:none; opacity:0; transition:opacity .4s; text-align:center; }
   #ratingOverlay.show { display:flex; opacity:1; }
   #ratingTint { position:absolute; inset:0; pointer-events:none; }
+  #ratingTint.storm { animation:stormPulse .85s ease-in-out infinite; }
+  #ratingTint.sun { animation:sunPulse 1.8s ease-in-out infinite; }
+  @keyframes stormPulse { 0%,100%{opacity:.8;} 50%{opacity:1;} }
+  @keyframes sunPulse { 0%,100%{opacity:.85;} 55%{opacity:1;} }
   #ratingStars { font-size:clamp(36px,12vw,68px); letter-spacing:7px; z-index:1; text-shadow:0 2px 18px rgba(0,0,0,.7); }
   #ratingPhrase { font-family:'Cinzel',serif; font-weight:700; font-size:clamp(20px,6vw,34px); letter-spacing:3px; z-index:1; text-shadow:0 2px 14px rgba(0,0,0,.8); }
   #ratingSub { font-size:12px; letter-spacing:4px; opacity:.75; color:#f6e9d2; z-index:1; }
@@ -777,7 +781,7 @@ function resetState(){
     layerBlocks:[], layerBoxes:[], prevLayerBoxes:[], active:null, falling:[], dropAnims:[],
     fx:[], squash:[], shakeAmt:0, shadow:null,
     coins:0, timeScale:1, heartT:0, bestPerfect:0, coinsDoubled:false,
-    buildQual:0, buildCount:0,    // sum of per-block placement quality & count → the pyramid's star rating
+    buildQual:0, buildCount:0, allPerfect:true,    // placement quality & count + "every block perfect?" → star rating
     pathSlots:[],          // ordered per-cell {pos, placed} for the runner
     run:null, runner:null };
 }
@@ -1052,7 +1056,7 @@ function missStone(a, label){
   crumbleStone(a.mesh);
   Sound.drop(); shake(0.35);
   S.integrity = Math.max(0, S.integrity - 0.06);
-  S.buildQual += 0; S.buildCount++;                  // a crumbled/gap stone counts against the pyramid rating
+  S.buildQual += 0; S.buildCount++; S.allPerfect = false;   // a crumbled/gap stone counts hard against the rating
   S.streak = 0; showCombo(0); showPop(label || 'MISS');
   pushCells(a, false, false, 0);                    // its cells become a gap in the run path
   updateHUD();
@@ -1089,6 +1093,7 @@ function blockPlaced(mesh, instability, capstone, len, consumed){
   DDA.note(tier==='PERFECT' ? 1 : tier==='GREAT' ? 0.7 : tier==='GOOD' ? 0.4 : 0.1);
   // tally placement quality for the end-of-pyramid star rating
   S.buildQual += (tier==='PERFECT' ? 1 : tier==='GREAT' ? 0.75 : tier==='GOOD' ? 0.5 : 0.15); S.buildCount++;
+  if (tier !== 'PERFECT') S.allPerfect = false;   // 5★ "WONDER" requires EVERY block perfect
 
   if (tier === 'PERFECT'){
     // exact hit ONLY — the full reaction: emoji pop + phone buzz + chime + sparkle
@@ -1128,8 +1133,9 @@ const RATINGS = [ null,
   { phrase:'FIT FOR A KING',       col:'#9fe9c0' },   // ★★★★
   { phrase:'A WONDER OF THE AGES', col:'#ffe6a0' } ]; // ★★★★★
 function pyramidRating(){
+  if (S.allPerfect && S.buildCount > 0) return 5;          // 5★ ONLY for a flawless, all-perfect pyramid
   const q = S.buildCount ? S.buildQual / S.buildCount : 0.5;
-  return q>=0.9 ? 5 : q>=0.72 ? 4 : q>=0.52 ? 3 : q>=0.32 ? 2 : 1;
+  return q>=0.85 ? 4 : q>=0.6 ? 3 : q>=0.35 ? 2 : 1;       // anything less than flawless tops out at 4★
 }
 function showRating(){
   const stars = pyramidRating(), r = RATINGS[stars];
@@ -1138,14 +1144,33 @@ function showRating(){
   $('ratingPhrase').textContent = r.phrase; $('ratingPhrase').style.color = r.col;
   // VIGNETTE tint — clear in the middle so you can see the whole pyramid you built behind it
   const tint = $('ratingTint');
-  if (stars<=2)      tint.style.background = 'radial-gradient(ellipse at 50% 50%, transparent 22%, rgba(120,16,8,.55) 92%)';   // fire/storm
-  else if (stars>=4) tint.style.background = 'radial-gradient(ellipse at 50% 42%, rgba(255,205,90,.20) 0%, transparent 36%, rgba(50,28,0,.5) 92%)'; // sun
-  else               tint.style.background = 'radial-gradient(ellipse at 50% 50%, transparent 24%, rgba(15,10,18,.55) 92%)';
+  tint.classList.remove('storm','sun');
+  if (stars<=2)      { tint.style.background = 'radial-gradient(ellipse at 50% 55%, transparent 18%, rgba(150,18,8,.62) 95%)'; tint.classList.add('storm'); }
+  else if (stars>=4) { tint.style.background = 'radial-gradient(ellipse at 50% 38%, rgba(255,210,90,.32) 0%, transparent 40%, rgba(55,30,0,.5) 95%)'; tint.classList.add('sun'); }
+  else                 tint.style.background = 'radial-gradient(ellipse at 50% 50%, transparent 24%, rgba(15,10,18,.55) 92%)';
   $('ratingOverlay').classList.add('show');
-  if (stars<=2){ Sound.fail(); for (let k=0;k<3;k++) setTimeout(()=>{ flash(); shake(0.55); }, 120 + k*240); }   // lightning + bad noise
-  else if (stars>=4){ Sound.glory(); flash(); }                                                                  // sun flash + fanfare
-  else { Sound.cap(); }
+  if (stars<=2) ratingStorm(stars);     // bad → lightning + heavy shake + rising fire embers
+  else if (stars>=4) ratingSun(stars);  // good → sun-burst flash + golden sparkles
+  else Sound.cap();
   // stays up — the player taps START CLIMB when ready (see beginClimb)
+}
+// a burst of particles scattered around / above the finished pyramid (it sits at the origin)
+function ratingBurst(color, count, up){
+  for (let i=0;i<count;i++){
+    const a=Math.random()*6.28, d=1.2+Math.random()*1.9, y=-0.4+Math.random()*2.8;
+    spawnDust(new THREE.Vector3(Math.sin(a)*d, y, Math.cos(a)*d), color, 1, 1.4, up);
+  }
+}
+function ratingStorm(stars){
+  Sound.fail();
+  const fires = stars===1 ? 4 : 3;
+  for (let k=0;k<6;k++) setTimeout(()=>{ flash(); shake(0.8); }, [0,140,260,520,640,1000][k]);   // irregular lightning + heavy shake
+  for (let k=0;k<fires;k++) setTimeout(()=> ratingBurst(0xff5418, 26, 3.2), k*260);               // rising fire embers
+}
+function ratingSun(stars){
+  Sound.glory(); flash();
+  const bursts = stars===5 ? 4 : 2;
+  for (let k=0;k<bursts;k++) setTimeout(()=>{ ratingBurst(0xffe08a, 34, 3.4); if (k>0) flash(); }, k*220);  // golden sparkle showers
 }
 
 function advance(len){
