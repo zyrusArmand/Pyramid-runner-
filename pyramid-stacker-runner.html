@@ -1763,36 +1763,36 @@ function climbPath(){
       const f = i/cN;                                           // 0..1 up the capstone
       const w = cBaseW + (0.3 - cBaseW)*f;                      // front-face width recedes toward the flat top
       const ty = cap.pos.y - ch/2 + ch*f + 0.02;               // step up, a hair above the surface
-      const tz = w/2 + 0.015;                                   // stand just in FRONT of this course's face → never clips into the next
-      tiles.push({ pos:new THREE.Vector3(cap.pos.x, ty, tz), gap:false, weak:false, mesh:cap.mesh, crumbled:false });
+      const tx = cap.pos.x * f;                                 // ease x from the climb centre toward the capstone's true centre
+      const tz = cap.pos.z + w/2 + 0.015;                       // stand just in FRONT of this course's face → never clips into the next
+      tiles.push({ pos:new THREE.Vector3(tx, ty, tz), gap:false, weak:false, mesh:cap.mesh, crumbled:false });
     }
-    tiles.push({ pos:new THREE.Vector3(cap.pos.x, cap.pos.y + ch/2 + 0.03, cap.pos.z), gap:false, weak:false, mesh:cap.mesh, crumbled:false });  // flat-top centre (celebration spot)
+    tiles.push({ pos:new THREE.Vector3(cap.pos.x, cap.pos.y + ch/2 + 0.03, cap.pos.z), gap:false, weak:false, mesh:cap.mesh, crumbled:false });  // EXACT flat-top centre (celebration spot)
   }
   return tiles;
 }
 
-// three subtle glowing lane ribbons running up the face — the only paths you may climb. Each is a soft neon
-// core inside a faint glow halo (centre lane brightest). The CENTRE ribbon runs all the way to the peak;
-// the two side ribbons stop where the pyramid's edge is at their offset (cut along the slope angle).
+// glowing lane guides that STEP with the pyramid: a small lit pad sits flat on each tread, so the three paths
+// look like they're painted onto the stairs (no hovering / clipping). Centre runs to the peak; the two side
+// lanes only appear where the pyramid is wide enough at that height.
 function addLaneGuides(tiles){
   const guides = [];
-  const cx = tiles[0].pos.x, base = tiles[0].pos, top = tiles[tiles.length-1].pos;
-  const Hbase = BASE_BLOCKS_PER_WALL/2;                     // front half-width at the base
-  const strip = (lane, w, col, op) => {
-    const d = lane*LANE_W;
-    const endFrac = lane===0 ? 0.99 : Math.max(0.4, 1 - Math.abs(d)/Hbase);   // centre → peak; sides → their sloped edge
-    const P0 = base.clone().lerp(top, 0.03), P1 = base.clone().lerp(top, endFrac);
-    const dy = P1.y - P0.y, dz = P1.z - P0.z, L = Math.hypot(dy, dz) || 1, ang = Math.atan2(-dy, dz);
-    const mat = new THREE.MeshBasicMaterial({ color:col, transparent:true, opacity:op, depthWrite:false, blending:THREE.AdditiveBlending });
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.01, L), mat);
-    m.position.set(cx + d, (P0.y+P1.y)/2 + 0.035, (P0.z+P1.z)/2); m.rotation.x = ang;
-    m.baseOp = op; scene.add(m); guides.push(m);
-  };
-  [-1,0,1].forEach(lane => {
-    const centre = lane===0;
-    strip(lane, 0.16, centre?0xffd24a:0xffb43a, centre?0.085:0.055);   // faint outer glow halo
-    strip(lane, 0.038,centre?0xffeec0:0xffe49a, centre?0.34:0.24);     // soft neon core line
-  });
+  const baseY = tiles[0].pos.y, apexY = tiles[tiles.length-1].pos.y, span = (apexY - baseY) || 1;
+  const Hbase = BASE_BLOCKS_PER_WALL/2;
+  for (let i=0; i<tiles.length; i++){
+    const t = tiles[i]; if (t.gap) continue;                 // no step over a gap
+    const frac = (t.pos.y - baseY) / span;
+    [-1,0,1].forEach(lane => {
+      const d = lane*LANE_W;
+      if (lane!==0 && frac > 1 - Math.abs(d)/Hbase) return;   // side lane has run off the edge by this height
+      const centre = lane===0, op = centre ? 0.36 : 0.22;
+      const mat = new THREE.MeshBasicMaterial({ color: centre?0xffe7a8:0xffc24a, transparent:true,
+        opacity:op, depthWrite:false, blending:THREE.AdditiveBlending });
+      const pad = new THREE.Mesh(new THREE.BoxGeometry(centre?0.09:0.075, 0.006, 0.075), mat);   // flat pad on the tread
+      pad.position.set(t.pos.x + d, t.pos.y + 0.012, t.pos.z);
+      pad.baseOp = op; scene.add(pad); guides.push(pad);
+    });
+  }
   S.run.laneGuides = guides;
 }
 
@@ -1825,7 +1825,8 @@ function loadRunDressing(){
     if ((tiles[i-1] && (tiles[i-1].gap || tiles[i-1].weak)) ||
         (tiles[i-2] && (tiles[i-2].gap || tiles[i-2].weak))) continue;   // leave landing room after a jump
     if (RND() > 0.3 * DDA.obstacleW() * hazardMul) continue;   // adaptive + shaped by how well you built the pyramid (denser now)
-    if (RND() < 0.5){
+    const pick = RND();
+    if (pick < 0.3){
       // SIDE HAMMER: pivots off one side and swings down to slam ONE lane. A longer arm reaches a farther
       // lane (1st / 2nd / 3rd path from that side), a shorter arm the nearest — dodge to a different lane.
       const side = RND()<0.5 ? -1 : 1;              // mounted on the left or right of the path
@@ -1841,7 +1842,7 @@ function loadRunDressing(){
       head.position.y = Larm; head.castShadow = true; ham.add(head);
       ham.position.set(t.pos.x + side*0.5, t.pos.y, t.pos.z);             // pivot just outside the lanes, at tread level
       scene.add(ham); t.obMesh = ham;
-    } else {
+    } else if (pick < 0.58){
       // themed temple SPIKE TRAP — NO base; bare spikes lean out toward the player, their roots sunk into the stone — slides lane↔lane
       const spikeMat = new THREE.MeshStandardMaterial({ color:0xc9a24a, emissive:0x2a1500, metalness:0.5, roughness:0.4 });
       t.ob = { type:'lane', lane:0, moving:true, phase: RND()*6.28, spd:0.0016 + RND()*0.003, yOff:0, mat:spikeMat };
@@ -1854,6 +1855,30 @@ function loadRunDressing(){
       }
       trap.position.set(t.pos.x, t.pos.y, t.pos.z);
       scene.add(trap); t.obMesh = trap;
+    } else if (pick < 0.8){
+      // LOW LINTEL: a stone beam across the whole path at head height — SLIDE under it (can't be dodged by lane)
+      t.ob = { type:'beam' };
+      const beam = new THREE.Group();
+      const barMat = new THREE.MeshStandardMaterial({ color:0x9a7b46, roughness:0.9, metalness:0.05, emissive:0x241808 });
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.05, 0.07), barMat);
+      bar.position.y = 0.085; bar.castShadow = true; beam.add(bar);
+      [-0.29, 0.29].forEach(px => { const post = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.11, 0.05), barMat);
+        post.position.set(px, 0.045, 0); post.castShadow = true; beam.add(post); });
+      beam.position.set(t.pos.x, t.pos.y, t.pos.z);
+      scene.add(beam); t.obMesh = beam;
+    } else {
+      // FLAME JET: erupts from one lane on a timer — time your pass for when it's down
+      const L = rndLane();
+      const fmat = new THREE.MeshStandardMaterial({ color:0xff7a1e, emissive:0xff5400, emissiveIntensity:1.3, transparent:true, opacity:0.9, roughness:0.6 });
+      t.ob = { type:'lane', lane:99, flame:true, L, phase:RND()*6.28, spd:0.003 + RND()*0.0035, mat:fmat };
+      const jet = new THREE.Group();
+      const vent = new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.05,0.03,10),
+        new THREE.MeshStandardMaterial({ color:0x2c241a, roughness:1 }));
+      vent.position.y = 0.0; jet.add(vent);
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.2, 8), fmat);
+      cone.position.y = 0.11; jet.add(cone); t.ob.coneMesh = cone;
+      jet.position.set(t.pos.x + L*LANE, t.pos.y, t.pos.z);
+      scene.add(jet); t.obMesh = jet;
     }
     lastOb = i;
   }
@@ -2794,6 +2819,15 @@ function animate(){
         if (near){ spawnDust(new THREE.Vector3(t.pos.x + t.ob.L*LANE_W, t.pos.y - 0.03, t.pos.z), 0xe8d8c0, 7, 1.6, 1);
           Sound.drop(); shake(0.16); }
       } else if (!slammed && t.ob.slam && s < aMax*0.65){ t.ob.slam = false; }
+    }
+    // FLAME JET: erupts on a timer in its lane; only deadly while the flame is up
+    if (t.ob && t.ob.flame && t.obMesh){
+      const s = Math.sin(performance.now()*(t.ob.spd||0.003) + t.ob.phase);   // -1..1
+      const up = s > 0.1;
+      if (t.ob.coneMesh){ const hgt = up ? (0.35 + 0.65*s) : 0.0;
+        t.ob.coneMesh.scale.set(1, Math.max(0.04, hgt), 1); t.ob.coneMesh.visible = up; }
+      if (t.ob.mat) t.ob.mat.opacity = up ? 0.9 : 0;
+      t.ob.lane = up ? t.ob.L : 99;
     }
   });
 
