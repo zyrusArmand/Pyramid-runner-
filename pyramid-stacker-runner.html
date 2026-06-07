@@ -603,7 +603,7 @@ const TIER_GOOD             = 0.45;
 const MAX_PIECE_LEN         = 2;     // pieces span 1–2 cells (longer rectangles)
 const CORNER_CHANCE         = 0.6;   // chance the first piece of a wall is a cornerstone
 const FALL_THRESHOLD        = 0.55;  // above layer 1, a drop this far off its support topples off
-const RUN_SCALE             = 0.2;   // tiny climber → the pyramid feels massive on the run up
+const RUN_SCALE             = 0.15;  // tiny climber → the pyramid feels massive on the run up
 
 // ---------- seeded RNG (so the Daily Challenge is identical for everyone, every day) ----------
 let __seed = 0, __seeded = false;
@@ -1794,10 +1794,10 @@ function loadRunDressing(){
   let lastOb = 2;
   for (let i = 5; i < tiles.length - 2; i++){
     const t = tiles[i];
-    if (t.gap || t.weak || i - lastOb < 4) continue;
+    if (t.gap || t.weak || i - lastOb < 3) continue;
     if ((tiles[i-1] && (tiles[i-1].gap || tiles[i-1].weak)) ||
         (tiles[i-2] && (tiles[i-2].gap || tiles[i-2].weak))) continue;   // leave landing room after a jump
-    if (RND() > 0.18 * DDA.obstacleW() * hazardMul) continue;   // adaptive + shaped by how well you built the pyramid
+    if (RND() > 0.3 * DDA.obstacleW() * hazardMul) continue;   // adaptive + shaped by how well you built the pyramid (denser now)
     if (RND() < 0.5){
       // SIDE HAMMER: pivots off one side and swings down to slam ONE lane. A longer arm reaches a farther
       // lane (1st / 2nd / 3rd path from that side), a shorter arm the nearest — dodge to a different lane.
@@ -1815,17 +1815,15 @@ function loadRunDressing(){
       ham.position.set(t.pos.x + side*0.5, t.pos.y, t.pos.z);             // pivot just outside the lanes, at tread level
       scene.add(ham); t.obMesh = ham;
     } else {
-      // themed temple SPIKE TRAP — the WHOLE assembly (base + spikes) leans out toward the player, roots buried — slides lane↔lane
+      // themed temple SPIKE TRAP — NO base; bare spikes lean out toward the player, their roots sunk into the stone — slides lane↔lane
       const spikeMat = new THREE.MeshStandardMaterial({ color:0xc9a24a, emissive:0x2a1500, metalness:0.5, roughness:0.4 });
-      t.ob = { type:'lane', lane:0, moving:true, phase: RND()*6.28, spd:0.0016 + RND()*0.003, yOff:-0.03, mat:spikeMat };
+      t.ob = { type:'lane', lane:0, moving:true, phase: RND()*6.28, spd:0.0016 + RND()*0.003, yOff:0, mat:spikeMat };
       const trap = new THREE.Group();
-      const tilt = new THREE.Group(); tilt.rotation.x = 1.15; trap.add(tilt);   // lean everything down-slope toward the player
-      const base = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.06, 0.15),       // base now tilts WITH the spikes and tucks into the slope
-        new THREE.MeshStandardMaterial({ color:0x4a3a26, roughness:1 }));
-      base.position.set(0, -0.02, 0); tilt.add(base);
-      for (const [sx,sz,sh] of [[-0.05,-0.03,0.15],[0.05,-0.03,0.15],[0,0.03,0.18],[0,-0.07,0.13]]){
-        const sp = new THREE.Mesh(new THREE.ConeGeometry(0.024, sh, 5), spikeMat);
-        sp.position.set(sx, 0.02 + sh/2, sz); sp.castShadow = true; tilt.add(sp);   // upright in the tilt group → all lean as one
+      for (const [sx,sz,sh] of [[-0.05,-0.02,0.17],[0.05,-0.02,0.17],[0,0.04,0.2],[0,-0.06,0.14]]){
+        const sp = new THREE.Mesh(new THREE.ConeGeometry(0.026, sh, 5), spikeMat);
+        sp.rotation.x = 0.95;                              // angled out toward the player
+        sp.position.set(sx, 0.02, sz);                     // centre at the tread → the lower half (root) is hidden inside the stone
+        sp.castShadow = true; trap.add(sp);
       }
       trap.position.set(t.pos.x, t.pos.y, t.pos.z);
       scene.add(trap); t.obMesh = trap;
@@ -1988,10 +1986,10 @@ function updateRun(dt){
       g.armL.rotation.z = 0.3; g.armR.rotation.z = -0.3;              // fists up in a V, pumping
       g.legL.rotation.x = 0; g.legR.rotation.x = 0;
     }
-    g.rotation.y += dt*0.6;                                            // slow show-off turn
-    placeShadow(g, r);
-    // camera: start close on the climber, spiral once around the whole pyramid, ease to a stop at a 3/4 angle
-    const DUR = 4.6, p = Math.min(r.celebT / DUR, 1), e = p*p*(3-2*p);
+    g.rotation.y += dt*0.35;                                           // slow show-off turn
+    if (S.shadow) S.shadow.material.opacity = 0;                       // hide the shadow blob (no stray dark disc up top)
+    // camera: start close on the climber, spiral SLOWLY once around the whole pyramid, ease to a stop at a 3/4 angle
+    const DUR = 7.2, p = Math.min(r.celebT / DUR, 1), e = p*p*(3-2*p);
     const topY = top.y, midY = topY*0.5, startA = 0.7;
     const a = startA + e*Math.PI*2;                                    // one full revolution
     const R = 1.7 + (8.6-1.7)*e, camY = (topY+0.45) + ((midY+2.9) - (topY+0.45))*e;
@@ -2020,7 +2018,7 @@ function updateRun(dt){
   if (r.invuln > 0) r.invuln -= dt;                // brief grace after a revive
 
   // advance along the path — the climb steadily quickens to keep the pressure on
-  r.speed = (3.6 + Math.min(r.idx * 0.03, 2.5)) * DDA.runSpeed() * levelSpeed();   // adaptive + faster each level
+  r.speed = (3.1 + Math.min(r.idx * 0.028, 2.3)) * DDA.runSpeed() * levelSpeed();   // adaptive + faster each level
   r.t += r.speed * dt / 1;
   while (r.t >= 1){
     r.t -= 1; r.idx++;
@@ -2299,10 +2297,10 @@ function followCam(dt, falling){
   if (dir.lengthSq() < 0.0001) dir.set(0,0,1); else dir.normalize();
   // a LOW chase cam, just behind & barely above the climber — like someone scrambling up right behind him,
   // but tilted up the slope so you still see what's coming right in front
-  const want = g.position.clone().addScaledVector(dir, -1.05); want.y = g.position.y + 0.26;
+  const want = g.position.clone().addScaledVector(dir, -0.95); want.y = g.position.y + 0.24;
   camera.position.lerp(want, Math.min(1, dt*4));
-  const look = g.position.clone().addScaledVector(dir, 0.8);   // aim up the slope, ahead of the runner
-  camera.lookAt(look.x, look.y + 0.24, look.z);
+  const look = g.position.clone().addScaledVector(dir, 0.85);   // aim further up the slope (smaller climber → more pyramid ahead)
+  camera.lookAt(look.x, look.y + 0.22, look.z);
   applyShake();
 }
 
@@ -2767,7 +2765,7 @@ function animate(){
 
   // shop character preview: spin briskly to show the model off from all sides
   if (charPrevOn && charPrev && charPrev.runner){
-    charPrev.runner.rotation.y += dt * 2.2;
+    charPrev.runner.rotation.y += dt * 1.4;
     charPrev.rend.render(charPrev.sc, charPrev.cam);
   }
 }
