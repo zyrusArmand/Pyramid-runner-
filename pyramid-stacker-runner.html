@@ -1044,7 +1044,7 @@ function makePiece(len, axis, color, corner){
 function makeSteppedPiece(len, axis, color, center, n){
   const mat = new THREE.MeshStandardMaterial({ color, roughness:0.92, metalness:0.04 });
   if (STONE_BUMP){ mat.bumpMap = STONE_BUMP; mat.bumpScale = 0.04; }    // carved stone surface relief
-  const h = LAYER_HEIGHT*0.94, GAP = 0.999;           // full cell: a PERFECT (flush) seat shows NO gap at all,
+  const h = LAYER_HEIGHT*1.04, GAP = 0.999;           // slightly over-tall so stacked courses overlap → NO visible gap between layers; a PERFECT (flush) seat shows NO gap at all,
                                                       // while a drifted stone still leaves a real visible gap
   const xHalf = (axis==='x' ? len*BLOCK_SIZE*GAP : BLOCK_SIZE*GAP)/2;
   const zHalf = (axis==='z' ? len*BLOCK_SIZE*GAP : BLOCK_SIZE*GAP)/2;
@@ -1073,20 +1073,16 @@ function makeCapstonePeak(color){
   const mat = new THREE.MeshStandardMaterial({ color, roughness:0.92, metalness:0.04 });  // exactly the other stones' look
   if (STONE_BUMP){ mat.bumpMap = STONE_BUMP; mat.bumpScale = 0.04; }
   const g = new THREE.Group();
-  const steps = 6;                                          // compact, regular-size crown
-  const baseW = BLOCK_SIZE*0.96, topW = baseW*0.18;         // base matches a normal block's width
-  const totalH = LAYER_HEIGHT*1.0, stepH = totalH/steps;    // about one course tall — not a tower
-  const baseY = -LAYER_HEIGHT*0.47;                         // base lines up with a normal block's bottom here
-  for (let i=0; i<steps; i++){
-    const f = i/(steps-1), w = baseW + (topW-baseW)*f;      // each course recedes on all four sides
-    const plate = new THREE.Mesh(new THREE.BoxGeometry(w, stepH+0.004, w), mat);
-    plate.position.y = baseY + stepH*(i+0.5);
+  // same stepping cadence as every other stone (STEP_N courses, 0.04 inset/course) but receding on ALL FOUR
+  // sides, topping out in a small FLAT platform the climber can stand on at the summit — no pointed peak.
+  const h = LAYER_HEIGHT*1.04, N = STEP_N, stepH = h/N, inset = 0.04, baseW = BLOCK_SIZE*0.999;
+  for (let i=0; i<N; i++){
+    const w = Math.max(0.28, baseW - 2*i*inset);            // recede on all four faces → flat stand on top
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(w, stepH+0.01, w), mat);
+    plate.position.y = -h/2 + stepH*(i+0.5);
     plate.receiveShadow = true; plate.castShadow = (i < 2);
     g.add(plate);
   }
-  const peak = new THREE.Mesh(new THREE.ConeGeometry(topW*0.7, stepH*1.4, 4), mat);   // small point on top
-  peak.position.y = baseY + totalH + stepH*0.35; peak.rotation.y = Math.PI/4; peak.castShadow = true;
-  g.add(peak);
   g.material = mat;                                          // for the active-piece glow pulse
   scene.add(g);
   return g;
@@ -1655,7 +1651,7 @@ function advance(len){
 // course (10 per layer), base to capstone. A missing front stone becomes one jumpable gap.
 function climbPath(){
   const tiles = [];
-  const h = LAYER_HEIGHT*0.94, zHalf = BLOCK_SIZE*0.985/2, inset = 0.04, N = STEP_N, stepH = h/N;
+  const h = LAYER_HEIGHT*1.04, zHalf = BLOCK_SIZE*0.985/2, inset = 0.04, N = STEP_N, stepH = h/N;
   const maxL = BASE_BLOCKS_PER_WALL - 1;
   function frontInfo(L){
     const n = nForLayer(L), H = (n*BLOCK_SIZE)/2, y = L*LAYER_HEIGHT;
@@ -1736,7 +1732,8 @@ function makeGlyph(ch){
 function loadRunDressing(){
   const r = S.run; if (!r || r.dressed) return; r.dressed = true;
   const tiles = r.tiles, hazardMul = r.hazardMul;
-  // procedural obstacles: swinging hammers to time + sliding spike traps to dodge
+  const LANE = 0.24, rndLane = () => [-1,0,1][Math.floor(RND()*3)];
+  // procedural obstacles: side-mounted swinging hammers to time + sliding spike traps to dodge
   let lastOb = 2;
   for (let i = 5; i < tiles.length - 2; i++){
     const t = tiles[i];
@@ -1744,41 +1741,42 @@ function loadRunDressing(){
     if ((tiles[i-1] && (tiles[i-1].gap || tiles[i-1].weak)) ||
         (tiles[i-2] && (tiles[i-2].gap || tiles[i-2].weak))) continue;   // leave landing room after a jump
     if (RND() > 0.18 * DDA.obstacleW() * hazardMul) continue;   // adaptive + shaped by how well you built the pyramid
-    const A = tiles[i].pos, B = tiles[Math.min(i+1, tiles.length-1)].pos;
-    let fwd = B.clone().sub(A); fwd.y = 0; if (fwd.lengthSq()<1e-4) fwd.set(0,0,1); else fwd.normalize();
-    const perp = new THREE.Vector3(-fwd.z, 0, fwd.x);
     if (RND() < 0.5){
-      // a giant pendulum hammer that WIPES side to side, slamming the ground on each side — time your run
-      t.ob = { type:'lane', lane:99, hammer:true, phase:RND()*6.28, spd:0.0021 + RND()*0.0022 };
-      t.perp = perp.clone();
+      // SIDE HAMMER: pivots off one side and swings down to slam ONE lane. A longer arm reaches a farther
+      // lane (1st / 2nd / 3rd path from that side), a shorter arm the nearest — dodge to a different lane.
+      const side = RND()<0.5 ? -1 : 1;              // mounted on the left or right of the path
+      const L = rndLane();                          // the lane it slams
+      const Larm = Math.max(0.26, 0.5 - side*L*LANE);   // arm length so the head reaches lane L at the bottom of its swing
+      const aMax = 1.45;
+      t.ob = { type:'lane', lane:99, hammer:true, side, L, aMax, phase:RND()*6.28, spd:0.0022 + RND()*0.0024, slam:false };
       const ham = new THREE.Group();
       const goldMat = new THREE.MeshStandardMaterial({ color:0xddb24a, metalness:0.6, roughness:0.4 });
-      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.016,0.022,0.34,8), goldMat);
-      arm.position.y = 0.17; ham.add(arm);                                // arm rises from a ground pivot
-      const head = new THREE.Mesh(new THREE.BoxGeometry(0.13,0.11,0.13), goldMat);  // heavy head at the top of the arm
-      head.position.y = 0.36; head.castShadow = true; ham.add(head);
-      ham.position.set(t.pos.x, t.pos.y - 0.1, t.pos.z);                  // pivot sunk into the stone, sweeps all lanes
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.015,0.02,Larm,8), goldMat);
+      arm.position.y = Larm/2; ham.add(arm);                              // arm rises from the side pivot
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.13,0.11,0.13), goldMat);  // heavy head at the tip
+      head.position.y = Larm; head.castShadow = true; ham.add(head);
+      ham.position.set(t.pos.x + side*0.5, t.pos.y, t.pos.z);             // pivot just outside the lanes, at tread level
       scene.add(ham); t.obMesh = ham;
     } else {
-      // themed temple SPIKE TRAP — base sunk into the stone, spikes slide left↔right at their own speed
+      // themed temple SPIKE TRAP — spikes angled OUT toward the player (roots buried) — slides lane↔lane
       const spikeMat = new THREE.MeshStandardMaterial({ color:0xc9a24a, emissive:0x2a1500, metalness:0.5, roughness:0.4 });
-      t.ob = { type:'lane', lane:0, moving:true, phase: RND()*6.28, spd:0.0016 + RND()*0.003, yOff:0, mat:spikeMat };
-      t.perp = perp.clone();
+      t.ob = { type:'lane', lane:0, moving:true, phase: RND()*6.28, spd:0.0016 + RND()*0.003, yOff:0.04, mat:spikeMat };
       const trap = new THREE.Group();
-      const base = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.05, 0.16),                 // base buried just under the tread
-        new THREE.MeshStandardMaterial({ color:0x4a3a26, roughness:1 }));
-      base.position.y = -0.035; trap.add(base);
-      for (const [sx,sz,sh] of [[-0.045,-0.04,0.12],[0.045,-0.04,0.12],[0,0.045,0.15],[0,-0.01,0.1]]){
-        const sp = new THREE.Mesh(new THREE.ConeGeometry(0.022, sh, 5), spikeMat);
-        sp.position.set(sx, sh/2 - 0.005, sz); sp.castShadow = true; trap.add(sp);   // spikes emerge from the surface
+      const buried = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.06, 0.12),       // dark root block, sunk out of sight
+        new THREE.MeshStandardMaterial({ color:0x33281a, roughness:1 }));
+      buried.position.set(0, -0.06, -0.04); trap.add(buried);
+      for (const [sx,sz,sh] of [[-0.05,0.0,0.15],[0.05,0.0,0.15],[0,0.05,0.18],[0,-0.05,0.13]]){
+        const sp = new THREE.Mesh(new THREE.ConeGeometry(0.024, sh, 5), spikeMat);
+        sp.rotation.x = 1.2;                                              // tip leans down-slope toward the player; root tucked behind
+        sp.position.set(sx, 0.03, sz); sp.castShadow = true; trap.add(sp);
       }
       trap.position.set(t.pos.x, t.pos.y, t.pos.z);
       scene.add(trap); t.obMesh = trap;
     }
     lastOb = i;
   }
-  // coins: a glinting trail of pickups. Most sit on safe tiles; a few hover over gaps,
-  // rewarding a well-timed jump (collect-while-airborne pays a bonus).
+  // coins: a glinting trail of pickups spread ACROSS the lanes (steer into a coin's lane to grab it).
+  // A few hover over gaps (centred), rewarding a well-timed jump (collect-while-airborne pays a bonus).
   let lastCoin = -3;
   for (let i = 3; i < tiles.length - 1; i++){
     const t = tiles[i];
@@ -1786,16 +1784,17 @@ function loadRunDressing(){
     const overGap = t.gap;                                       // only real gaps float coins in the air
     if (i - lastCoin < 3) continue;                              // space coins out on the dense steps
     if (overGap ? (RND() < 0.6) : (RND() < 0.22)){
+      const lane = overGap ? 0 : rndLane();                      // gap coins stay centred; ground coins pick a lane
       const c = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.014, 14),   // small coin for the tiny climber
         new THREE.MeshStandardMaterial({ color:0xffd24a, emissive:0x6a4a00, metalness:0.7, roughness:0.3 }));
       c.rotation.x = Math.PI/2;
-      c.position.set(t.pos.x, t.pos.y + (overGap ? 0.3 : 0.12), t.pos.z);
+      c.position.set(t.pos.x + lane*LANE, t.pos.y + (overGap ? 0.3 : 0.12), t.pos.z);
       c.castShadow = true; scene.add(c);
-      t.coin = { mesh:c, got:false, air:overGap };
+      t.coin = { mesh:c, got:false, air:overGap, lane };
       lastCoin = i;
     }
   }
-  // ---- power-ups: occasional pickups (magnet / shield / slow-mo) on safe stretches ----
+  // ---- power-ups: occasional pickups (magnet / shield / slow-mo), also placed on a random lane ----
   let lastPow = 0;
   for (let i = 12; i < tiles.length - 5; i++){
     const t = tiles[i];
@@ -1803,6 +1802,7 @@ function loadRunDressing(){
     if (RND() < 0.55) continue;                                    // sparse — a treat, not a guarantee
     const type = ['magnet','shield','slow'][Math.floor(RND()*3)];
     const col = type==='magnet' ? 0x46d6ff : type==='shield' ? 0x57e08a : 0xc59cff;
+    const lane = rndLane();
     const grp = new THREE.Group();
     const core = new THREE.Mesh(new THREE.SphereGeometry(0.055,18,14),
       new THREE.MeshStandardMaterial({ color:col, emissive:col, emissiveIntensity:0.9, metalness:0.3, roughness:0.3 }));
@@ -1812,8 +1812,8 @@ function loadRunDressing(){
     ring.rotation.x = Math.PI/2; grp.add(ring);
     const glyph = makeGlyph(type==='magnet' ? '⚡' : type==='shield' ? '🛡' : '⏱');   // camera-facing type symbol
     if (glyph) grp.add(glyph);
-    grp.position.set(t.pos.x, t.pos.y + 0.2, t.pos.z); scene.add(grp);
-    t.power = { type, mesh:grp, core, ring, glyph, got:false };
+    grp.position.set(t.pos.x + lane*LANE, t.pos.y + 0.2, t.pos.z); scene.add(grp);
+    t.power = { type, mesh:grp, core, ring, glyph, got:false, lane };
     lastPow = i;
   }
   addLaneGuides(tiles);                                  // the three glowing paths you're restricted to
@@ -1919,6 +1919,24 @@ function updateRun(dt){
   }
   if (r.dead){ followCam(dt, false); return; }     // frozen while the revive prompt is up
 
+  if (r.celebrating > 0){                           // VICTORY: standing on the flat summit, arms thrown overhead
+    r.celebrating -= dt;
+    const top = r.tiles[r.tiles.length-1].pos;
+    const bob = Math.abs(Math.sin(performance.now()*0.012)) * 0.05;   // little victory hops
+    g.position.set(top.x, top.y + bob, top.z);
+    g.scale.set(RUN_SCALE, RUN_SCALE, RUN_SCALE);
+    if (g.legL){
+      g.armL.rotation.x = -2.8; g.armR.rotation.x = -2.8;             // both arms straight up over the head
+      g.armL.rotation.z = 0.35; g.armR.rotation.z = -0.35;            // spread in a V
+      g.legL.rotation.x = 0; g.legR.rotation.x = 0;
+    }
+    g.rotation.y += dt*1.2;                                            // slow triumphant spin
+    placeShadow(g, r);
+    followCam(dt, false);
+    if (r.celebrating <= 0) nextLevel();
+    return;
+  }
+
   // sandstorm: ease the fog in/out depending on whether we're inside a storm stretch
   const inStorm = (r.storms||[]).some(s => r.idx >= s[0] && r.idx <= s[1]);
   scene.fog.far  += ((inStorm ? 17 : 46) - scene.fog.far) * Math.min(1, dt*1.6);
@@ -1941,7 +1959,12 @@ function updateRun(dt){
   r.t += r.speed * dt / 1;
   while (r.t >= 1){
     r.t -= 1; r.idx++;
-    if (r.idx >= r.tiles.length-1){ Sound.win(); nextLevel(); return; }   // reached the summit → next level, faster
+    if (r.idx >= r.tiles.length-1){     // reached the summit → stand on the flat top & celebrate, then next level
+      r.idx = r.tiles.length-1; r.t = 0; r.celebrating = 1.5; Sound.win();
+      g.position.copy(r.tiles[r.idx].pos); placeShadow(g, r);
+      spawnDust(g.position.clone(), 0xffe6a0, 16, 2.4, 2.4); flash(); shake(0.3);
+      return;
+    }
     Sound.step();
     if (r.invuln <= 0 && tileUnsafe(r.tiles[r.idx])){
       if (!r.jumping){ crumbleTile(r.tiles[r.idx]); startFall(); return; }
@@ -2150,7 +2173,10 @@ function showHint(text, ms){
 
 function collectCoin(t, r, force){
   if (!t.coin || t.coin.got) return;
-  if (!force && t.coin.air && !r.jumping) return;   // hovering coins demand a jump to grab (magnet bypasses)
+  if (!force){
+    if (t.coin.air && !r.jumping) return;            // hovering coins demand a jump to grab
+    if (!t.coin.air && t.coin.lane !== undefined && r.lane !== t.coin.lane) return;   // ground coins: must be in their lane (magnet bypasses)
+  }
   t.coin.got = true;
   const bonus = Math.round((t.coin.air ? 2 : 1) * (S.climbCoinMul || 1));   // airborne grabs pay double; better builds pay more
   S.coins += bonus; S.score += 50 * bonus;
@@ -2168,6 +2194,7 @@ function updateCoinHud(pulse){
 // ---------- run power-ups ----------
 function collectPower(t, r){
   if (!t.power || t.power.got) return;
+  if (t.power.lane !== undefined && r.lane !== t.power.lane) return;   // must steer into the power-up's lane to grab it
   t.power.got = true;
   const type = t.power.type, pos = t.power.mesh.position.clone();
   scene.remove(t.power.mesh); sparkle(pos); Sound.buy();
@@ -2621,29 +2648,30 @@ function animate(){
     if (t.power && !t.power.got){ t.power.mesh.rotation.y += dt*1.8;
       t.power.mesh.position.y = t.pos.y + 0.2 + 0.03*Math.sin(performance.now()*0.004); }
     const near = S.run && (ti - S.run.idx) >= -1 && (ti - S.run.idx) < 8;   // close enough ahead to matter
-    // spikes / pillars slide between lanes at their own speed — keep the mesh and live hit-lane in sync
-    if (t.ob && t.ob.moving && t.obMesh && t.perp){
+    // spike traps slide lane↔lane (along x) at their own speed — keep the mesh and live hit-lane in sync
+    if (t.ob && t.ob.moving && t.obMesh){
       const f = Math.sin(performance.now()*(t.ob.spd||0.0024) + t.ob.phase);
       t.ob.lane = f > 0.33 ? 1 : (f < -0.33 ? -1 : 0);
       const yo = (t.ob.yOff !== undefined) ? t.ob.yOff : 0.15;
-      t.obMesh.position.set(t.pos.x + t.perp.x*f*0.24, t.pos.y + yo, t.pos.z + t.perp.z*f*0.24);
+      t.obMesh.position.set(t.pos.x + f*0.24, t.pos.y + yo, t.pos.z);
       if (t.ob.mat){                                   // telegraph: spikes glint red when they're in YOUR lane just ahead
         const danger = near && t.ob.lane === S.run.lane;
         t.ob.mat.emissive.setRGB(danger ? 0.5+0.4*pulse : 0.16, danger ? 0.04 : 0.08, 0);
       }
     }
-    if (t.ob && t.ob.hammer && t.obMesh){             // pendulum hammer wipes side to side, slamming the ground each side
-      const th = Math.sin(performance.now()*(t.ob.spd||0.003) + t.ob.phase) * 1.4;   // ±80° sweep
-      t.obMesh.rotation.z = th;
-      const offset = -0.34 * Math.sin(th);             // where the head currently is across the lanes
-      const down = Math.cos(th) < 0.72;                // head swung DOWN near a side
-      t.ob.lane = down ? Math.max(-1, Math.min(1, Math.round(offset/0.24))) : 99;   // only deadly while down
-      const slammed = Math.cos(th) < 0.42;             // head essentially on the ground
-      if (slammed && !t.ob.slam){                      // fire a dust puff + thud once per ground-slam
+    // SIDE HAMMER: swings down from its side pivot to slam its target lane L; only deadly while the head is down
+    if (t.ob && t.ob.hammer && t.obMesh){
+      const aMax = t.ob.aMax || 1.45;
+      const s = aMax * (0.5 - 0.5*Math.cos(performance.now()*(t.ob.spd||0.003) + t.ob.phase));   // 0 (up, safe) → aMax (slam)
+      t.obMesh.rotation.z = t.ob.side * s;
+      const down = s > aMax*0.72;                      // head swung inward, low over its lane
+      t.ob.lane = down ? t.ob.L : 99;
+      const slammed = s > aMax*0.9;
+      if (slammed && !t.ob.slam){                      // fire a dust puff + thud once per slam
         t.ob.slam = true;
-        if (near){ spawnDust(new THREE.Vector3(t.pos.x + offset, t.pos.y - 0.06, t.pos.z), 0xe8d8c0, 7, 1.6, 1);
-          Sound.drop(); shake(0.18); }
-      } else if (!slammed && t.ob.slam && Math.cos(th) > 0.55){ t.ob.slam = false; }
+        if (near){ spawnDust(new THREE.Vector3(t.pos.x + t.ob.L*0.24, t.pos.y - 0.03, t.pos.z), 0xe8d8c0, 7, 1.6, 1);
+          Sound.drop(); shake(0.16); }
+      } else if (!slammed && t.ob.slam && s < aMax*0.65){ t.ob.slam = false; }
     }
   });
 
