@@ -638,11 +638,25 @@ function initCharPreview(){
   const dl = new THREE.DirectionalLight(0xffffff, 0.85); dl.position.set(1.4, 2.2, 1.8); sc.add(dl);
   charPrev = { rend, sc, cam, runner:null };
 }
+// a little stepped stone block in the current STONE palette — mirrors the pyramid's look
+function makeStonePreview(){
+  const g = new THREE.Group();
+  const layers = 4, lh = 0.12, base = 0.52;
+  for (let i=0; i<layers; i++){
+    const w = base - i*(base*0.62/layers);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(w, lh, w),
+      new THREE.MeshStandardMaterial({ color:layerColor(i), roughness:0.92, metalness:0.04 }));
+    box.position.y = 0.08 + i*lh + lh/2;
+    g.add(box);
+  }
+  return g;
+}
 function updateCharPreview(){
   initCharPreview();
   if (!charPrev) return;
   if (charPrev.runner) charPrev.sc.remove(charPrev.runner);
-  const g = makeRunner(); g.rotation.y = 0.5; charPrev.runner = g; charPrev.sc.add(g);
+  const g = (shopTab==='chars') ? makeRunner() : makeStonePreview();
+  g.rotation.y = 0.5; charPrev.runner = g; charPrev.sc.add(g);
   resizeCharPreview();
 }
 function resizeCharPreview(){
@@ -2032,10 +2046,9 @@ function renderShop(){
     el.addEventListener('pointerdown', ev => { ev.stopPropagation(); ev.preventDefault(); isChar ? pickChar(key) : pickStone(key); });
     grid.appendChild(el);
   });
-  // spinning 3D preview only makes sense for characters
-  const stage = $('charStage');
-  if (isChar){ stage.classList.remove('hidden'); updateCharPreview(); charPrevOn = true; }
-  else { stage.classList.add('hidden'); charPrevOn = false; }
+  // spinning 3D preview: the runner on CHARACTERS, a stone block on STONES
+  $('charStage').classList.remove('hidden');
+  updateCharPreview(); charPrevOn = true;
 }
 function buyOrEquip(key, set, own, ownedKey, equip){
   Sound.init(); if (Sound.ctx && Sound.ctx.state==='suspended') Sound.ctx.resume();
