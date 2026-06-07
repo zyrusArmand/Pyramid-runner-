@@ -108,7 +108,12 @@
     background:rgba(20,12,28,.55); border:1px solid rgba(243,200,120,.4); border-radius:10px;
     padding:8px 11px; pointer-events:auto; }
   #menuBtn:active { transform:scale(.95); }
-  #hud > div:first-child { padding-left:46px; }   /* clear room for the menu button */
+  #restartBtn { position:fixed; left:58px; top:calc(max(16px,env(safe-area-inset-top)) + 2px); z-index:6;
+    font-family:'Space Mono',monospace; font-size:16px; line-height:1; color:#f6e9d2; display:none;
+    background:rgba(20,12,28,.55); border:1px solid rgba(243,200,120,.4); border-radius:10px;
+    padding:8px 11px; pointer-events:auto; }
+  #restartBtn:active { transform:scale(.95); }
+  #hud > div:first-child { padding-left:98px; }   /* clear room for the menu + restart buttons */
 
   /* ---------- home screen (cover art + buttons) ---------- */
   #startScreen { padding:0; justify-content:flex-end; }
@@ -238,6 +243,7 @@
 <div id="coinHud" class="hidden"><span class="coinIcon"></span><span id="coinVal">0</span></div>
 <div id="combo"></div>
 <div id="menuBtn">☰</div>
+<div id="restartBtn">↻</div>
 
 <div id="meterWrap"><div id="meterLabel">LAYER STABILITY</div>
   <div id="meterBar"><div id="meterFill"></div></div></div>
@@ -329,12 +335,13 @@
   <div class="bigscore" id="finalScore">0</div>
   <div class="gostat" id="finalStat"></div>
   <div class="gostat" id="finalReward" style="margin-top:14px;color:#ffe08a"></div>
+  <div class="cta hero" id="retryBtn" style="pointer-events:auto;margin-top:22px">RETRY</div>
   <div class="obtnRow">
     <div class="obtn gold" id="dblBtn">2× COINS ▶</div>
     <div class="obtn" id="shareBtn">SHARE</div>
     <div class="obtn" id="menuFromOver">MAIN MENU</div>
   </div>
-  <div class="cta">TAP TO PLAY AGAIN</div>
+  <div class="cta" style="margin-top:14px;opacity:.55;font-size:11px">OR TAP ANYWHERE</div>
 </div>
 
 <div class="overlay hidden" id="reviveScreen">
@@ -1592,7 +1599,7 @@ function startGame(){
   $('hud').style.display='flex'; updateCoinHud(false);     // coin counter visible the whole game
   $('storm').style.opacity='0'; scene.fog.near=16; scene.fog.far=46; S.stormA=0;
   $('reviveScreen').classList.add('hidden'); $('adModal').classList.add('hidden'); $('hint').classList.remove('show');
-  $('menuBtn').style.display = 'block';
+  $('menuBtn').style.display = 'block'; $('restartBtn').style.display='block';
   if (firstTime) showHint('TAP to drop · land each block CENTERED for PERFECT', 5000);
   updateHUD(); spawnBlock();
 }
@@ -1613,7 +1620,7 @@ function nextLevel(){
   $('coinHud').classList.remove('hidden'); $('combo').classList.remove('show'); $('vignette').style.opacity='0';
   $('hud').style.display='flex';
   $('storm').style.opacity='0'; scene.fog.near=16; scene.fog.far=46; S.stormA=0;
-  $('reviveScreen').classList.add('hidden'); $('hint').classList.remove('show'); $('menuBtn').style.display='block';
+  $('reviveScreen').classList.add('hidden'); $('hint').classList.remove('show'); $('menuBtn').style.display='block'; $('restartBtn').style.display='block';
   showPop('LEVEL ' + gameLevel);
   updateHUD(); spawnBlock();
 }
@@ -1627,7 +1634,7 @@ function showStart(){            // the main "home" menu (cover art + PLAY / LEA
   $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden');
   $('startScreen').classList.remove('hidden');
   $('coinHud').classList.add('hidden'); $('combo').classList.remove('show'); $('vignette').style.opacity='0';
-  $('menuBtn').style.display = 'none'; $('reviveScreen').classList.add('hidden');
+  $('menuBtn').style.display = 'none'; $('restartBtn').style.display='none'; $('reviveScreen').classList.add('hidden');
   $('hud').style.display = 'none';                  // clear leftover run HUD behind the menu
   $('meterWrap').style.opacity = '0';              // hide the structural-integrity bar on the menus
   renderHome();
@@ -1684,7 +1691,7 @@ function endGame(won, how){
   if (S.gameOver) return;
   S.gameOver = true; S.won = won; S.phase = 'over';
   DDA.note(won ? 0.9 : (how==='collapsed' ? 0.15 : 0.3));   // run outcome feeds the adaptive skill estimate
-  $('reviveScreen').classList.add('hidden'); $('menuBtn').style.display = 'none';
+  $('reviveScreen').classList.add('hidden'); $('menuBtn').style.display = 'none'; $('restartBtn').style.display='none';
   $('hud').style.display = 'none'; $('coinHud').classList.add('hidden');
   // coins were already banked as they were collected; just save records here
   const newBest = S.score > bestScore;
@@ -1736,6 +1743,8 @@ btn('reviveAd',      reviveWithAd);
 btn('reviveGiveup',  giveUp);
 btn('menuBtn',       goMenu);
 btn('menuFromOver',  goMenu);
+btn('retryBtn',      ()=>startGame());
+btn('restartBtn',    ()=>startGame());   // in-game restart (back to level 1)
 function goMenu(){ endRevivePrompt(); $('adModal').classList.add('hidden'); showStart(); }   // quit to main menu mid-game
 
 window.addEventListener('pointerdown', e => {
