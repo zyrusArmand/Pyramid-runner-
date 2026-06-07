@@ -1835,48 +1835,57 @@ function loadRunDressing(){
       const aMax = 1.45;
       t.ob = { type:'lane', lane:99, hammer:true, side, L, aMax, phase:RND()*6.28, spd:0.0022 + RND()*0.0024, slam:false };
       const ham = new THREE.Group();
-      const goldMat = new THREE.MeshStandardMaterial({ color:0xddb24a, metalness:0.6, roughness:0.4 });
-      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.011,0.015,Larm,8), goldMat);
-      arm.position.y = Larm/2; ham.add(arm);                              // arm rises from the side pivot
-      const head = new THREE.Mesh(new THREE.BoxGeometry(0.095,0.08,0.095), goldMat);  // heavy head at the tip
+      const goldMat = new THREE.MeshStandardMaterial({ color:0xe0b24a, metalness:0.78, roughness:0.3 });
+      const woodMat = new THREE.MeshStandardMaterial({ color:0x5e4126, roughness:0.85, metalness:0.05 });
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.014,0.018,Larm,10), woodMat);   // thick wooden handle
+      arm.position.y = Larm/2; arm.castShadow = true; ham.add(arm);
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.14,0.1,0.11), goldMat);              // chunky gold head
       head.position.y = Larm; head.castShadow = true; ham.add(head);
+      const band = new THREE.Mesh(new THREE.BoxGeometry(0.045,0.108,0.118),                    // darker striking band
+        new THREE.MeshStandardMaterial({ color:0x8a5a18, metalness:0.7, roughness:0.4 }));
+      band.position.y = Larm; ham.add(band);
       ham.position.set(t.pos.x + side*0.5, t.pos.y, t.pos.z);             // pivot just outside the lanes, at tread level
       scene.add(ham); t.obMesh = ham;
     } else if (pick < 0.58){
-      // themed temple SPIKE TRAP — NO base; bare spikes lean out toward the player, their roots sunk into the stone — slides lane↔lane
-      const spikeMat = new THREE.MeshStandardMaterial({ color:0xc9a24a, emissive:0x2a1500, metalness:0.5, roughness:0.4 });
+      // themed temple SPIKE TRAP — a clean row of bright bronze spikes, roots sunk into the stone — slides lane↔lane
+      const spikeMat = new THREE.MeshStandardMaterial({ color:0xd9bd72, emissive:0x241808, metalness:0.75, roughness:0.28 });
       t.ob = { type:'lane', lane:0, moving:true, phase: RND()*6.28, spd:0.0016 + RND()*0.003, yOff:0, mat:spikeMat };
       const trap = new THREE.Group();
-      for (const [sx,sz,sh] of [[-0.038,-0.015,0.13],[0.038,-0.015,0.13],[0,0.03,0.15],[0,-0.045,0.1]]){
-        const sp = new THREE.Mesh(new THREE.ConeGeometry(0.02, sh, 5), spikeMat);
-        sp.rotation.x = 0.95;                              // angled out toward the player
-        sp.position.set(sx, 0.015, sz);                    // centre at the tread → the lower half (root) is hidden inside the stone
-        sp.castShadow = true; trap.add(sp);
+      for (const [sx,sz,sh] of [[-0.06,-0.01,0.12],[-0.02,0.02,0.16],[0.02,0.02,0.16],[0.06,-0.01,0.12]]){
+        const sp = new THREE.Mesh(new THREE.ConeGeometry(0.022, sh, 6), spikeMat);
+        sp.rotation.x = 0.92;                              // angled out toward the player
+        sp.position.set(sx, 0.018, sz); sp.castShadow = true; trap.add(sp);
       }
       trap.position.set(t.pos.x, t.pos.y, t.pos.z);
       scene.add(trap); t.obMesh = trap;
     } else if (pick < 0.8){
-      // LOW LINTEL: a stone beam across the whole path at head height — SLIDE under it (can't be dodged by lane)
+      // LOW LINTEL: a carved stone gate across the whole path at head height — SLIDE under it (can't be lane-dodged)
       t.ob = { type:'beam' };
       const beam = new THREE.Group();
-      const barMat = new THREE.MeshStandardMaterial({ color:0x9a7b46, roughness:0.9, metalness:0.05, emissive:0x241808 });
-      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.05, 0.07), barMat);
-      bar.position.y = 0.085; bar.castShadow = true; beam.add(bar);
-      [-0.29, 0.29].forEach(px => { const post = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.11, 0.05), barMat);
-        post.position.set(px, 0.045, 0); post.castShadow = true; beam.add(post); });
+      const stoneMat = new THREE.MeshStandardMaterial({ color:0xb59a64, roughness:0.85, metalness:0.04 });
+      const goldTrim = new THREE.MeshStandardMaterial({ color:0xe0b24a, metalness:0.72, roughness:0.32, emissive:0x2a1c00 });
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.07, 0.085), stoneMat);
+      bar.position.y = 0.095; bar.castShadow = true; beam.add(bar);
+      const trim = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.022, 0.092), goldTrim);   // gold inlay band
+      trim.position.y = 0.095; beam.add(trim);
+      [-0.28, 0.28].forEach(px => { const post = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.14, 0.06), stoneMat);
+        post.position.set(px, 0.05, 0); post.castShadow = true; beam.add(post); });
       beam.position.set(t.pos.x, t.pos.y, t.pos.z);
       scene.add(beam); t.obMesh = beam;
     } else {
-      // FLAME JET: erupts from one lane on a timer — time your pass for when it's down
+      // FLAME JET: a two-layer flame over a stone brazier, erupting from one lane on a timer — pass when it's down
       const L = rndLane();
-      const fmat = new THREE.MeshStandardMaterial({ color:0xff7a1e, emissive:0xff5400, emissiveIntensity:1.3, transparent:true, opacity:0.9, roughness:0.6 });
-      t.ob = { type:'lane', lane:99, flame:true, L, phase:RND()*6.28, spd:0.003 + RND()*0.0035, mat:fmat };
+      const fmat = new THREE.MeshStandardMaterial({ color:0xff7a1e, emissive:0xff5400, emissiveIntensity:1.4, transparent:true, opacity:0.88, roughness:0.6 });
+      const fmat2 = new THREE.MeshStandardMaterial({ color:0xffe06a, emissive:0xffc000, emissiveIntensity:1.9, transparent:true, opacity:0.92, roughness:0.5 });
+      t.ob = { type:'lane', lane:99, flame:true, L, phase:RND()*6.28, spd:0.003 + RND()*0.0035, mat:fmat, mat2:fmat2 };
       const jet = new THREE.Group();
-      const vent = new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.05,0.03,10),
-        new THREE.MeshStandardMaterial({ color:0x2c241a, roughness:1 }));
-      vent.position.y = 0.0; jet.add(vent);
-      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.2, 8), fmat);
-      cone.position.y = 0.11; jet.add(cone); t.ob.coneMesh = cone;
+      const brazier = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.058,0.05,12),
+        new THREE.MeshStandardMaterial({ color:0x4a3a26, roughness:0.9, metalness:0.1 }));
+      brazier.position.y = 0.0; brazier.castShadow = true; jet.add(brazier);
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.22, 10), fmat);
+      cone.position.y = 0.15; jet.add(cone); t.ob.coneMesh = cone;
+      const core = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.15, 10), fmat2);
+      core.position.y = 0.13; jet.add(core); t.ob.coreMesh = core;
       jet.position.set(t.pos.x + L*LANE, t.pos.y, t.pos.z);
       scene.add(jet); t.obMesh = jet;
     }
@@ -1929,8 +1938,9 @@ function loadRunDressing(){
 function startRun(){
   S.phase = 'run';
   Sound.cap();
-  // polish the built stones for the close-up climb: drop the grainy bump map + smooth them so the surface reads clean
-  S.allBlocks.forEach(b => { if (b && b.material){ b.material.bumpMap = null; b.material.bumpScale = 0; b.material.roughness = 0.7; b.material.metalness = 0.06; b.material.needsUpdate = true; } });
+  // polish the built stones for the close-up climb: drop the grainy bump map but keep them FULLY MATTE so the
+  // sun shades each step (tread bright, riser shadowed) and the staircase still reads in 3D — just clean, not noisy.
+  S.allBlocks.forEach(b => { if (b && b.material){ b.material.bumpMap = null; b.material.bumpScale = 0; b.material.roughness = 0.98; b.material.metalness = 0.0; b.material.needsUpdate = true; } });
   // BUILD → CLIMB: the quality of the pyramid you built shapes the climb. A clean build means a
   // safer path and richer coins; a sloppy one means a treacherous climb.
   const stars = pyramidRating(); S.buildStars = stars;
@@ -2823,10 +2833,12 @@ function animate(){
     // FLAME JET: erupts on a timer in its lane; only deadly while the flame is up
     if (t.ob && t.ob.flame && t.obMesh){
       const s = Math.sin(performance.now()*(t.ob.spd||0.003) + t.ob.phase);   // -1..1
-      const up = s > 0.1;
-      if (t.ob.coneMesh){ const hgt = up ? (0.35 + 0.65*s) : 0.0;
-        t.ob.coneMesh.scale.set(1, Math.max(0.04, hgt), 1); t.ob.coneMesh.visible = up; }
-      if (t.ob.mat) t.ob.mat.opacity = up ? 0.9 : 0;
+      const up = s > 0.1, flick = 1 + 0.12*Math.sin(performance.now()*0.03 + t.ob.phase);   // gentle flicker
+      const hgt = up ? (0.35 + 0.65*s) * flick : 0.0;
+      if (t.ob.coneMesh){ t.ob.coneMesh.scale.set(1, Math.max(0.04, hgt), 1); t.ob.coneMesh.visible = up; }
+      if (t.ob.coreMesh){ t.ob.coreMesh.scale.set(1, Math.max(0.04, hgt*0.92), 1); t.ob.coreMesh.visible = up; }
+      if (t.ob.mat) t.ob.mat.opacity = up ? 0.88 : 0;
+      if (t.ob.mat2) t.ob.mat2.opacity = up ? 0.92 : 0;
       t.ob.lane = up ? t.ob.L : 99;
     }
   });
