@@ -343,12 +343,19 @@
   #hint.show { opacity:1; }
 
   /* local leaderboard on the start screen */
-  #lb { font-family:'Space Mono',monospace; font-size:11px; letter-spacing:1px; color:#f6e9d2; opacity:.85;
-    display:flex; flex-direction:column; gap:3px; min-width:200px; }
-  #lb .lbttl { font-size:10px; letter-spacing:2px; opacity:.5; margin-bottom:3px; text-align:center; }
-  #lb .lbrow { display:flex; justify-content:space-between; }
-  #lb .lbrow span:first-child { opacity:.55; }
-  #lb .lbrow.me b { color:#f3d99a; }
+  /* leaderboard lifetime-stats grid */
+  #lbStats { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; width:min(360px,90vw); margin:4px 0 8px; }
+  .lbStat { background:rgba(243,200,120,.07); border:1px solid rgba(243,200,120,.18); border-radius:12px; padding:11px 4px; text-align:center; }
+  .lbStatV { font-family:'Cinzel',serif; font-weight:700; font-size:20px; color:#f3d99a; line-height:1; }
+  .lbStatL { font-size:8.5px; letter-spacing:1.2px; opacity:.6; margin-top:5px; }
+  #lb { font-family:'Space Mono',monospace; color:#f6e9d2; display:flex; flex-direction:column; gap:4px; width:min(360px,90vw); }
+  #lb .lbttl { font-size:10px; letter-spacing:2px; opacity:.55; margin:4px 0 2px; text-align:center; }
+  #lb .lbrow { display:flex; align-items:center; gap:10px; padding:7px 12px; border-radius:10px; background:rgba(255,255,255,.035); }
+  #lb .lbrow.top { background:rgba(243,200,120,.13); border:1px solid rgba(243,200,120,.3); }
+  #lb .lbrank { width:22px; height:22px; flex:0 0 auto; border-radius:50%; border:1.5px solid rgba(243,200,120,.35);
+    display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; opacity:.9; }
+  #lb .lbrow b { margin-left:auto; font-size:15px; color:#f3d99a; letter-spacing:1px; }
+  #lb .lbtag { color:#9fd0ff; font-size:11px; opacity:.8; }
 
   /* over-screen action buttons (share / double coins) */
   .obtnRow { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-top:18px; }
@@ -484,7 +491,14 @@
 
 <div class="overlay hidden panel" id="leaderPanel">
   <div class="panelTitle">LEADERBOARD</div>
-  <div class="bestRow"><div>BEST<b id="lbBest">0</b></div><div>HIGH CLIMB<b id="lbHeight">0m</b></div></div>
+  <div id="lbStats">
+    <div class="lbStat"><div class="lbStatV" id="lbBest">0</div><div class="lbStatL">BEST SCORE</div></div>
+    <div class="lbStat"><div class="lbStatV" id="lbHeight">0m</div><div class="lbStatL">HIGH CLIMB</div></div>
+    <div class="lbStat"><div class="lbStatV" id="lbDeben">0</div><div class="lbStatL">DEBEN</div></div>
+    <div class="lbStat"><div class="lbStatV" id="lbBuilds">0</div><div class="lbStatL">PYRAMIDS</div></div>
+    <div class="lbStat"><div class="lbStatV" id="lbStreak">0</div><div class="lbStatL">BEST STREAK</div></div>
+    <div class="lbStat"><div class="lbStatV" id="lbMaxLvl">1</div><div class="lbStatL">MAX LEVEL</div></div>
+  </div>
   <div id="lb"></div>
   <div class="backBtn" id="leaderBack">◀ BACK</div>
 </div>
@@ -622,6 +636,9 @@ let bank      = Store.get('coins', 0);
 let bestScore = Store.get('best', 0);
 let bestHeight= Store.get('height', 0);
 let scores    = Store.get('scores', []);          // local leaderboard (top 10)
+let totalBuilds = Store.get('builds', 0);         // lifetime pyramids built
+let bestStreak  = Store.get('bestStreak', 0);     // lifetime best PERFECT streak
+let maxLevel    = Store.get('maxLevel', 1);       // highest level reached
 let firstTime = !Store.get('tut', 0);             // show the onboarding hints once
 let dailyMode = false;
 let goalsNew  = false;                            // a goal completed / streak bonus is waiting to be seen
@@ -1583,6 +1600,7 @@ function blockPlaced(mesh, instability, capstone, len, consumed, bonus){
   if (tier === 'PERFECT'){
     // exact hit ONLY — the full reaction: emoji pop + phone buzz + chime + sparkle
     S.streak++; S.bestPerfect = Math.max(S.bestPerfect, S.streak); missionEvent('streak', S.streak);   // goal: perfect streak
+    if (S.streak > bestStreak){ bestStreak = S.streak; Store.set('bestStreak', bestStreak); }          // lifetime best streak
     const mult = Math.min(1 + Math.floor((S.streak-1)/3), 5);    // x1 (1–3), x2 (4–6), … up to x5 — the chain reward
     S.score += Math.round((baseScore + S.streak*25) * len * mult);
     if (bonus){                                                  // golden block nailed perfectly → fat coin + score bonus
@@ -1738,15 +1756,17 @@ function climbPath(){
   }
   const cap = S.pathSlots[S.pathSlots.length-1];                // capstone on top
   if (cap){
-    // climb the capstone as a FULL set of steps (one per course) so it's scaled at regular climb speed, not a single fast hop
-    const ch = LAYER_HEIGHT*1.04, cN = STEP_N, cStepH = ch/cN, cBaseW = BLOCK_SIZE*0.999;
-    for (let i=0; i<cN; i++){
-      const w = Math.max(0.28, cBaseW - 2*i*inset);            // matches makeCapstonePeak's all-sides recede
-      const ty = cap.pos.y - ch/2 + cStepH*(i+1) + 0.015;
-      const tz = cap.pos.z + w/2 - 0.02;                        // front edge, receding inward as it rises
+    // climb the capstone over a handful of clean steps (regular speed, not one fast hop). Steps are bigger than the
+    // visual courses so the small climber clearly stands ON each one (and slightly in FRONT of it, never inside it).
+    const ch = LAYER_HEIGHT*1.04, cBaseW = BLOCK_SIZE*0.999, cN = 5;
+    for (let i=1; i<=cN; i++){
+      const f = i/cN;                                           // 0..1 up the capstone
+      const w = cBaseW + (0.3 - cBaseW)*f;                      // front-face width recedes toward the flat top
+      const ty = cap.pos.y - ch/2 + ch*f + 0.02;               // step up, a hair above the surface
+      const tz = w/2 + 0.015;                                   // stand just in FRONT of this course's face → never clips into the next
       tiles.push({ pos:new THREE.Vector3(cap.pos.x, ty, tz), gap:false, weak:false, mesh:cap.mesh, crumbled:false });
     }
-    tiles.push({ pos:new THREE.Vector3(cap.pos.x, cap.pos.y + ch/2 + 0.01, cap.pos.z), gap:false, weak:false, mesh:cap.mesh, crumbled:false });  // flat-top centre (celebration spot)
+    tiles.push({ pos:new THREE.Vector3(cap.pos.x, cap.pos.y + ch/2 + 0.03, cap.pos.z), gap:false, weak:false, mesh:cap.mesh, crumbled:false });  // flat-top centre (celebration spot)
   }
   return tiles;
 }
@@ -1884,9 +1904,13 @@ function loadRunDressing(){
 function startRun(){
   S.phase = 'run';
   Sound.cap();
+  // polish the built stones for the close-up climb: drop the grainy bump map + smooth them so the surface reads clean
+  S.allBlocks.forEach(b => { if (b && b.material){ b.material.bumpMap = null; b.material.bumpScale = 0; b.material.roughness = 0.7; b.material.metalness = 0.06; b.material.needsUpdate = true; } });
   // BUILD → CLIMB: the quality of the pyramid you built shapes the climb. A clean build means a
   // safer path and richer coins; a sloppy one means a treacherous climb.
   const stars = pyramidRating(); S.buildStars = stars;
+  totalBuilds++; Store.set('builds', totalBuilds);                                   // lifetime pyramids built
+  if (gameLevel > maxLevel){ maxLevel = gameLevel; Store.set('maxLevel', maxLevel); } // highest level reached
   missionEvent('stars', stars); missionEvent('builds', 1);   // goals: build quality + pyramids built
   const hazardMul = stars>=5 ? 0.4 : stars>=4 ? 0.65 : stars>=3 ? 1.0 : stars>=2 ? 1.35 : 1.7;   // fewer hazards on a clean build
   S.climbCoinMul = stars>=5 ? 2 : stars>=4 ? 1.6 : stars>=3 ? 1.2 : stars>=2 ? 1.0 : 0.7;        // richer coins on a clean build
@@ -2219,8 +2243,12 @@ function recordScore(entry){ scores.push(entry); scores.sort((a,b)=>b.score-a.sc
 function renderLeaderboard(){
   const lb = $('lb'); if (!lb) return;
   if (!scores.length){ lb.innerHTML = '<div class="lbttl">NO RUNS YET — BUILD ONE!</div>'; return; }
-  lb.innerHTML = '<div class="lbttl">TOP RUNS</div>' + scores.slice(0,5).map((s,i)=>
-    `<div class="lbrow"><span>${i+1}.${s.daily?' ◈':''}</span><b>${s.score}</b></div>`).join('');
+  const medal = ['#ffd86a','#d6d6d6','#cd8b54'];
+  lb.innerHTML = '<div class="lbttl">TOP RUNS</div>' + scores.slice(0,8).map((s,i)=>{
+    const rankStyle = i<3 ? `color:${medal[i]};border-color:${medal[i]}` : '';
+    return `<div class="lbrow${i===0?' top':''}"><span class="lbrank" style="${rankStyle}">${i+1}</span>`+
+      `<b>${(s.score||0).toLocaleString()}</b>${s.daily?'<span class="lbtag">◈</span>':''}</div>`;
+  }).join('');
 }
 function shareScore(){
   Sound.blip(660,0.08,'sine',0.12);
@@ -2465,8 +2493,12 @@ function showHow(){ $('howtoPanel').classList.remove('hidden'); }
 function closeHow(){ $('howtoPanel').classList.add('hidden'); Store.set('how', 1); }
 function backHome(){ charPrevOn = false; $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden'); $('goalsPanel').classList.add('hidden'); $('settingsPanel').classList.add('hidden'); $('startScreen').classList.remove('hidden'); renderHome(); }
 function renderLeader(){
-  $('lbBest').textContent = bestScore;
+  $('lbBest').textContent   = (bestScore||0).toLocaleString();
   $('lbHeight').textContent = (bestHeight||0).toFixed(0)+'m';
+  $('lbDeben').textContent  = (bank||0).toLocaleString();
+  $('lbBuilds').textContent = totalBuilds;
+  $('lbStreak').textContent = bestStreak;
+  $('lbMaxLvl').textContent = maxLevel;
   renderLeaderboard();
 }
 function renderShop(){
