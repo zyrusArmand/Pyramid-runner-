@@ -101,6 +101,7 @@
   #ratingStars { font-size:clamp(36px,12vw,68px); letter-spacing:7px; z-index:1; text-shadow:0 2px 18px rgba(0,0,0,.7); }
   #ratingPhrase { font-family:'Cinzel',serif; font-weight:700; font-size:clamp(20px,6vw,34px); letter-spacing:3px; z-index:1; text-shadow:0 2px 14px rgba(0,0,0,.8); }
   #ratingSub { font-size:12px; letter-spacing:4px; opacity:.75; color:#f6e9d2; z-index:1; }
+  #ratingReward { font-size:13px; letter-spacing:2px; z-index:1; color:#ffe0a0; text-shadow:0 1px 8px rgba(0,0,0,.7); margin-top:2px; }
   #climbBtn { position:absolute; bottom:max(40px,calc(env(safe-area-inset-bottom) + 26px)); z-index:1; pointer-events:auto; }
   @keyframes ratePop { 0%{transform:scale(.55);opacity:0;} 45%{transform:scale(1.14);opacity:1;} 100%{transform:scale(1);opacity:1;} }
   #ratingOverlay.show #ratingStars, #ratingOverlay.show #ratingPhrase { animation:ratePop .55s ease-out; }
@@ -281,6 +282,7 @@
   <div id="ratingSub">PYRAMID COMPLETE</div>
   <div id="ratingStars"></div>
   <div id="ratingPhrase"></div>
+  <div id="ratingReward"></div>
   <div class="cta hero" id="climbBtn">START CLIMB ▲</div>
 </div>
 <div id="pop">PERFECT</div>
@@ -771,6 +773,7 @@ const Sound = {
 
 // ---------- particles / fx ----------
 function spawnDust(pos, color=0xe8d8c0, count=8, spread=1.6, up=2){
+  if (S.fx && S.fx.length > 300) return;     // cap live particles so big bursts stay smooth on phones
   for (let i=0;i<count;i++){
     const p = new THREE.Mesh(new THREE.SphereGeometry(0.07+Math.random()*0.06, 6, 6),
       new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.9 }));
@@ -1153,6 +1156,10 @@ function showRating(){
   $('ratingStars').textContent = '★'.repeat(stars) + '☆'.repeat(5-stars);
   $('ratingStars').style.color = r.col;
   $('ratingPhrase').textContent = r.phrase; $('ratingPhrase').style.color = r.col;
+  // tell the player how their build shapes the climb ahead
+  const rw = [ '', 'TREACHEROUS CLIMB · FEWER COINS', 'ROUGH CLIMB · NORMAL COINS',
+    'STEADY CLIMB · 1.2× COINS', 'EASY CLIMB · 1.6× COINS', 'CLEAR PATH · 2× CLIMB COINS' ][stars];
+  $('ratingReward').textContent = rw; $('ratingReward').style.color = r.col;
   // VIGNETTE tint — clear in the middle so you can see the whole pyramid you built behind it
   const tint = $('ratingTint');
   tint.classList.remove('storm','sun');
@@ -1246,6 +1253,11 @@ function climbPath(){
 function startRun(){
   S.phase = 'run';
   Sound.cap();
+  // BUILD → CLIMB: the quality of the pyramid you built shapes the climb. A clean build means a
+  // safer path and richer coins; a sloppy one means a treacherous climb.
+  const stars = pyramidRating(); S.buildStars = stars;
+  const hazardMul = stars>=5 ? 0.4 : stars>=4 ? 0.65 : stars>=3 ? 1.0 : stars>=2 ? 1.35 : 1.7;   // fewer hazards on a clean build
+  S.climbCoinMul = stars>=5 ? 2 : stars>=4 ? 1.6 : stars>=3 ? 1.2 : stars>=2 ? 1.0 : 0.7;        // richer coins on a clean build
   const tiles = climbPath();   // steep, direct step-by-step climb up the front face
   // (cracked stones are safe to climb — only an actual missing stone is a gap you must jump)
   // procedural obstacles: beams to SLIDE under, side pillars to DODGE
@@ -1255,7 +1267,7 @@ function startRun(){
     if (t.gap || t.weak || i - lastOb < 4) continue;
     if ((tiles[i-1] && (tiles[i-1].gap || tiles[i-1].weak)) ||
         (tiles[i-2] && (tiles[i-2].gap || tiles[i-2].weak))) continue;   // leave landing room after a jump
-    if (RND() > 0.18 * DDA.obstacleW()) continue;          // adaptive: more obstacles when sharp, fewer when struggling
+    if (RND() > 0.18 * DDA.obstacleW() * hazardMul) continue;   // adaptive + shaped by how well you built the pyramid
     const A = tiles[i].pos, B = tiles[Math.min(i+1, tiles.length-1)].pos;
     let fwd = B.clone().sub(A); fwd.y = 0; if (fwd.lengthSq()<1e-4) fwd.set(0,0,1); else fwd.normalize();
     const perp = new THREE.Vector3(-fwd.z, 0, fwd.x);
@@ -1613,7 +1625,7 @@ function collectCoin(t, r){
   if (!t.coin || t.coin.got) return;
   if (t.coin.air && !r.jumping) return;       // hovering coins demand a jump to grab
   t.coin.got = true;
-  const bonus = t.coin.air ? 2 : 1;           // airborne grabs pay double
+  const bonus = Math.round((t.coin.air ? 2 : 1) * (S.climbCoinMul || 1));   // airborne grabs pay double; better builds pay more
   S.coins += bonus; S.score += 50 * bonus;
   bank += bonus; Store.set('coins', bank);    // bank instantly so coins persist even if you quit mid-run
   Sound.coin(S.coins);
@@ -1706,7 +1718,7 @@ function startGame(){
   $('storm').style.opacity='0'; scene.fog.near=16; scene.fog.far=46; S.stormA=0;
   $('reviveScreen').classList.add('hidden'); $('adModal').classList.add('hidden'); $('hint').classList.remove('show');
   $('menuBtn').style.display = 'block'; $('restartBtn').style.display='block';
-  if (firstTime) showHint('TAP to drop · land each block CENTERED for PERFECT', 5000);
+  if (firstTime) showHint('TAP to drop the stone INTO the glowing outline — nail it for a PERFECT', 5500);
   updateHUD(); spawnBlock();
 }
 
