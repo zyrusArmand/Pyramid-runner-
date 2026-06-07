@@ -1686,6 +1686,25 @@ function startRun(){
       lastCoin = i;
     }
   }
+  // ---- power-ups: occasional pickups (magnet / shield / slow-mo) on safe stretches ----
+  let lastPow = 0;
+  for (let i = 12; i < tiles.length - 5; i++){
+    const t = tiles[i];
+    if (t.gap || t.weak || t.ob || t.coin || i - lastPow < 16) continue;
+    if (RND() < 0.55) continue;                                    // sparse — a treat, not a guarantee
+    const type = ['magnet','shield','slow'][Math.floor(RND()*3)];
+    const col = type==='magnet' ? 0x46d6ff : type==='shield' ? 0x57e08a : 0xc59cff;
+    const grp = new THREE.Group();
+    const core = new THREE.Mesh(new THREE.SphereGeometry(0.075,18,14),
+      new THREE.MeshStandardMaterial({ color:col, emissive:col, emissiveIntensity:0.9, metalness:0.3, roughness:0.3 }));
+    core.castShadow = true; grp.add(core);
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.13,0.014,22),
+      new THREE.MeshStandardMaterial({ color:col, emissive:col, transparent:true, opacity:0.55, depthWrite:false }));
+    ring.rotation.x = Math.PI/2; grp.add(ring);
+    grp.position.set(t.pos.x, t.pos.y + 0.24, t.pos.z); scene.add(grp);
+    t.power = { type, mesh:grp, core, ring, got:false };
+    lastPow = i;
+  }
   // ---- rigged little climber: torso, head, arms & legs pivoted at the shoulders/hips ----
   const g = makeRunner();
   g.scale.set(RUN_SCALE, RUN_SCALE, RUN_SCALE); scene.add(g);   // tiny climber
@@ -1699,6 +1718,7 @@ function startRun(){
             falling:false, fallV:0, yOff:0, startDelay:0.6, awaitStart:true,
             lane:0, laneX:0, sliding:false, slideT:0, slideDur:0.5,
             rolling:false, rollT:0, rollDur:0.5, rollDir:1, rollCD:0,
+            magnet:0, shield:0, slow:0, bubble:null,
             storms, revives:0, usedAdRevive:false, invuln:0, dead:false, deathReason:'fell' };
   g.position.copy(tiles[0].pos);
 
@@ -1800,6 +1820,22 @@ function updateRun(dt){
       if (ob.type==='lane' && r.lane===ob.lane){ runCrash(); return; }  // must dodge to another lane
     }
     collectCoin(r.tiles[r.idx], r);
+    collectPower(r.tiles[r.idx], r);
+  }
+
+  // active power-ups (timed off real seconds so slow-mo doesn't stretch itself)
+  const rdt = S.realDt || dt;
+  if (r.slow > 0){ r.slow -= rdt; S.timeScale = 0.5; if (r.slow <= 0) r.slow = 0; }
+  if (r.magnet > 0){
+    r.magnet -= rdt; if (r.magnet < 0) r.magnet = 0;
+    for (let j = r.idx-1; j <= r.idx+3 && j < r.tiles.length; j++){
+      if (j < 0) continue; const tt = r.tiles[j];
+      if (tt && tt.coin && !tt.coin.got){
+        const cm = tt.coin.mesh.position; cm.lerp(g.position, Math.min(1, rdt*7));
+        const ddx = cm.x-g.position.x, ddy = cm.y-g.position.y, ddz = cm.z-g.position.z;
+        if (ddx*ddx + ddy*ddy + ddz*ddz < 0.04) collectCoin(tt, r, true);   // within ~0.2 units
+      }
+    }
   }
   const A = r.tiles[r.idx].pos, B = r.tiles[Math.min(r.idx+1,r.tiles.length-1)].pos;
   const base = A.clone().lerp(B, r.t);
@@ -1844,6 +1880,8 @@ function updateRun(dt){
 
   g.position.set(base.x + perp.x*r.laneX, base.y + r.yOff, base.z + perp.z*r.laneX);
   g.scale.set(sx*RUN_SCALE, sy*RUN_SCALE, sx*RUN_SCALE);
+  if (r.bubble){ r.bubble.position.set(g.position.x, g.position.y + 0.12, g.position.z);
+    const bs = 1 + 0.06*Math.sin(performance.now()*0.008); r.bubble.scale.set(bs, bs, bs); }
   placeShadow(g, r);
 
   // ---- rig animation: legs & arms pump while running, tuck on a jump, kick out on a slide ----
@@ -1887,6 +1925,11 @@ function slowmo(){ S.timeScale = 0.32; }      // brief bullet-time, eased back t
 function reviveCost(){ return 200 * (((S.run && S.run.revives) || 0) + 1); }
 function die(reason){
   const r = S.run; if (!r || r.dead || r.falling) return;
+  if (r.shield > 0){                                    // a shield soaks one lethal hit, then pops
+    r.shield = 0; removeShieldBubble(r); r.invuln = Math.max(r.invuln, 1.0);
+    Sound.land(); shake(0.35); sparkle(S.runner.position.clone()); showPop('SHIELD!');
+    return;
+  }
   r.dead = true; r.deathReason = reason;
   Sound.drop(); if (reason==='hit') shake(0.6);
   const cost = reviveCost();
@@ -1895,6 +1938,7 @@ function die(reason){
 }
 function beginDeathFall(){
   const r = S.run; if (!r) return;
+  removeShieldBubble(r); r.magnet = 0; r.slow = 0;
   r.falling = true; r.fallV = (r.deathReason==='hit' ? 1.2 : -1);
 }
 function offerRevive(reason, cost){
@@ -1921,6 +1965,7 @@ function performRevive(){
   }
   r.idx = i; r.t = 0; r.dead = false; r.falling = false; r.fallV = 0;
   r.jumping = false; r.sliding = false; r.yOff = 0; r.lane = 0; r.laneX = 0;
+  r.magnet = 0; r.slow = 0; removeShieldBubble(r);
   r.startDelay = 0.6; r.invuln = 1.3;
   g.rotation.z = 0; g.position.copy(r.tiles[i].pos); g.visible = true;
   if (S.shadow) S.shadow.material.opacity = 0.32;
@@ -1963,9 +2008,9 @@ function showHint(text, ms){
   clearTimeout(showHint._t); if (ms) showHint._t = setTimeout(()=>h.classList.remove('show'), ms);
 }
 
-function collectCoin(t, r){
+function collectCoin(t, r, force){
   if (!t.coin || t.coin.got) return;
-  if (t.coin.air && !r.jumping) return;       // hovering coins demand a jump to grab
+  if (!force && t.coin.air && !r.jumping) return;   // hovering coins demand a jump to grab (magnet bypasses)
   t.coin.got = true;
   const bonus = Math.round((t.coin.air ? 2 : 1) * (S.climbCoinMul || 1));   // airborne grabs pay double; better builds pay more
   S.coins += bonus; S.score += 50 * bonus;
@@ -1980,6 +2025,23 @@ function updateCoinHud(pulse){
   const h = $('coinHud'); $('coinVal').textContent = bank;   // show total coins you own (persists, grows live)
   if (pulse){ h.classList.add('pulse'); setTimeout(()=>h.classList.remove('pulse'), 130); }
 }
+// ---------- run power-ups ----------
+function collectPower(t, r){
+  if (!t.power || t.power.got) return;
+  t.power.got = true;
+  const type = t.power.type, pos = t.power.mesh.position.clone();
+  scene.remove(t.power.mesh); sparkle(pos); Sound.buy();
+  if (type === 'magnet'){ r.magnet = 6.5; showPop('⚡ COIN MAGNET'); }
+  else if (type === 'shield'){ r.shield = 1; addShieldBubble(r); showPop('🛡 SHIELD'); }
+  else { r.slow = 4.5; showPop('⏱ SLOW-MO'); }
+}
+function addShieldBubble(r){
+  if (r.bubble) return;
+  const b = new THREE.Mesh(new THREE.SphereGeometry(0.34,20,16),
+    new THREE.MeshStandardMaterial({ color:0x8fffd0, emissive:0x2a8a5a, transparent:true, opacity:0.26, depthWrite:false }));
+  scene.add(b); r.bubble = b;
+}
+function removeShieldBubble(r){ if (r && r.bubble){ scene.remove(r.bubble); r.bubble = null; } }
 
 // a tile you can't safely stand on: a hole, or a cracked (weak) block
 function tileUnsafe(t){ return t.gap; }     // only a real missing stone (gap) must be jumped
@@ -2287,6 +2349,7 @@ resetState(); S.phase = null;
 function animate(){
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
+  S.realDt = dt;                                   // unscaled seconds, for power-up timers
   // slow-mo: timeScale dips on a clutch jump, then eases back to full speed
   S.timeScale = (S.timeScale||1) + (1 - (S.timeScale||1)) * Math.min(1, dt*3.5);
   const sdt = dt * (S.timeScale||1);
@@ -2359,6 +2422,8 @@ function animate(){
   if (S.run) S.run.tiles.forEach(t => {
     if (t.marker) t.marker.material.opacity = 0.5 + 0.4*pulse;
     if (t.coin && !t.coin.got) t.coin.mesh.rotation.z += dt*3.4;
+    if (t.power && !t.power.got){ t.power.mesh.rotation.y += dt*1.8;
+      t.power.mesh.position.y = t.pos.y + 0.24 + 0.03*Math.sin(performance.now()*0.004); }
     // moving pillars sweep between lanes — keep the mesh and its live hit-lane in sync
     if (t.ob && t.ob.moving && t.obMesh && t.perp){
       const f = Math.sin(performance.now()*0.0024 + t.ob.phase);
