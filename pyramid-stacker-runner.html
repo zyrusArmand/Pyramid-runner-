@@ -609,72 +609,113 @@ let curChar     = Store.get('char', 'explorer');
 function stone(){ return STONES[curStone] || STONES.sand; }
 function character(){ return CHARACTERS[curChar] || CHARACTERS.explorer; }
 
-// build the rigged little climber (unscaled, ~0.6 tall) — used for the run and the shop preview.
-// each character "style" gets distinct accessories so a PHARAOH / MUMMY / ANUBIS really look the part.
+// build the rigged little climber (unscaled, ~0.66 tall) — used for the run and the shop preview.
+// smooth, rounded geometry (capsule limbs, ellipsoid torso, high-segment spheres) + per-style
+// accessories so a PHARAOH / MUMMY / ANUBIS each read clearly and look modern.
 function makeRunner(){
   const ch = character(), style = ch.style || 'explorer';
   const g = new THREE.Group();
-  const cMat = new THREE.MeshStandardMaterial({ color:ch.color, emissive:0x0a0a08, roughness:0.5 });
-  const gold = () => new THREE.MeshStandardMaterial({ color:0xe8c45a, emissive:0x3a2600, metalness:0.5, roughness:0.4 });
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.17,0.22,0.12), cMat);
-  torso.position.y = 0.34; torso.castShadow = true; g.add(torso);
-  const headCol = style==='mummy' ? 0xe6dcc2 : style==='anubis' ? 0x26262f : 0xfff0d0;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.1,16,16),
-    new THREE.MeshStandardMaterial({ color:headCol, emissive: (style==='explorer'||style==='pharaoh')?0x332600:0x080808 }));
-  head.position.y = 0.52; head.castShadow = true; g.add(head);
-  function limb(px, py, w, h){                          // pivot group with the limb hanging below it
-    const piv = new THREE.Group(); piv.position.set(px, py, 0);
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, w*1.1), cMat);
-    m.position.y = -h/2; m.castShadow = true; piv.add(m); g.add(piv); return piv;
+  const cMat   = new THREE.MeshStandardMaterial({ color:ch.color, emissive:0x070707, roughness:0.55, metalness: style==='pharaoh'?0.4:0.06 });
+  const skinCol = style==='mummy' ? 0xe6dcc2 : style==='anubis' ? 0x2a2a35 : 0xf0c79a;
+  const skinMat = new THREE.MeshStandardMaterial({ color:skinCol, emissive:(style==='explorer'||style==='pharaoh')?0x241806:0x060606, roughness:0.6 });
+  const gold   = () => new THREE.MeshStandardMaterial({ color:0xe8c45a, emissive:0x3a2600, metalness:0.75, roughness:0.28 });
+  const blue   = () => new THREE.MeshStandardMaterial({ color:0x2b5bd0, emissive:0x0a1638, metalness:0.3, roughness:0.5 });
+
+  // smooth capsule (cylinder + rounded caps) for a modern limb silhouette
+  function capsule(r, len, mat){
+    const grp = new THREE.Group();
+    const cyl = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 16), mat); cyl.castShadow = true; grp.add(cyl);
+    const a = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 12), mat); a.position.y =  len/2; grp.add(a);
+    const b = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 12), mat); b.position.y = -len/2; grp.add(b);
+    return grp;
   }
-  g.legL = limb(-0.045, 0.22, 0.06, 0.2);
-  g.legR = limb( 0.045, 0.22, 0.06, 0.2);
-  g.armL = limb(-0.105, 0.43, 0.045, 0.16);
-  g.armR = limb( 0.105, 0.43, 0.045, 0.16);
+  function limb(px, py, r, len, foot){                  // pivot group at the shoulder/hip
+    const piv = new THREE.Group(); piv.position.set(px, py, 0);
+    const cap = capsule(r, len, cMat); cap.position.y = -len/2; piv.add(cap);
+    if (foot){ const f = new THREE.Mesh(new THREE.SphereGeometry(r*1.15, 12, 10), cMat);
+      f.scale.set(1, 0.7, 1.6); f.position.set(0, -len, r*0.7); f.castShadow = true; piv.add(f); }
+    g.add(piv); return piv;
+  }
+
+  // torso: smooth tapered ellipsoid + shoulders + hips
+  const torso = new THREE.Mesh(new THREE.SphereGeometry(0.12, 24, 20), cMat);
+  torso.scale.set(0.92, 1.32, 0.78); torso.position.y = 0.37; torso.castShadow = true; g.add(torso);
+  const shoulders = new THREE.Mesh(new THREE.SphereGeometry(0.1, 20, 16), cMat);
+  shoulders.scale.set(1.3, 0.62, 0.82); shoulders.position.y = 0.47; shoulders.castShadow = true; g.add(shoulders);
+  const pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.1, 20, 16), cMat);
+  pelvis.scale.set(1.05, 0.7, 0.88); pelvis.position.y = 0.27; g.add(pelvis);
+  // neck + head
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.04, 0.06, 14), skinMat); neck.position.y = 0.52; g.add(neck);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.1, 28, 24), skinMat);
+  head.position.y = 0.585; head.castShadow = true; g.add(head);
+
+  g.legL = limb(-0.05, 0.27, 0.042, 0.21, true);
+  g.legR = limb( 0.05, 0.27, 0.042, 0.21, true);
+  g.armL = limb(-0.118, 0.46, 0.03, 0.18, false);
+  g.armR = limb( 0.118, 0.46, 0.03, 0.18, false);
 
   if (style === 'pharaoh'){
-    // broad golden collar
-    const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.135,0.155,0.05,18), gold());
+    // broad usekh collar
+    const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.135, 0.16, 0.05, 24), gold());
     collar.position.y = 0.45; collar.castShadow = true; g.add(collar);
-    // nemes headdress flaring at the sides, with a blue brow band
-    const nemes = new THREE.Mesh(new THREE.BoxGeometry(0.27,0.17,0.21),
-      new THREE.MeshStandardMaterial({ color:0xe6c24f, metalness:0.4, roughness:0.5 }));
-    nemes.position.set(0, 0.55, -0.01); nemes.castShadow = true; g.add(nemes);
-    const band = new THREE.Mesh(new THREE.BoxGeometry(0.282,0.04,0.215),
-      new THREE.MeshStandardMaterial({ color:0x2b5bd0, emissive:0x0a1530 }));
-    band.position.set(0, 0.605, 0); g.add(band);
+    // nemes headcloth: a domed cap over the crown + two lappets framing the face
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.118, 24, 18, 0, Math.PI*2, 0, Math.PI*0.62), gold());
+    dome.position.set(0, 0.59, -0.008); dome.castShadow = true; g.add(dome);
+    [-1,1].forEach(s => {
+      const lap = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.18, 0.06), gold());
+      lap.position.set(s*0.108, 0.55, 0.03); lap.rotation.z = -s*0.12; g.add(lap);
+      const st = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.18, 0.018), blue());
+      st.position.set(s*0.108, 0.55, 0.062); st.rotation.z = -s*0.12; g.add(st);
+    });
+    const band = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.035, 0.03), blue());
+    band.position.set(0, 0.64, 0.07); g.add(band);
+    const uraeus = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.05, 10), gold());
+    uraeus.position.set(0, 0.675, 0.085); uraeus.rotation.x = 0.3; g.add(uraeus);
     // sun-disk crown
-    const disk = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.02,20),
-      new THREE.MeshStandardMaterial({ color:0xffd24a, emissive:0x7a5400, metalness:0.6, roughness:0.3 }));
-    disk.rotation.x = Math.PI/2; disk.position.set(0, 0.73, -0.02); g.add(disk);
+    const disk = new THREE.Mesh(new THREE.CylinderGeometry(0.072, 0.072, 0.018, 24),
+      new THREE.MeshStandardMaterial({ color:0xffd24a, emissive:0x7a5400, metalness:0.7, roughness:0.25 }));
+    disk.rotation.x = Math.PI/2; disk.position.set(0, 0.78, -0.02); disk.castShadow = true; g.add(disk);
   } else if (style === 'mummy'){
-    // two glowing eyes peeking through the wraps
+    // sunken glowing eyes
     const eyeMat = new THREE.MeshStandardMaterial({ color:0xffd24a, emissive:0xffb000 });
-    const eL = new THREE.Mesh(new THREE.SphereGeometry(0.022,8,8), eyeMat); eL.position.set(-0.035,0.53,0.085); g.add(eL);
-    const eR = new THREE.Mesh(new THREE.SphereGeometry(0.022,8,8), eyeMat); eR.position.set( 0.035,0.53,0.085); g.add(eR);
-    // a loose bandage trailing off the shoulder
-    const strip = new THREE.Mesh(new THREE.BoxGeometry(0.045,0.2,0.012),
-      new THREE.MeshStandardMaterial({ color:0xd8cdb0, roughness:0.95 }));
-    strip.position.set(-0.1,0.34,-0.05); strip.rotation.z = 0.55; strip.castShadow = true; g.add(strip);
+    [-1,1].forEach(s => { const e = new THREE.Mesh(new THREE.SphereGeometry(0.02, 12, 10), eyeMat);
+      e.position.set(s*0.035, 0.59, 0.087); g.add(e); });
+    // a diagonal wrap across the chest + a loose bandage trailing off the shoulder
+    const wrapMat = new THREE.MeshStandardMaterial({ color:0xd8cdb0, roughness:0.96 });
+    const sash = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.055, 0.02), wrapMat);
+    sash.position.set(0, 0.37, 0.075); sash.rotation.z = 0.5; g.add(sash);
+    const strip1 = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.16, 0.012), wrapMat);
+    strip1.position.set(-0.115, 0.4, -0.05); strip1.rotation.z = 0.5; strip1.castShadow = true; g.add(strip1);
+    const strip2 = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.13, 0.012), wrapMat);
+    strip2.position.set(-0.15, 0.31, -0.06); strip2.rotation.z = 0.9; g.add(strip2);
   } else if (style === 'anubis'){
-    // golden collar
-    const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.135,0.155,0.05,18), gold());
+    // golden usekh collar
+    const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.135, 0.16, 0.05, 24), gold());
     collar.position.y = 0.45; collar.castShadow = true; g.add(collar);
-    // jackal ears + a slim gold snout
-    const earMat = new THREE.MeshStandardMaterial({ color:0x26262f, roughness:0.6 });
-    const earL = new THREE.Mesh(new THREE.ConeGeometry(0.035,0.13,10), earMat); earL.position.set(-0.05,0.64,-0.01); g.add(earL);
-    const earR = new THREE.Mesh(new THREE.ConeGeometry(0.035,0.13,10), earMat); earR.position.set( 0.05,0.64,-0.01); g.add(earR);
-    const snout = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.05,0.09),
-      new THREE.MeshStandardMaterial({ color:0xc9a23a, metalness:0.4, roughness:0.5 }));
-    snout.position.set(0,0.5,0.085); g.add(snout);
+    // tall jackal ears (gold-tipped) + a slim snout
+    const earMat = new THREE.MeshStandardMaterial({ color:0x26262f, roughness:0.55 });
+    [-1,1].forEach(s => {
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.034, 0.15, 12), earMat);
+      ear.position.set(s*0.052, 0.69, -0.005); ear.rotation.z = -s*0.12; ear.castShadow = true; g.add(ear);
+      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.06, 10), gold());
+      tip.position.set(s*0.057, 0.735, -0.005); tip.rotation.z = -s*0.12; g.add(tip);
+    });
+    const snout = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.045, 0.1, 14),
+      new THREE.MeshStandardMaterial({ color:0x26262f, roughness:0.55 }));
+    snout.rotation.x = Math.PI/2; snout.position.set(0, 0.565, 0.095); snout.castShadow = true; g.add(snout);
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.02, 12, 10), gold());
+    nose.position.set(0, 0.565, 0.15); g.add(nose);
   } else {
-    // explorer (and the colour variants): backpack + sun hat
-    const pack = new THREE.Mesh(new THREE.BoxGeometry(0.13,0.16,0.08),
-      new THREE.MeshStandardMaterial({ color:0x6e4a2c, roughness:0.8 }));
-    pack.position.set(0, 0.34, -0.09); pack.castShadow = true; g.add(pack);
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 8, 0, Math.PI*2, 0, Math.PI*0.55),
-      new THREE.MeshStandardMaterial({ color:0x5a3d22, roughness:0.8 }));
-    cap.position.y = 0.55; cap.castShadow = true; g.add(cap);
+    // explorer (and the colour variants): a rounded pack + a soft sun hat
+    const pack = new THREE.Mesh(new THREE.SphereGeometry(0.085, 18, 14),
+      new THREE.MeshStandardMaterial({ color:0x6e4a2c, roughness:0.85 }));
+    pack.scale.set(0.9, 1.15, 0.7); pack.position.set(0, 0.37, -0.095); pack.castShadow = true; g.add(pack);
+    const hat = new THREE.Mesh(new THREE.SphereGeometry(0.105, 18, 12, 0, Math.PI*2, 0, Math.PI*0.55),
+      new THREE.MeshStandardMaterial({ color:0x5a3d22, roughness:0.85 }));
+    hat.position.y = 0.6; hat.castShadow = true; g.add(hat);
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.135, 0.135, 0.012, 20),
+      new THREE.MeshStandardMaterial({ color:0x5a3d22, roughness:0.85 }));
+    brim.position.y = 0.6; g.add(brim);
   }
   return g;
 }
