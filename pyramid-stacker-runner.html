@@ -61,16 +61,16 @@
   .gostat { font-size:13px; letter-spacing:2px; opacity:.8; }
 
   /* coin counter (top-centre) */
-  #coinHud { position:fixed; top:max(16px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
+  #coinHud { position:fixed; top:calc(max(16px,env(safe-area-inset-top)) + 46px); left:50%; transform:translateX(-50%);
     z-index:5; pointer-events:none; font-family:'Space Mono',monospace; color:#ffe08a; font-weight:700;
-    font-size:20px; text-shadow:0 2px 6px rgba(0,0,0,.6); display:flex; align-items:center; gap:7px; transition:transform .12s; }
+    font-size:19px; text-shadow:0 2px 6px rgba(0,0,0,.6); display:flex; align-items:center; gap:7px; transition:transform .12s; }
   #coinHud.pulse { transform:translateX(-50%) scale(1.25); }
   #coinHud .coinIcon { width:15px; height:15px; border-radius:50%; background:radial-gradient(circle at 35% 30%,#fff3b0,#e8b020);
     box-shadow:0 0 8px rgba(232,200,90,.8); display:inline-block; }
   #coinHud.hidden { display:none; }
 
   /* combo flag under the score */
-  #combo { position:fixed; top:calc(max(16px,env(safe-area-inset-top)) + 52px); left:18px; z-index:5;
+  #combo { position:fixed; top:calc(max(16px,env(safe-area-inset-top)) + 80px); left:18px; z-index:5;
     pointer-events:none; font-family:'Space Mono',monospace; font-weight:700; font-size:14px; letter-spacing:1px;
     color:#ffd36a; text-shadow:0 0 10px rgba(255,180,80,.7); opacity:0; transition:opacity .25s; }
   #combo.show { opacity:1; }
@@ -273,7 +273,8 @@
   .loadTxt { font-family:'Space Mono',monospace; font-size:12px; letter-spacing:5px; color:#e8c98a; opacity:.8; }
 
   /* ---------- leaderboard / shop panels ---------- */
-  .panel { justify-content:flex-start; padding-top:max(46px,calc(env(safe-area-inset-top) + 30px)); gap:16px; }
+  .panel { justify-content:flex-start; padding-top:max(46px,calc(env(safe-area-inset-top) + 30px)); gap:16px;
+    background:radial-gradient(ellipse at 50% 28%, rgba(28,18,38,1), rgba(7,4,11,1)); }   /* fully opaque — no bleed-through */
   .panelTitle { font-family:'Cinzel',serif; font-weight:700; font-size:clamp(24px,7vw,38px); color:#f3d99a;
     letter-spacing:3px; text-shadow:0 0 22px rgba(243,200,120,.4); }
   .backBtn { pointer-events:auto; position:fixed; left:16px; top:max(16px,env(safe-area-inset-top));
@@ -285,6 +286,17 @@
   .tab { pointer-events:auto; font-family:'Space Mono',monospace; font-size:12px; letter-spacing:2px; padding:10px 18px;
     border-radius:22px; border:1.5px solid rgba(243,200,120,.25); color:#caa; cursor:pointer; }
   .tab.sel { border-color:#f3d99a; color:#f3d99a; background:rgba(243,200,120,.14); }
+  /* shop action bar: act on the item you're PREVIEWING (clicking a grid item only views it) */
+  #shopActions { display:flex; flex-direction:column; align-items:center; gap:9px; }
+  #shopItemName { font-family:'Cinzel',serif; font-weight:700; font-size:18px; letter-spacing:2px; color:#f3d99a; }
+  #shopBtnRow { display:flex; gap:12px; justify-content:center; }
+  .sbtn { pointer-events:auto; cursor:pointer; font-family:'Space Mono',monospace; font-weight:700; font-size:13px;
+    letter-spacing:2px; padding:11px 26px; border-radius:30px; border:1.5px solid rgba(243,200,120,.5);
+    color:#f3d99a; background:rgba(243,200,120,.08); transition:all .14s; }
+  .sbtn:active { transform:scale(.95); }
+  .sbtn.buy { border-color:#ffe08a; color:#3a2410; background:linear-gradient(180deg,#ffe79a,#e2a93f); }
+  .sbtn.equip { border-color:#9fe9c0; color:#9fe9c0; background:rgba(159,233,192,.1); }
+  .sbtn.disabled { opacity:.4; pointer-events:none; filter:grayscale(.4); }
   #shopGrid { display:flex; flex-wrap:wrap; gap:12px; justify-content:center; max-width:360px; }
   .shopItem { width:84px; padding:12px 6px; border-radius:14px; border:1.5px solid rgba(243,200,120,.22);
     background:rgba(255,255,255,.05); display:flex; flex-direction:column; align-items:center; gap:7px;
@@ -454,6 +466,13 @@
     <div class="tab" id="tabStones">STONES</div>
   </div>
   <div id="charStage"><canvas id="charPreviewCanvas"></canvas></div>
+  <div id="shopActions">
+    <div id="shopItemName">EXPLORER</div>
+    <div id="shopBtnRow">
+      <div class="sbtn buy" id="shopBuyBtn">PURCHASE</div>
+      <div class="sbtn equip" id="shopEquipBtn">EQUIP</div>
+    </div>
+  </div>
   <div id="shopGrid"></div>
   <div class="backBtn" id="shopBack">◀ BACK</div>
 </div>
@@ -493,10 +512,8 @@
   <div class="cta hero" id="retryBtn" style="pointer-events:auto;margin-top:22px">RETRY</div>
   <div class="obtnRow">
     <div class="obtn gold" id="dblBtn">2× COINS ▶</div>
-    <div class="obtn" id="shareBtn">SHARE</div>
     <div class="obtn" id="menuFromOver">MAIN MENU</div>
   </div>
-  <div class="cta" style="margin-top:14px;opacity:.55;font-size:11px">OR TAP ANYWHERE</div>
 </div>
 
 <div class="overlay hidden" id="reviveScreen">
@@ -628,6 +645,7 @@ let ownedStones = Store.get('ownedStones', ['sand']);
 let curStone    = Store.get('stone', 'sand');
 let ownedChars  = Store.get('ownedChars', ['explorer']);
 let curChar     = Store.get('char', 'explorer');
+let selChar     = curChar, selStone = curStone;   // shop PREVIEW selection (what you're viewing, not necessarily worn)
 function stone(){ return STONES[curStone] || STONES.sand; }
 function character(){ return CHARACTERS[curChar] || CHARACTERS.explorer; }
 
@@ -799,7 +817,10 @@ function updateCharPreview(){
   initCharPreview();
   if (!charPrev) return;
   if (charPrev.runner) charPrev.sc.remove(charPrev.runner);
-  const g = (shopTab==='chars') ? makeRunner() : makeStonePreview();
+  // build the model for the PREVIEWED item by briefly standing in the selection (without equipping it)
+  let g;
+  if (shopTab==='chars'){ const save = curChar; curChar = selChar || curChar; g = makeRunner(); curChar = save; }
+  else { const save = curStone; curStone = selStone || curStone; g = makeStonePreview(); curStone = save; }
   g.rotation.y = 0.5; charPrev.runner = g; charPrev.sc.add(g);
   resizeCharPreview();
 }
@@ -2331,8 +2352,8 @@ function renderGoals(){
   });
   $('goalsList').innerHTML = html;
 }
-function showLeader(){ $('startScreen').classList.add('hidden'); $('leaderPanel').classList.remove('hidden'); renderLeader(); }
-function showShop(tab){ if (tab) shopTab = tab; $('startScreen').classList.add('hidden'); $('shopPanel').classList.remove('hidden'); renderShop(); }
+function showLeader(){ $('howtoPanel').classList.add('hidden'); $('startScreen').classList.add('hidden'); $('leaderPanel').classList.remove('hidden'); renderLeader(); }
+function showShop(tab){ if (tab) shopTab = tab; $('howtoPanel').classList.add('hidden'); selChar = curChar; selStone = curStone; $('startScreen').classList.add('hidden'); $('shopPanel').classList.remove('hidden'); renderShop(); }
 function showGoals(){ goalsNew = false; $('startScreen').classList.add('hidden'); $('goalsPanel').classList.remove('hidden'); renderGoals(); }
 function showSettings(){ $('startScreen').classList.add('hidden'); $('settingsPanel').classList.remove('hidden'); renderSettings(); }
 function showHow(){ $('howtoPanel').classList.remove('hidden'); }
@@ -2351,31 +2372,64 @@ function renderShop(){
   const isChar = shopTab==='chars';
   const set = isChar ? CHARACTERS : STONES;
   const own = isChar ? ownedChars : ownedStones;
-  const cur = isChar ? curChar : curStone;
+  const equipped = isChar ? curChar : curStone;
+  let sel = isChar ? selChar : selStone;
+  if (!sel || !set[sel]){ sel = equipped; if (isChar) selChar = sel; else selStone = sel; }   // default preview = worn item
   Object.keys(set).forEach(key => {
-    const it = set[key], have = own.includes(key), sel = cur===key;
+    const it = set[key], have = own.includes(key), isSel = key===sel, isEq = key===equipped;
     const el = document.createElement('div');
-    el.className = 'shopItem' + (sel?' sel':'') + (have?'':' locked');
+    el.className = 'shopItem' + (isSel?' sel':'') + (have?'':' locked');
     el.innerHTML = `<div class="swatch" style="background:${it.swatch}"></div>`+
       `<div class="iName">${it.name}</div>`+
-      `<div class="iCost">${have ? (sel?'✓ WORN':'OWNED') : '◎'+it.cost}</div>`;
+      `<div class="iCost">${have ? (isEq?'✓ WORN':'OWNED') : '◎'+it.cost}</div>`;
+    // clicking only PREVIEWS the item — purchasing/equipping is done with the buttons below the preview
     el.addEventListener('pointerdown', ev => { ev.stopPropagation(); ev.preventDefault(); isChar ? pickChar(key) : pickStone(key); });
     grid.appendChild(el);
   });
-  // spinning 3D preview: the runner on CHARACTERS, a stone block on STONES
+  // action bar for the previewed item
+  const it = set[sel], have = own.includes(sel), isEq = sel===equipped;
+  $('shopItemName').textContent = it.name;
+  const buyBtn = $('shopBuyBtn'), eqBtn = $('shopEquipBtn');
+  if (have){
+    buyBtn.style.display = 'none';
+    eqBtn.style.display = '';
+    eqBtn.textContent = isEq ? '✓ EQUIPPED' : 'EQUIP';
+    eqBtn.classList.toggle('disabled', isEq);
+  } else {
+    eqBtn.style.display = 'none';
+    buyBtn.style.display = '';
+    buyBtn.textContent = 'PURCHASE  ◎' + it.cost;
+    buyBtn.classList.toggle('disabled', bank < it.cost);
+  }
+  // spinning 3D preview of the PREVIEWED item: runner on CHARACTERS, a stone block on STONES
   $('charStage').classList.remove('hidden');
   updateCharPreview(); charPrevOn = true;
 }
-function buyOrEquip(key, set, own, ownedKey, equip){
+// clicking a grid item just selects it for preview (no purchase, no equip)
+function pickChar(key){ selChar = key; renderShop(); }
+function pickStone(key){ selStone = key; renderShop(); }
+// PURCHASE button: unlock the previewed item (does not auto-equip — that's a separate button)
+function purchaseSel(){
   Sound.init(); if (Sound.ctx && Sound.ctx.state==='suspended') Sound.ctx.resume();
+  const isChar = shopTab==='chars';
+  const set = isChar ? CHARACTERS : STONES, own = isChar ? ownedChars : ownedStones;
+  const ownedKey = isChar ? 'ownedChars' : 'ownedStones', key = isChar ? selChar : selStone;
+  if (!key || own.includes(key)) return;
   const it = set[key];
-  if (own.includes(key)){ equip(key); Sound.blip(660,0.08,'sine',0.12); }
-  else if (bank >= it.cost){ bank -= it.cost; Store.set('coins', bank); own.push(key); Store.set(ownedKey, own); equip(key); Sound.buy(); }
+  if (bank >= it.cost){ bank -= it.cost; Store.set('coins', bank); own.push(key); Store.set(ownedKey, own); Sound.buy(); showPop('UNLOCKED — TAP EQUIP'); }
   else { Sound.blip(150,0.16,'sawtooth',0.14); showPop('NEED MORE COINS'); }
   renderShop();
 }
-function pickChar(key){ buyOrEquip(key, CHARACTERS, ownedChars, 'ownedChars', k => { curChar=k; Store.set('char',k); }); }
-function pickStone(key){ buyOrEquip(key, STONES, ownedStones, 'ownedStones', k => { curStone=k; Store.set('stone',k); }); }
+// EQUIP button: wear the previewed item (must already be owned)
+function equipSel(){
+  Sound.init(); if (Sound.ctx && Sound.ctx.state==='suspended') Sound.ctx.resume();
+  const isChar = shopTab==='chars';
+  const own = isChar ? ownedChars : ownedStones, key = isChar ? selChar : selStone;
+  if (!key || !own.includes(key)) return;
+  if (isChar){ curChar = key; Store.set('char', key); } else { curStone = key; Store.set('stone', key); }
+  Sound.blip(660,0.08,'sine',0.12);
+  renderShop();
+}
 
 function endGame(won, how){
   if (S.gameOver) return;
@@ -2432,10 +2486,11 @@ btn('goalsBack',     backHome);
 btn('settingsBack',  backHome);
 btn('tabChars',      ()=>{ shopTab='chars';  renderShop(); });
 btn('tabStones',     ()=>{ shopTab='stones'; renderShop(); });
+btn('shopBuyBtn',    purchaseSel);
+btn('shopEquipBtn',  equipSel);
 btn('dailyBtn',      ()=>{ dailyMode = !dailyMode; renderSettings(); });
 btn('ddaBtn',        ()=>{ DDA.on = !DDA.on; Store.set('dda', DDA.on?1:0); renderSettings(); });
 btn('musicBtn',      ()=>{ Music.toggle(!Music.on); renderSettings(); });
-btn('shareBtn',      shareScore);
 btn('dblBtn',        doubleCoins);
 btn('reviveCoins',   reviveWithCoins);
 btn('reviveAd',      reviveWithAd);
@@ -2452,7 +2507,7 @@ function goMenu(){ endRevivePrompt(); $('adModal').classList.add('hidden'); show
 window.addEventListener('pointerdown', e => {
   e.preventDefault(); primeAudio();
   if (atMenu){ return; }                                                   // menu uses its own buttons
-  if (S.gameOver){ if (!$('overScreen').classList.contains('hidden')) startGame(); return; }   // tap = play again
+  if (S.gameOver) return;                                                  // over screen uses its RETRY / MAIN MENU buttons
   if (S.phase==='build'){ drop(); return; }
   if (S.phase==='run'){ gStart = { x:e.clientX, y:e.clientY }; }   // wait for swipe direction
 }, { passive:false });
