@@ -499,8 +499,8 @@
   <div class="howCard">
     <div class="howTitle">HOW TO PLAY</div>
     <div class="howStep"><span class="howNum">1</span><div><b>STACK</b><span>Tap to drop each stone into the glowing outline. Line it up dead-on for a PERFECT.</span></div></div>
-    <div class="howStep"><span class="howNum">2</span><div><b>CLIMB</b><span>Then run up the pyramid you built — jump the gaps, dodge traps, and grab coins.</span></div></div>
-    <div class="howStep"><span class="howNum">3</span><div><b>EARN</b><span>A flawless build scores 5★: fewer hazards and double coins on the climb up.</span></div></div>
+    <div class="howStep"><span class="howNum">2</span><div><b>CLIMB</b><span>Then run up the pyramid you built — jump the gaps, dodge traps, and grab deben.</span></div></div>
+    <div class="howStep"><span class="howNum">3</span><div><b>EARN</b><span>A flawless build scores 5★: fewer hazards and double deben on the climb up.</span></div></div>
     <div class="cta hero" id="howClose">LET'S GO</div>
   </div>
 </div>
@@ -512,7 +512,7 @@
   <div class="gostat" id="finalReward" style="margin-top:14px;color:#ffe08a"></div>
   <div class="cta hero" id="retryBtn" style="pointer-events:auto;margin-top:22px">RETRY</div>
   <div class="obtnRow">
-    <div class="obtn gold" id="dblBtn">2× COINS ▶</div>
+    <div class="obtn gold" id="dblBtn">2× DEBEN ▶</div>
     <div class="obtn" id="menuFromOver">MAIN MENU</div>
   </div>
 </div>
@@ -592,7 +592,7 @@ const MISSION_POOL = [
   { id:'s5',  desc:'Build a flawless 5★ pyramid', type:'stars',    goal:5,  reward:130 },
   { id:'l3',  desc:'Reach level 3',               type:'level',    goal:3,  reward:80  },
   { id:'l5',  desc:'Reach level 5',               type:'level',    goal:5,  reward:150 },
-  { id:'c80', desc:'Grab 80 coins in one run',    type:'runCoins', goal:80, reward:70  },
+  { id:'c80', desc:'Grab 80 deben in one run',    type:'runCoins', goal:80, reward:70  },
   { id:'st6', desc:'Land a 6× PERFECT streak',    type:'streak',   goal:6,  reward:90  },
   { id:'st10',desc:'Land a 10× PERFECT streak',   type:'streak',   goal:10, reward:170 },
   { id:'b3',  desc:'Build 3 pyramids',            type:'builds',   goal:3,  reward:60  },
@@ -609,7 +609,7 @@ function missionEvent(type, value){
     const np = (d.type==='builds') ? m.prog+value : Math.max(m.prog, value);
     if (np!==m.prog){ m.prog=np; changed=true; }
     if (m.prog>=d.goal){ bank+=d.reward; Store.set('coins',bank); if (typeof updateCoinHud==='function') updateCoinHud(true);
-      showHint('✦ GOAL DONE  +'+d.reward+' COINS · '+d.desc, 3200); missions[idx]=newMission(missions.map(x=>x.id)); changed=true; goalsNew=true; }
+      showHint('✦ GOAL DONE  +'+d.reward+' DEBEN · '+d.desc, 3200); missions[idx]=newMission(missions.map(x=>x.id)); changed=true; goalsNew=true; }
   });
   if (changed) Store.set('missions', missions);
 }
@@ -620,7 +620,7 @@ function checkDailyStreak(){
   dailyStreak = (last===dayKey(1)) ? dailyStreak+1 : 1;
   Store.set('dstreak', dailyStreak); Store.set('dday', today);
   const reward = Math.min(20 + dailyStreak*10, 120); bank += reward; Store.set('coins', bank); goalsNew = true;
-  setTimeout(()=> showHint('🔥 DAY '+dailyStreak+' · DAILY BONUS +'+reward+' COINS', 3600), 700);
+  setTimeout(()=> showHint('🔥 DAY '+dailyStreak+' · DAILY BONUS +'+reward+' DEBEN', 3600), 700);
 }
 
 // ---------- cosmetics: STONE themes (block palette) + CHARACTER costumes (runner), bought with coins ----------
@@ -647,8 +647,8 @@ let curStone    = Store.get('stone', 'sand');
 let ownedChars  = Store.get('ownedChars', ['explorer']);
 let curChar     = Store.get('char', 'explorer');
 let selChar     = curChar, selStone = curStone;   // shop PREVIEW selection (what you're viewing, not necessarily worn)
-const COIN_NAME = 'COINS';                         // what the in-game currency is called (change this one word to rename everywhere)
-try { document.querySelectorAll('.coinLbl').forEach(e => e.textContent = COIN_NAME); } catch(e){}
+const COIN_NAME = 'DEBEN';                          // what the in-game currency is called (change this one word to rename the labels)
+try { document.querySelectorAll('.coinLbl, .chipLbl').forEach(e => e.textContent = COIN_NAME); } catch(e){}
 function stone(){ return STONES[curStone] || STONES.sand; }
 function character(){ return CHARACTERS[curChar] || CHARACTERS.explorer; }
 
@@ -1594,8 +1594,8 @@ function showRating(){
   $('ratingStars').style.color = r.col;
   $('ratingPhrase').textContent = r.phrase; $('ratingPhrase').style.color = r.col;
   // tell the player how their build shapes the climb ahead
-  const rw = [ '', 'TREACHEROUS CLIMB · FEWER COINS', 'ROUGH CLIMB · NORMAL COINS',
-    'STEADY CLIMB · 1.2× COINS', 'EASY CLIMB · 1.6× COINS', 'CLEAR PATH · 2× CLIMB COINS' ][stars];
+  const rw = [ '', 'TREACHEROUS CLIMB · FEWER DEBEN', 'ROUGH CLIMB · NORMAL DEBEN',
+    'STEADY CLIMB · 1.2× DEBEN', 'EASY CLIMB · 1.6× DEBEN', 'CLEAR PATH · 2× CLIMB DEBEN' ][stars];
   $('ratingReward').textContent = rw; $('ratingReward').style.color = r.col;
   // VIGNETTE tint — clear in the middle so you can see the whole pyramid you built behind it
   const tint = $('ratingTint');
@@ -2165,7 +2165,7 @@ function doubleCoins(){
   if (S.coinsDoubled || S.coins <= 0) return;
   runAd(()=>{
     S.coinsDoubled = true; bank += S.coins; Store.set('coins', bank);   // add a second copy of the run's coins
-    $('finalReward').innerHTML = `★ COINS DOUBLED! &nbsp;·&nbsp; +${S.coins*2} this run &nbsp;·&nbsp; bank ◎${bank}`;
+    $('finalReward').innerHTML = `★ DEBEN DOUBLED! &nbsp;·&nbsp; +${S.coins*2} this run &nbsp;·&nbsp; bank ◎${bank}`;
     $('dblBtn').style.display = 'none'; Sound.buy();
   });
 }
@@ -2447,7 +2447,7 @@ function purchaseSel(){
   if (!key || own.includes(key)) return;
   const it = set[key];
   if (bank >= it.cost){ bank -= it.cost; Store.set('coins', bank); own.push(key); Store.set(ownedKey, own); Sound.buy(); showPop('UNLOCKED — TAP EQUIP'); }
-  else { Sound.blip(150,0.16,'sawtooth',0.14); showPop('NEED MORE COINS'); }
+  else { Sound.blip(150,0.16,'sawtooth',0.14); showPop('NEED MORE DEBEN'); }
   renderShop();
 }
 // EQUIP button: wear the previewed item (must already be owned)
@@ -2482,7 +2482,7 @@ function endGame(won, how){
       ? 'Pyramid built and conquered.'
       : (how==='fell' ? 'So close to the summit.' : how==='hit' ? 'Hit an obstacle on the climb.' : `The structure gave way on layer ${S.layer+1}.`);
     $('finalReward').innerHTML = (newBest ? '★ NEW BEST! &nbsp;·&nbsp; ' : '') +
-      `+${S.coins} coins collected &nbsp;·&nbsp; bank ◎${bank}`;
+      `+${S.coins} deben collected &nbsp;·&nbsp; bank ◎${bank}`;
     $('dblBtn').style.display = (S.coins > 0 && !S.coinsDoubled) ? '' : 'none';
     $('overScreen').classList.remove('hidden');
   }, 700);
