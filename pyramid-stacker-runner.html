@@ -566,13 +566,31 @@ const sky = new THREE.Mesh(skyGeo, skyMat); scene.add(sky);
 
 const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 120);
 
-scene.add(new THREE.HemisphereLight(0xffd9a8, 0x33203a, 0.55));
+const hemi = new THREE.HemisphereLight(0xffd9a8, 0x33203a, 0.55); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff0d0, 0.72);          // softer key so light sandstone doesn't blow out to white
 sun.position.set(7,16,9); sun.castShadow = true;
 sun.shadow.mapSize.set(1024,1024);
 sun.shadow.camera.near=1; sun.shadow.camera.far=60;
 sun.shadow.camera.left=-16; sun.shadow.camera.right=16; sun.shadow.camera.top=16; sun.shadow.camera.bottom=-16;
 scene.add(sun);
+
+// ---------- BIOMES: the sky, fog & light shift every level so the climb keeps feeling fresh ----------
+const BIOMES = [
+  { name:'DUSK DESERT',   skyTop:0x241a36, skyBot:0xc9714e, fog:0x2a1d33, sun:0xfff0d0, hSky:0xffd9a8, hGnd:0x33203a, storm:0.05 },
+  { name:'CRIMSON DUNES', skyTop:0x2a0e1a, skyBot:0xd1492f, fog:0x3a1320, sun:0xffd0b0, hSky:0xffc59a, hGnd:0x3a1020, storm:0.08 },
+  { name:'EMERALD NILE',  skyTop:0x10302e, skyBot:0x4fae8c, fog:0x16302b, sun:0xeafff0, hSky:0xcdf5d6, hGnd:0x1a3a30, storm:0.03 },
+  { name:'FROZEN PEAKS',  skyTop:0x1c2a44, skyBot:0x9fc7e0, fog:0x223349, sun:0xeaf4ff, hSky:0xdfeaff, hGnd:0x33405a, storm:0.10 },
+  { name:'OBSIDIAN NIGHT',skyTop:0x0a0814, skyBot:0x3a2a55, fog:0x140f22, sun:0xb9a8ff, hSky:0x8a7ad0, hGnd:0x140f22, storm:0.04 },
+];
+function biomeFor(level){ return BIOMES[((level-1) % BIOMES.length + BIOMES.length) % BIOMES.length]; }
+function applyBiome(level){
+  const b = biomeFor(level);
+  skyMat.uniforms.top.value.setHex(b.skyTop);
+  skyMat.uniforms.bot.value.setHex(b.skyBot);
+  scene.fog.color.setHex(b.fog);
+  sun.color.setHex(b.sun);
+  hemi.color.setHex(b.hSky); hemi.groundColor.setHex(b.hGnd);
+}
 
 // ---------- true bloom (post-processing) — best-effort, falls back to plain render ----------
 // Tuned so ONLY genuinely bright/emissive things (coins, capstone) glow — not the lit stone.
@@ -1380,8 +1398,9 @@ function startRun(){
   }
   // HAZARD: sandstorm stretches — fog closes in, harder to read the path ahead
   const storms = [];
+  const stormChance = biomeFor(gameLevel).storm;          // each biome storms at its own rate (blizzards, calm oasis, etc.)
   for (let i = 8; i < tiles.length - 6; i++){
-    if (RND() < 0.05){ storms.push([i, Math.min(i + 6 + Math.floor(RND()*5), tiles.length-2)]); i += 11; }
+    if (RND() < stormChance){ storms.push([i, Math.min(i + 6 + Math.floor(RND()*5), tiles.length-2)]); i += 11; }
   }
   // coins: a glinting trail of pickups. Most sit on safe tiles; a few hover over gaps,
   // rewarding a well-timed jump (collect-while-airborne pays a bonus).
@@ -1777,6 +1796,7 @@ function buzz(pattern){ try { if (navigator.vibrate) navigator.vibrate(pattern);
 
 function startGame(){
   gameLevel = 1;
+  applyBiome(gameLevel);                        // level-1 biome: sky / fog / light
   checkDailyStreak();                          // first game of the day → streak bump + bonus coins
   $('ratingOverlay').classList.remove('show');
   resetState();
@@ -1801,6 +1821,7 @@ function startGame(){
 // reached the summit → start the NEXT pyramid: keep score/coins, bump the level, everything a bit faster
 function nextLevel(){
   gameLevel++;
+  applyBiome(gameLevel);                                   // shift the biome (sky / fog / light) for the new level
   missionEvent('level', gameLevel);                        // goal: reach a level
   DDA.note(0.85);                                          // finishing a pyramid means you're playing well
   const keepScore = S.score, keepCoins = S.coins, keepBest = S.bestPerfect||0;
@@ -1816,7 +1837,7 @@ function nextLevel(){
   $('hud').style.display='flex';
   $('storm').style.opacity='0'; scene.fog.near=16; scene.fog.far=46; S.stormA=0;
   $('reviveScreen').classList.add('hidden'); $('hint').classList.remove('show'); $('menuBtn').style.display='block'; $('restartBtn').style.display='block';
-  showPop('LEVEL ' + gameLevel);
+  showPop('LEVEL ' + gameLevel + ' · ' + biomeFor(gameLevel).name);
   updateHUD(); spawnBlock();
 }
 
