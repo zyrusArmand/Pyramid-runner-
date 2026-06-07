@@ -1219,8 +1219,25 @@ function addPlaceGuide(a){
 }
 function removeKeystoneGuide(){ if (S.keyGuide){ scene.remove(S.keyGuide); S.keyGuide = null; } }
 
+// faint translucent outline of the FULL ring for the current layer, so you can see exactly where each
+// block — and especially each corner — is meant to land
+function updateGhostRing(){
+  if (S.ghostRing && S.ghostLayer === S.layer) return;
+  if (S.ghostRing){ scene.remove(S.ghostRing); S.ghostRing = null; }
+  const L = S.layer, n = nForLayer(L); if (n <= 0){ S.ghostLayer = L; return; }
+  const H = (n*BLOCK_SIZE)/2, y = L*LAYER_HEIGHT, hh = LAYER_HEIGHT*0.9, t = BLOCK_SIZE*0.98, span = n*BLOCK_SIZE;
+  const g = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color:0xffe6a0, transparent:true, opacity:0.12, depthWrite:false });
+  const wall = (wx, wz, ax) => { const m = new THREE.Mesh(new THREE.BoxGeometry(ax==='x'?span:t, hh, ax==='x'?t:span), mat);
+    m.position.set(wx, y, wz); g.add(m); };
+  wall(0, H, 'x'); wall(0, -H, 'x'); wall(H, 0, 'z'); wall(-H, 0, 'z');   // the four target walls
+  scene.add(g); S.ghostRing = g; S.ghostLayer = L;
+}
+function clearGhostRing(){ if (S.ghostRing){ scene.remove(S.ghostRing); S.ghostRing = null; } S.ghostLayer = -1; }
+
 function spawnBlock(){
   const capstone = S.capstone;
+  if (capstone) clearGhostRing(); else updateGhostRing();
   let center, axis, len = 1, cells = [], corner = false;
 
   if (capstone){
@@ -1298,7 +1315,9 @@ function spawnBlock(){
       // piece can never swing THROUGH a neighbour (this also respects the far corner on the closing wall).
       const sb = swingBounds(axis, len, center, odir, range, axis);   // open piece swings along its span axis
       if (!sb.fit){ scene.remove(mesh); advance(len); return; }         // slot blocked — leave a gap, move on
-      const seat = (odir>0) ? sb.sLo : sb.sHi;             // perfect (flush) end
+      // CORNERSTONES anchor to their exact grid corner so the ring can't drift off the wall (fixes the offset/gap corner);
+      // mid-wall pieces keep the flowing flush seat
+      const seat = corner ? center[axis] : ((odir>0) ? sb.sLo : sb.sHi);   // perfect (flush) end
       const far  = (odir>0) ? sb.sHi : sb.sLo;             // far/opposite end — where the stone enters from
       const oSpeed = speed * 1.25 * DDA.buildSpeed() * levelSpeed();   // steady sweep (adaptive + faster each level)
       mesh.position[axis] = far;                           // SPAWN at the far/opposite end, then sweep to the seat
@@ -1689,11 +1708,37 @@ function addLaneGuides(tiles){
     strip(lane, 0.22, centre?0xffd24a:0xffb43a, centre?0.16:0.11);   // soft outer glow halo
     strip(lane, 0.05, centre?0xfff2c0:0xffe49a, centre?0.7:0.5);     // bright neon core line
   });
-  return guides;
+  // a bright shimmer that scrolls UP each lane, giving the ribbons a sense of energy/flow
+  const flows = [];
+  [-1,0,1].forEach(lane => {
+    const mat = new THREE.MeshBasicMaterial({ color:0xfff6d2, transparent:true, opacity:0.0,
+      depthWrite:false, blending:THREE.AdditiveBlending });
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.012, Math.min(0.5, L*0.12)), mat);
+    m.rotation.x = ang; scene.add(m); flows.push({ mesh:m, lane });
+  });
+  S.run.laneGuides = guides;
+  S.run.laneFlows = flows;
+  S.run.laneGeom = { P0:P0.clone(), P1:P1.clone(), cx };
+}
+
+// a tiny camera-facing symbol (⚡🛡⏱) drawn on a canvas sprite, so each power-up reads at a glance.
+// Wrapped in try/catch — if the renderer can't make a canvas texture, the pickup just shows without a glyph.
+function makeGlyph(ch){
+  try {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+    const ctx = cv.getContext && cv.getContext('2d'); if (!ctx) return null;
+    ctx.font = '46px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(ch, 32, 35);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:new THREE.CanvasTexture(cv),
+      transparent:true, depthWrite:false, depthTest:false }));
+    sp.scale.set(0.12, 0.12, 0.12);
+    return sp;
+  } catch(e){ return null; }
 }
 
 function startRun(){
   S.phase = 'run';
+  clearGhostRing();
   Sound.cap();
   // BUILD → CLIMB: the quality of the pyramid you built shapes the climb. A clean build means a
   // safer path and richer coins; a sloppy one means a treacherous climb.
@@ -1728,10 +1773,10 @@ function startRun(){
       scene.add(ham); t.obMesh = ham;
     } else {
       // themed temple SPIKE TRAP — base sunk into the stone, spikes slide left↔right at their own speed
-      t.ob = { type:'lane', lane:0, moving:true, phase: RND()*6.28, spd:0.0016 + RND()*0.003, yOff:0 };
+      const spikeMat = new THREE.MeshStandardMaterial({ color:0xc9a24a, emissive:0x2a1500, metalness:0.5, roughness:0.4 });
+      t.ob = { type:'lane', lane:0, moving:true, phase: RND()*6.28, spd:0.0016 + RND()*0.003, yOff:0, mat:spikeMat };
       t.perp = perp.clone();
       const trap = new THREE.Group();
-      const spikeMat = new THREE.MeshStandardMaterial({ color:0xc9a24a, emissive:0x2a1500, metalness:0.5, roughness:0.4 });
       const base = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.05, 0.16),                 // base buried just under the tread
         new THREE.MeshStandardMaterial({ color:0x4a3a26, roughness:1 }));
       base.position.y = -0.035; trap.add(base);
@@ -1783,8 +1828,10 @@ function startRun(){
     const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.095,0.095,0.011,22),
       new THREE.MeshStandardMaterial({ color:col, emissive:col, transparent:true, opacity:0.55, depthWrite:false }));
     ring.rotation.x = Math.PI/2; grp.add(ring);
+    const glyph = makeGlyph(type==='magnet' ? '⚡' : type==='shield' ? '🛡' : '⏱');   // camera-facing type symbol
+    if (glyph) grp.add(glyph);
     grp.position.set(t.pos.x, t.pos.y + 0.2, t.pos.z); scene.add(grp);
-    t.power = { type, mesh:grp, core, ring, got:false };
+    t.power = { type, mesh:grp, core, ring, glyph, got:false };
     lastPow = i;
   }
   // ---- rigged little climber: torso, head, arms & legs pivoted at the shoulders/hips ----
@@ -1802,7 +1849,7 @@ function startRun(){
             rolling:false, rollT:0, rollDur:0.5, rollDir:1, rollCD:0,
             magnet:0, shield:0, slow:0, bubble:null,
             storms, revives:0, usedAdRevive:false, invuln:0, dead:false, deathReason:'fell' };
-  S.run.laneGuides = addLaneGuides(tiles);               // the three glowing paths you're restricted to
+  addLaneGuides(tiles);                                  // the three glowing paths you're restricted to (+ scrolling shimmer)
   g.position.copy(tiles[0].pos);
 
   // HUD swap
@@ -2531,24 +2578,44 @@ function animate(){
     S.active.mesh.material.emissive.setRGB(0.35*pulse, 0.24*pulse, 0.0);
   if (S.run && S.run.laneGuides){                                        // the neon lane ribbons breathe gently
     S.run.laneGuides.forEach(gd => gd.material.opacity = gd.baseOp * (0.7 + 0.45*pulse)); }
-  if (S.run) S.run.tiles.forEach(t => {
+  if (S.run && S.run.laneFlows && S.run.laneGeom){                       // a shimmer scrolls up each lane
+    const G = S.run.laneGeom;
+    S.run.laneFlows.forEach(fl => {
+      const tt = ((performance.now()*0.00028 + fl.lane*0.27) % 1 + 1) % 1;   // 0→1 looping, staggered per lane
+      fl.mesh.position.set(G.cx + fl.lane*0.24,
+        G.P0.y + (G.P1.y-G.P0.y)*tt + 0.06, G.P0.z + (G.P1.z-G.P0.z)*tt);
+      fl.mesh.material.opacity = 0.6 * Math.sin(tt*Math.PI);                 // fade in/out at the ends
+    });
+  }
+  if (S.run) S.run.tiles.forEach((t, ti) => {
     if (t.marker) t.marker.material.opacity = 0.5 + 0.4*pulse;
     if (t.coin && !t.coin.got) t.coin.mesh.rotation.z += dt*3.4;
     if (t.power && !t.power.got){ t.power.mesh.rotation.y += dt*1.8;
       t.power.mesh.position.y = t.pos.y + 0.2 + 0.03*Math.sin(performance.now()*0.004); }
+    const near = S.run && (ti - S.run.idx) >= -1 && (ti - S.run.idx) < 8;   // close enough ahead to matter
     // spikes / pillars slide between lanes at their own speed — keep the mesh and live hit-lane in sync
     if (t.ob && t.ob.moving && t.obMesh && t.perp){
       const f = Math.sin(performance.now()*(t.ob.spd||0.0024) + t.ob.phase);
       t.ob.lane = f > 0.33 ? 1 : (f < -0.33 ? -1 : 0);
       const yo = (t.ob.yOff !== undefined) ? t.ob.yOff : 0.15;
       t.obMesh.position.set(t.pos.x + t.perp.x*f*0.24, t.pos.y + yo, t.pos.z + t.perp.z*f*0.24);
+      if (t.ob.mat){                                   // telegraph: spikes glint red when they're in YOUR lane just ahead
+        const danger = near && t.ob.lane === S.run.lane;
+        t.ob.mat.emissive.setRGB(danger ? 0.5+0.4*pulse : 0.16, danger ? 0.04 : 0.08, 0);
+      }
     }
     if (t.ob && t.ob.hammer && t.obMesh){             // pendulum hammer wipes side to side, slamming the ground each side
       const th = Math.sin(performance.now()*(t.ob.spd||0.003) + t.ob.phase) * 1.4;   // ±80° sweep
       t.obMesh.rotation.z = th;
       const offset = -0.34 * Math.sin(th);             // where the head currently is across the lanes
-      t.ob.lane = (Math.cos(th) < 0.72)                // only deadly while the head is swung DOWN near a side
-        ? Math.max(-1, Math.min(1, Math.round(offset/0.24))) : 99;
+      const down = Math.cos(th) < 0.72;                // head swung DOWN near a side
+      t.ob.lane = down ? Math.max(-1, Math.min(1, Math.round(offset/0.24))) : 99;   // only deadly while down
+      const slammed = Math.cos(th) < 0.42;             // head essentially on the ground
+      if (slammed && !t.ob.slam){                      // fire a dust puff + thud once per ground-slam
+        t.ob.slam = true;
+        if (near){ spawnDust(new THREE.Vector3(t.pos.x + offset, t.pos.y - 0.06, t.pos.z), 0xe8d8c0, 7, 1.6, 1);
+          Sound.drop(); shake(0.18); }
+      } else if (!slammed && t.ob.slam && Math.cos(th) > 0.55){ t.ob.slam = false; }
     }
   });
 
