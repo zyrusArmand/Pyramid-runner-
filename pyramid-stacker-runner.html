@@ -407,9 +407,8 @@
     <div id="ratingSub">PYRAMID COMPLETE</div>
     <div id="ratingStars"></div>
     <div id="ratingPhrase"></div>
-    <div id="ratingReward"></div>
   </div>
-  <div class="cta hero" id="climbBtn">START CLIMB ▲</div>
+  <div class="cta hero" id="climbBtn">START CLIMB</div>
 </div>
 <div id="introOverlay">
   <div id="introSub">PYRAMID COMPLETE</div>
@@ -1649,10 +1648,6 @@ function showRating(){
   $('ratingStars').textContent = '★'.repeat(stars) + '☆'.repeat(5-stars);
   $('ratingStars').style.color = r.col;
   $('ratingPhrase').textContent = r.phrase; $('ratingPhrase').style.color = r.col;
-  // tell the player how their build shapes the climb ahead
-  const rw = [ '', 'TREACHEROUS CLIMB · FEWER DEBEN', 'ROUGH CLIMB · NORMAL DEBEN',
-    'STEADY CLIMB · 1.2× DEBEN', 'EASY CLIMB · 1.6× DEBEN', 'CLEAR PATH · 2× CLIMB DEBEN' ][stars];
-  $('ratingReward').textContent = rw; $('ratingReward').style.color = r.col;
   // VIGNETTE tint — clear in the middle so you can see the whole pyramid you built behind it
   const tint = $('ratingTint');
   tint.classList.remove('storm','sun');
