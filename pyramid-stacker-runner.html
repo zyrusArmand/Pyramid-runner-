@@ -73,6 +73,8 @@
     pointer-events:none; font-family:'Space Mono',monospace; font-weight:700; font-size:14px; letter-spacing:1px;
     color:#ffd36a; text-shadow:0 0 10px rgba(255,180,80,.7); opacity:0; transition:opacity .25s; }
   #combo.show { opacity:1; }
+  #combo.hot { color:#fff0b0; text-shadow:0 0 14px rgba(255,120,40,.95), 0 0 26px rgba(255,80,30,.6); animation:comboHot .5s ease-in-out infinite; }
+  @keyframes comboHot { 0%,100%{transform:scale(1);} 50%{transform:scale(1.09);} }
 
   /* low-integrity danger vignette */
   #vignette { position:fixed; inset:0; z-index:4; pointer-events:none; opacity:0;
@@ -1262,6 +1264,12 @@ function spawnBlock(){
       addPlaceGuide(S.active);                             // glowing perfect-seat outline for this stone
     }
   }
+  // GOLDEN BONUS BLOCK: now and then a stone is worth a fat bonus — but ONLY if you seat it PERFECT
+  if (!capstone && S.active && RND() < 0.15){
+    S.active.bonus = true;
+    if (mesh.material && mesh.material.color) mesh.material.color.setHex(0xffcf3a);
+    showPop('✦ GOLDEN BLOCK — NAIL IT');
+  }
 }
 
 function drop(){
@@ -1333,7 +1341,7 @@ function drop(){
   updateHUD();
 
   if (S.integrity <= 0){ collapseAll(); endGame(false, 'collapsed'); return; }
-  blockPlaced(a.mesh, offN, a.capstone, a.len, a.len + extra);
+  blockPlaced(a.mesh, offN, a.capstone, a.len, a.len + extra, a.bonus);
 }
 
 // footprint (AABB in x/z) of a placed piece
@@ -1447,7 +1455,7 @@ function pushCells(a, placed, weak, off=0){
   });
 }
 
-function blockPlaced(mesh, instability, capstone, len, consumed){
+function blockPlaced(mesh, instability, capstone, len, consumed, bonus){
   S.layerBlocks.push(mesh);
   S.squash.push({ mesh, t:0 });                 // satisfying landing squash (juice)
   // accuracy tiers — PERFECT (exact) / GREAT / GOOD pay 3 / 2 / 1 coins; anything looser is a MISS
@@ -1465,12 +1473,20 @@ function blockPlaced(mesh, instability, capstone, len, consumed){
   if (tier === 'PERFECT'){
     // exact hit ONLY — the full reaction: emoji pop + phone buzz + chime + sparkle
     S.streak++; S.bestPerfect = Math.max(S.bestPerfect, S.streak); missionEvent('streak', S.streak);   // goal: perfect streak
-    S.score += (baseScore + S.streak*25) * len;
-    showPop(S.streak>2 ? `PERFECT ×${S.streak}` : 'PERFECT');
+    const mult = Math.min(1 + Math.floor((S.streak-1)/3), 5);    // x1 (1–3), x2 (4–6), … up to x5 — the chain reward
+    S.score += Math.round((baseScore + S.streak*25) * len * mult);
+    if (bonus){                                                  // golden block nailed perfectly → fat coin + score bonus
+      const bc = 8; S.coins += bc; bank += bc; Store.set('coins', bank); S.score += 250;
+      showPop(`✦ GOLDEN PERFECT +${bc}`); Sound.buy(); flash();
+      sparkle(mesh.position.clone().add(new THREE.Vector3(0,0.55,0)));
+      sparkle(mesh.position.clone().add(new THREE.Vector3(0.25,0.45,0.1)));
+    } else {
+      showPop(S.streak>2 ? `PERFECT ×${S.streak}` : 'PERFECT');
+      sparkle(mesh.position.clone().add(new THREE.Vector3(0,0.5,0)));
+      if (S.streak >= 2) flash();
+    }
     Sound.perfect(S.streak); buzz([16,28,16]);
-    sparkle(mesh.position.clone().add(new THREE.Vector3(0,0.5,0)));
-    if (S.streak >= 2) flash();
-    showCombo(S.streak);
+    showCombo(S.streak, mult);
   } else {
     S.streak = 0; showCombo(0);
     S.score += baseScore * len;
@@ -1485,10 +1501,13 @@ function blockPlaced(mesh, instability, capstone, len, consumed){
   advance(consumed || len);                // overshooting stones consume the cells they slid into
 }
 
-function showCombo(n){
+function showCombo(n, mult){
   const c = $('combo');
-  if (n >= 2){ c.textContent = `COMBO x${n}`; c.classList.add('show'); }
-  else c.classList.remove('show');
+  if (n >= 2){
+    c.innerHTML = `PERFECT&nbsp;CHAIN&nbsp;×${n}` + (mult>1 ? ` &nbsp;·&nbsp; ×${mult}&nbsp;SCORE` : '');
+    c.classList.add('show'); c.classList.toggle('hot', n >= 6);
+    c.style.fontSize = Math.min(14 + n, 26) + 'px';
+  } else { c.classList.remove('show'); c.classList.remove('hot'); }
 }
 function flash(){ const f=$('flash'); f.classList.remove('show'); void f.offsetWidth; f.classList.add('show'); }
 
