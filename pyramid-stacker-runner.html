@@ -904,6 +904,7 @@ function drop(){
       advance(a.len);
       return;
     }
+    box.ax = a.axis;                                            // wall axis (for corner-vs-collinear reasoning)
     S.layerBoxes.push(box);
   }
 
@@ -951,7 +952,7 @@ function clampPlacement(a, cur, offAxis){
   let lo = -Infinity, hi = Infinity;
   S.layerBoxes.forEach(o => {
     const oPeLo = (perpAx==='x') ? o.x0 : o.z0, oPeHi = (perpAx==='x') ? o.x1 : o.z1;
-    if (bPeHi <= oPeLo+0.02 || bPeLo >= oPeHi-0.02) return;               // not in the same row across the axis
+    if (Math.min(bPeHi,oPeHi) - Math.max(bPeLo,oPeLo) < 0.34) return;    // only a COLLINEAR (same-wall) neighbour constrains; a perpendicular corner touch is tolerated
     const oLo = (offAxis==='x') ? o.x0 : o.z0, oHi = (offAxis==='x') ? o.x1 : o.z1;
     if (cur <= (oLo+oHi)/2) hi = Math.min(hi, oLo - halfO - 0.015);       // rest exactly on the cell grid (1.0 spacing)
     else                    lo = Math.max(lo, oHi + halfO + 0.015);
@@ -969,7 +970,7 @@ function swingBounds(axis, len, center, odir, range, spanAxis){
   let lo = -Infinity, hi = Infinity;
   S.layerBoxes.forEach(o => {
     const oPeLo = (perpAx==='x') ? o.x0 : o.z0, oPeHi = (perpAx==='x') ? o.x1 : o.z1;
-    if (bPeHi <= oPeLo+0.02 || bPeLo >= oPeHi-0.02) return;             // not in the same row across the axis
+    if (Math.min(bPeHi,oPeHi) - Math.max(bPeLo,oPeLo) < 0.34) return;   // only a COLLINEAR (same-wall) neighbour bounds the swing; a perpendicular corner touch is tolerated
     const oLo = (axis==='x') ? o.x0 : o.z0, oHi = (axis==='x') ? o.x1 : o.z1;
     if ((oLo+oHi)/2 < cc) lo = Math.max(lo, oHi+halfO+0.015);           // stone on the inner side (cell-grid spacing)
     else                  hi = Math.min(hi, oLo-halfO-0.015);           // stone on the outer side (e.g. far corner)
