@@ -12,16 +12,14 @@
   canvas { display:block; }
 
   #hud { position:fixed; top:0; left:0; right:0; padding-top:max(16px,env(safe-area-inset-top));
-    padding-left:18px; padding-right:18px; display:flex; justify-content:space-between;
+    padding-left:18px; padding-right:18px; display:flex; justify-content:flex-end;
     align-items:flex-start; pointer-events:none; font-family:'Space Mono',monospace;
     color:#f6e9d2; text-shadow:0 2px 6px rgba(0,0,0,.55); z-index:5; }
-  .stat { font-size:12px; letter-spacing:2px; opacity:.8; }
-  .val  { font-size:21px; font-weight:700; line-height:1; margin-top:2px; }
-  #lives { display:flex; gap:7px; margin-top:6px; justify-content:flex-end; }
-  .life { width:12px; height:12px; border-radius:2px; background:#e8b85f; transform:rotate(45deg);
-    box-shadow:0 0 8px rgba(232,184,95,.7); transition:all .3s; }
-  .life.gone { background:#3a2e2a; box-shadow:none; opacity:.5; }
-  .right { text-align:right; }
+  .stat { font-size:10px; letter-spacing:2px; opacity:.7; }
+  .val  { font-size:18px; font-weight:700; line-height:1; }
+  /* three stacked readouts (SCORE / LEVEL / LAYER) top-right */
+  .right { display:flex; flex-direction:column; align-items:flex-end; gap:5px; }
+  .statBox { display:flex; align-items:baseline; justify-content:flex-end; gap:7px; }
 
   #meterWrap { position:fixed; left:50%; transform:translateX(-50%);
     bottom:max(26px,env(safe-area-inset-bottom)); width:min(320px,70vw); z-index:5;
@@ -236,16 +234,15 @@
 
   /* in-game main-menu button (top-left) */
   #menuBtn { position:fixed; left:14px; top:calc(max(16px,env(safe-area-inset-top)) + 2px); z-index:6;
-    font-family:'Space Mono',monospace; font-size:16px; line-height:1; color:#f6e9d2; display:none;
-    background:rgba(20,12,28,.55); border:1px solid rgba(243,200,120,.4); border-radius:10px;
-    padding:8px 11px; pointer-events:auto; }
+    font-family:'Space Mono',monospace; font-size:22px; line-height:1; color:#f6e9d2; display:none;
+    background:rgba(20,12,28,.6); border:1.5px solid rgba(243,200,120,.45); border-radius:12px;
+    padding:11px 15px; pointer-events:auto; }
   #menuBtn:active { transform:scale(.95); }
-  #restartBtn { position:fixed; left:58px; top:calc(max(16px,env(safe-area-inset-top)) + 2px); z-index:6;
-    font-family:'Space Mono',monospace; font-size:16px; line-height:1; color:#f6e9d2; display:none;
-    background:rgba(20,12,28,.55); border:1px solid rgba(243,200,120,.4); border-radius:10px;
-    padding:8px 11px; pointer-events:auto; }
+  #restartBtn { position:fixed; left:76px; top:calc(max(16px,env(safe-area-inset-top)) + 2px); z-index:6;
+    font-family:'Space Mono',monospace; font-size:22px; line-height:1; color:#f6e9d2; display:none;
+    background:rgba(20,12,28,.6); border:1.5px solid rgba(243,200,120,.45); border-radius:12px;
+    padding:11px 15px; pointer-events:auto; }
   #restartBtn:active { transform:scale(.95); }
-  #hud > div:first-child { padding-left:98px; }   /* clear room for the menu + restart buttons */
 
   /* ---------- home screen (cover art + buttons) ---------- */
   #startScreen { padding:0; justify-content:flex-end; }
@@ -380,9 +377,12 @@
 <div id="loader"><div class="loadPyr"></div><div class="loadTxt">LOADING</div></div>
 
 <div id="hud">
-  <div><div class="stat" id="lblA">SCORE</div><div class="val" id="score">0</div></div>
-  <div class="right"><div class="stat" id="lblB">LAYER</div><div class="val" id="layer">1</div>
-    <div id="lives"><span class="life"></span><span class="life"></span><span class="life"></span></div></div>
+  <div class="right">
+    <div class="statBox"><span class="stat" id="lblA">SCORE</span><span class="val" id="score">0</span></div>
+    <div class="statBox"><span class="stat" id="lblMid">LEVEL</span><span class="val" id="level">1</span></div>
+    <div class="statBox"><span class="stat" id="lblB">LAYER</span><span class="val" id="layer">1</span></div>
+  </div>
+  <div id="lives" style="display:none"></div>
 </div>
 
 <div id="coinHud" class="hidden"><span class="coinIcon"></span><span id="coinVal">0</span><span class="coinLbl"></span></div>
@@ -555,6 +555,15 @@
   <div class="rbtn gold" id="reviveCoins">CONTINUE  ◎200</div>
   <div class="rbtn" id="reviveAd">WATCH AD ▶ FREE REVIVE</div>
   <div class="rbtn giveup" id="reviveGiveup">GIVE UP</div>
+</div>
+
+<div class="overlay hidden" id="restartConfirm">
+  <div class="title" style="font-size:clamp(24px,7vw,40px)">RESTART?</div>
+  <div class="sub" style="margin-top:8px;opacity:.85;max-width:300px">This abandons your current run and starts over from Level&nbsp;1.</div>
+  <div class="obtnRow" style="margin-top:24px">
+    <div class="obtn gold" id="restartYes">RESTART</div>
+    <div class="obtn" id="restartNo">CANCEL</div>
+  </div>
 </div>
 
 <div class="hidden" id="adModal">
@@ -1195,7 +1204,11 @@ const Sound = {
   glory(){ [0,4,7,12,16,19,24].forEach((s,i)=> setTimeout(()=>this.blip(392*Math.pow(2,s/12),0.45,'triangle',0.17),i*95)); }, // big ascending fanfare
   coin(n=0){ this.blip(880*Math.pow(2,Math.min(n,8)/24), 0.10, 'square', 0.10, 1320); },
   heart(){ this.blip(70, 0.16, 'sine', 0.22, 45); },
-  buy(){ [0,7,12].forEach((s,i)=> setTimeout(()=>this.blip(523*Math.pow(2,s/12),0.2,'triangle',0.14),i*70)); }
+  buy(){ [0,7,12].forEach((s,i)=> setTimeout(()=>this.blip(523*Math.pow(2,s/12),0.2,'triangle',0.14),i*70)); },
+  treasure(){ // a bright "treasure chest opens" shimmer for golden blocks
+    [0,4,7,12,16].forEach((s,i)=> setTimeout(()=>this.blip(660*Math.pow(2,s/12),0.5,'sine',0.13),i*55));
+    setTimeout(()=>this.blip(1760,0.7,'triangle',0.07,2640),300);   // a high sparkle on top
+  }
 };
 
 // ---------- procedural background music: a calm Egyptian-flavoured loop that intensifies on the climb ----------
@@ -1364,7 +1377,8 @@ function spawnBlock(){
   if (!capstone && S.active && RND() < 0.15){
     S.active.bonus = true;
     if (mesh.material && mesh.material.color) mesh.material.color.setHex(0xffcf3a);
-    showPop('✦ GOLDEN BLOCK — NAIL IT');
+    if (mesh.material && mesh.material.emissive) mesh.material.emissive.setRGB(0.4, 0.28, 0.0);   // gold glow
+    showPop('✦ GOLDEN BLOCK — NAIL IT'); Sound.treasure();
   }
 }
 
@@ -1899,6 +1913,7 @@ function startRun(){
 
   // HUD swap
   $('lblA').textContent = 'HEIGHT'; $('lblB').textContent = 'CLIMB';
+  $('level').textContent = gameLevel;
   $('lives').style.display = 'none';
   $('meterLabel').textContent = 'SWIPE ←→ MOVE · ↑ JUMP · ↓ SLIDE · ↑↑/↓↓ ROLL';
   $('meterBar').style.display = 'none';
@@ -2318,7 +2333,9 @@ function applyShake(){
 
 // ---------- HUD / screens ----------
 function updateHUD(){
-  $('score').textContent = S.score; $('layer').textContent = gameLevel;   // right stat = current LEVEL during the build
+  $('score').textContent = S.score;
+  $('level').textContent = gameLevel;
+  $('layer').textContent = S.capstone ? 'CAP' : ((S.layer+1) + '/' + BASE_BLOCKS_PER_WALL);   // which course you're laying
   const integ = Math.max(0, S.integrity);
   $('meterFill').style.width = (integ*100)+'%';
   $('meterFill').style.background = integ>0.4 ? 'linear-gradient(90deg,#6fe3a0,#e8d35f)' : 'linear-gradient(90deg,#e8a35f,#e85f5f)';
@@ -2340,7 +2357,7 @@ function startGame(){
   atMenu = false;
   $('startScreen').classList.add('hidden'); $('overScreen').classList.add('hidden');
   $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden');
-  $('lblA').textContent='SCORE'; $('lblB').textContent='LEVEL';
+  $('lblA').textContent='SCORE'; $('lblB').textContent='LAYER';
   $('lives').style.display='none'; $('meterLabel').textContent='STRUCTURAL INTEGRITY'; $('meterBar').style.display='block';
   $('meterWrap').style.opacity='1';
   $('coinHud').classList.remove('hidden'); $('combo').classList.remove('show'); $('vignette').style.opacity='0';
@@ -2367,7 +2384,7 @@ function nextLevel(){
   [...scene.children].forEach(o => { if (o.__env || o===ground || o===sky) return; if (o.isMesh||o.isGroup) scene.remove(o); });
   S.phase = 'build';
   $('storm').style.opacity='0'; scene.fog.near=16; scene.fog.far=46; S.stormA=0;
-  $('lblA').textContent='SCORE'; $('lblB').textContent='LEVEL';
+  $('lblA').textContent='SCORE'; $('lblB').textContent='LAYER';
   $('lives').style.display='none'; $('meterLabel').textContent='STRUCTURAL INTEGRITY'; $('meterBar').style.display='block';
   $('meterWrap').style.opacity='1'; $('vignette').style.opacity='0';
   $('coinHud').classList.remove('hidden'); $('combo').classList.remove('show');
@@ -2383,7 +2400,7 @@ function beginBuild(){
   if (S.phase !== 'intro') return;
   $('introOverlay').classList.remove('show');
   S.phase = 'build';
-  $('lblA').textContent='SCORE'; $('lblB').textContent='LEVEL';
+  $('lblA').textContent='SCORE'; $('lblB').textContent='LAYER';
   $('lives').style.display='none'; $('meterLabel').textContent='STRUCTURAL INTEGRITY'; $('meterBar').style.display='block';
   $('meterWrap').style.opacity='1';
   $('coinHud').classList.remove('hidden');
@@ -2581,17 +2598,22 @@ btn('reviveGiveup',  giveUp);
 btn('menuBtn',       goMenu);
 btn('menuFromOver',  goMenu);
 btn('retryBtn',      ()=>startGame());
-btn('restartBtn',    ()=>startGame());   // in-game restart (back to level 1)
+btn('restartBtn',    showRestartConfirm);   // in-game restart → ask first
+btn('restartYes',    ()=>{ hideRestartConfirm(); startGame(); });
+btn('restartNo',     hideRestartConfirm);
 btn('climbBtn',      beginClimb);        // start the climb from the rating screen
 btn('introBtn',      beginBuild);        // start building from the between-level intro card
 btn('introOverlay',  beginBuild);        // …or tap anywhere on the card
 btn('nextLevelBtn',  nextLevel);         // advance after the victory celebration
 function goMenu(){ endRevivePrompt(); $('adModal').classList.add('hidden'); showStart(); }   // quit to main menu mid-game
+// restart confirmation — pause the game while the player decides
+function showRestartConfirm(){ if (atMenu || S.gameOver) return; S.paused = true; $('restartConfirm').classList.remove('hidden'); }
+function hideRestartConfirm(){ S.paused = false; $('restartConfirm').classList.add('hidden'); }
 
 window.addEventListener('pointerdown', e => {
   e.preventDefault(); primeAudio();
   if (atMenu){ return; }                                                   // menu uses its own buttons
-  if (S.gameOver) return;                                                  // over screen uses its RETRY / MAIN MENU buttons
+  if (S.gameOver || S.paused) return;                                      // over/confirm screens use their own buttons
   if (S.phase==='build'){ drop(); return; }
   if (S.phase==='run'){ gStart = { x:e.clientX, y:e.clientY }; }   // wait for swipe direction
 }, { passive:false });
@@ -2608,6 +2630,7 @@ window.addEventListener('keydown', e => {
   const k = e.code;
   if (k!=='Space' && k!=='ArrowUp' && k!=='ArrowDown' && k!=='ArrowLeft' && k!=='ArrowRight') return;
   e.preventDefault(); primeAudio();
+  if (S.paused) return;
   if (atMenu){ startGame(); return; }
   if (S.gameOver){ if (!$('overScreen').classList.contains('hidden')) startGame(); return; }
   if (S.phase==='intro'){ beginBuild(); return; }     // any key starts building the next pyramid
@@ -2632,7 +2655,7 @@ function animate(){
   S.timeScale = (S.timeScale||1) + (1 - (S.timeScale||1)) * Math.min(1, dt*3.5);
   const sdt = dt * (S.timeScale||1);
 
-  if (S.active && S.phase==='build'){
+  if (S.active && S.phase==='build' && !S.paused){
     const a = S.active;
     a.phase += a.speed*dt;
     if (a.mode==='keystone' || a.mode==='open'){
@@ -2655,7 +2678,12 @@ function animate(){
         if (near) S.keyGuide.material.color.setRGB(0.4,1.0,0.5); else S.keyGuide.material.color.setRGB(1.0,0.85,0.42);
         S.keyGuide.material.opacity = near ? 0.95 : 0.6;
       }
-      if (a.mesh.material && a.mesh.material.emissive) a.mesh.material.emissive.setRGB(0, near?0.28:0, near?0.08:0);
+      if (a.mesh.material && a.mesh.material.emissive){
+        if (near) a.mesh.material.emissive.setRGB(0, 0.28, 0.08);                 // green the instant it lines up
+        else if (a.bonus){ const gp = 0.55 + 0.45*Math.sin(performance.now()*0.006);
+          a.mesh.material.emissive.setRGB(0.45*gp, 0.3*gp, 0.0); }                // golden blocks keep a warm pulsing glow
+        else a.mesh.material.emissive.setRGB(0, 0, 0);
+      }
     }
   }
   for (let i=S.falling.length-1;i>=0;i--){ const f=S.falling[i];
@@ -2732,7 +2760,7 @@ function animate(){
     }
   });
 
-  if (S.phase==='run') updateRun(sdt);
+  if (S.phase==='run'){ if (!S.paused) updateRun(sdt); }
   else updateBuildCam(dt);
 
   if (composer) composer.render(); else renderer.render(scene, camera);
