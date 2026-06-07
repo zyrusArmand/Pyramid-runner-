@@ -98,11 +98,18 @@
     background:linear-gradient(to top, rgba(255,110,28,.92), rgba(220,50,14,.5) 36%, rgba(150,20,8,.15) 62%, transparent 80%); }
   #ratingFlames.show { display:block; animation:flameFlicker .15s ease-in-out infinite; }
   @keyframes flameFlicker { 0%{opacity:.72; transform:scaleY(1);} 50%{opacity:1; transform:scaleY(1.08);} 100%{opacity:.82; transform:scaleY(.97);} }
-  #ratingStars { font-size:clamp(36px,12vw,68px); letter-spacing:7px; z-index:1; text-shadow:0 2px 18px rgba(0,0,0,.7); }
-  #ratingPhrase { font-family:'Cinzel',serif; font-weight:700; font-size:clamp(20px,6vw,34px); letter-spacing:3px; z-index:1; text-shadow:0 2px 14px rgba(0,0,0,.8); }
-  #ratingSub { font-size:12px; letter-spacing:4px; opacity:.75; color:#f6e9d2; z-index:1; }
-  #ratingReward { font-size:13px; letter-spacing:2px; z-index:1; color:#ffe0a0; text-shadow:0 1px 8px rgba(0,0,0,.7); margin-top:2px; }
-  #climbBtn { position:absolute; bottom:max(40px,calc(env(safe-area-inset-bottom) + 26px)); z-index:1; pointer-events:auto; }
+  /* dark header / footer bands: cleanly cut the rays top & bottom and back the title + button */
+  #ratingHead { position:absolute; left:0; right:0; top:0; height:35vh; pointer-events:none;
+    background:linear-gradient(to bottom, rgba(10,6,16,.95) 0%, rgba(10,6,16,.78) 38%, rgba(10,6,16,.32) 72%, rgba(10,6,16,0) 100%); }
+  #ratingFoot { position:absolute; left:0; right:0; bottom:0; height:26vh; pointer-events:none;
+    background:linear-gradient(to top, rgba(10,6,16,.96) 0%, rgba(10,6,16,.8) 40%, rgba(10,6,16,.34) 74%, rgba(10,6,16,0) 100%); }
+  #ratingTop { position:absolute; top:0; left:0; right:0; z-index:1; display:flex; flex-direction:column; align-items:center; gap:7px;
+    padding-top:max(7vh, calc(env(safe-area-inset-top) + 30px)); pointer-events:none; text-align:center; }
+  #ratingStars { font-size:clamp(36px,12vw,68px); letter-spacing:7px; text-shadow:0 2px 18px rgba(0,0,0,.7); }
+  #ratingPhrase { font-family:'Cinzel',serif; font-weight:700; font-size:clamp(20px,6vw,34px); letter-spacing:3px; text-shadow:0 2px 14px rgba(0,0,0,.8); }
+  #ratingSub { font-size:12px; letter-spacing:4px; opacity:.75; color:#f6e9d2; }
+  #ratingReward { font-size:13px; letter-spacing:2px; color:#ffe0a0; text-shadow:0 1px 8px rgba(0,0,0,.7); margin-top:2px; }
+  #climbBtn { position:absolute; bottom:max(40px,calc(env(safe-area-inset-bottom) + 26px)); z-index:2; pointer-events:auto; }
   @keyframes ratePop { 0%{transform:scale(.55);opacity:0;} 45%{transform:scale(1.14);opacity:1;} 100%{transform:scale(1);opacity:1;} }
   #ratingOverlay.show #ratingStars, #ratingOverlay.show #ratingPhrase { animation:ratePop .55s ease-out; }
 
@@ -335,11 +342,15 @@
 <div id="ratingOverlay">
   <div id="ratingTint"></div>
   <div id="ratingRays"></div>
+  <div id="ratingHead"></div>
+  <div id="ratingFoot"></div>
   <div id="ratingFlames"></div>
-  <div id="ratingSub">PYRAMID COMPLETE</div>
-  <div id="ratingStars"></div>
-  <div id="ratingPhrase"></div>
-  <div id="ratingReward"></div>
+  <div id="ratingTop">
+    <div id="ratingSub">PYRAMID COMPLETE</div>
+    <div id="ratingStars"></div>
+    <div id="ratingPhrase"></div>
+    <div id="ratingReward"></div>
+  </div>
   <div class="cta hero" id="climbBtn">START CLIMB ▲</div>
 </div>
 <div id="pop">PERFECT</div>
@@ -1407,6 +1418,7 @@ function showRating(){
   // clear the in-game HUD so the rating screen is a clean cinematic beat over the pyramid
   $('hud').style.display='none'; $('coinHud').classList.add('hidden');
   $('menuBtn').style.display='none'; $('restartBtn').style.display='none'; $('combo').classList.remove('show');
+  $('meterWrap').style.opacity='0';   // hide the bottom swipe-hint so it doesn't sit under START CLIMB
   $('ratingOverlay').classList.add('show');
   if (stars<=2) ratingStorm(stars);     // bad → flame band + lightning + heavy shake + fire embers + thunder buzz
   else if (stars>=4) ratingSun(stars);  // good → sun rays + sun-burst flash + golden sparkles
@@ -1604,6 +1616,7 @@ function beginClimb(){
   // bring the run HUD back for the actual climb
   $('hud').style.display='flex'; $('coinHud').classList.remove('hidden');
   $('menuBtn').style.display='block'; $('restartBtn').style.display='block';
+  $('meterWrap').style.opacity='1';   // swipe hint returns at the bottom for the climb
   const gaps = r.tiles.some(t => t.gap);
   showPop(gaps ? 'JUMP THE GAPS!' : 'CLIMB!');
   if (firstTime){ showHint('TAP/↑ JUMP · ⟷ MOVE · ↓ SLIDE · DOUBLE ↑↓ ROLL', 5200); }
