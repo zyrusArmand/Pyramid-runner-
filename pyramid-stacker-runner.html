@@ -89,6 +89,15 @@
   #ratingTint.sun { animation:sunPulse 1.8s ease-in-out infinite; }
   @keyframes stormPulse { 0%,100%{opacity:.8;} 50%{opacity:1;} }
   @keyframes sunPulse { 0%,100%{opacity:.85;} 55%{opacity:1;} }
+  #ratingRays { position:absolute; left:50%; top:36%; width:170vmax; height:170vmax; transform:translate(-50%,-50%);
+    display:none; pointer-events:none; mix-blend-mode:screen; opacity:.55;
+    background:repeating-conic-gradient(from 0deg, rgba(255,222,130,.55) 0deg 5deg, transparent 5deg 15deg); }
+  #ratingRays.show { display:block; animation:raySpin 22s linear infinite; }
+  @keyframes raySpin { to { transform:translate(-50%,-50%) rotate(360deg); } }
+  #ratingFlames { position:absolute; left:0; right:0; bottom:0; height:42vh; display:none; pointer-events:none; mix-blend-mode:screen;
+    background:linear-gradient(to top, rgba(255,110,28,.92), rgba(220,50,14,.5) 36%, rgba(150,20,8,.15) 62%, transparent 80%); }
+  #ratingFlames.show { display:block; animation:flameFlicker .15s ease-in-out infinite; }
+  @keyframes flameFlicker { 0%{opacity:.72; transform:scaleY(1);} 50%{opacity:1; transform:scaleY(1.08);} 100%{opacity:.82; transform:scaleY(.97);} }
   #ratingStars { font-size:clamp(36px,12vw,68px); letter-spacing:7px; z-index:1; text-shadow:0 2px 18px rgba(0,0,0,.7); }
   #ratingPhrase { font-family:'Cinzel',serif; font-weight:700; font-size:clamp(20px,6vw,34px); letter-spacing:3px; z-index:1; text-shadow:0 2px 14px rgba(0,0,0,.8); }
   #ratingSub { font-size:12px; letter-spacing:4px; opacity:.75; color:#f6e9d2; z-index:1; }
@@ -267,6 +276,8 @@
 <div id="flash"></div>
 <div id="ratingOverlay">
   <div id="ratingTint"></div>
+  <div id="ratingRays"></div>
+  <div id="ratingFlames"></div>
   <div id="ratingSub">PYRAMID COMPLETE</div>
   <div id="ratingStars"></div>
   <div id="ratingPhrase"></div>
@@ -1148,9 +1159,10 @@ function showRating(){
   if (stars<=2)      { tint.style.background = 'radial-gradient(ellipse at 50% 55%, transparent 18%, rgba(150,18,8,.62) 95%)'; tint.classList.add('storm'); }
   else if (stars>=4) { tint.style.background = 'radial-gradient(ellipse at 50% 38%, rgba(255,210,90,.32) 0%, transparent 40%, rgba(55,30,0,.5) 95%)'; tint.classList.add('sun'); }
   else                 tint.style.background = 'radial-gradient(ellipse at 50% 50%, transparent 24%, rgba(15,10,18,.55) 92%)';
+  $('ratingRays').classList.remove('show'); $('ratingFlames').classList.remove('show');
   $('ratingOverlay').classList.add('show');
-  if (stars<=2) ratingStorm(stars);     // bad → lightning + heavy shake + rising fire embers
-  else if (stars>=4) ratingSun(stars);  // good → sun-burst flash + golden sparkles
+  if (stars<=2) ratingStorm(stars);     // bad → flame band + lightning + heavy shake + fire embers + thunder buzz
+  else if (stars>=4) ratingSun(stars);  // good → sun rays + sun-burst flash + golden sparkles
   else Sound.cap();
   // stays up — the player taps START CLIMB when ready (see beginClimb)
 }
@@ -1162,15 +1174,17 @@ function ratingBurst(color, count, up){
   }
 }
 function ratingStorm(stars){
-  Sound.fail();
-  const fires = stars===1 ? 4 : 3;
-  for (let k=0;k<6;k++) setTimeout(()=>{ flash(); shake(0.8); }, [0,140,260,520,640,1000][k]);   // irregular lightning + heavy shake
-  for (let k=0;k<fires;k++) setTimeout(()=> ratingBurst(0xff5418, 26, 3.2), k*260);               // rising fire embers
+  Sound.fail(); $('ratingFlames').classList.add('show');                    // a flickering flame band rises from the base
+  buzz([50,50,140,90,260,160]);                                            // thunder you can feel
+  const flashes = [0,140,260,520,640,1000,1300,1600];
+  flashes.forEach((t,k)=> setTimeout(()=>{ flash(); shake(0.85); if (k%2===0) buzz(120); }, t));   // irregular lightning + shake + rumble
+  const fires = stars===1 ? 7 : 5;
+  for (let k=0;k<fires;k++) setTimeout(()=> ratingBurst(0xff5418, 34, 3.4), k*230);                 // long stream of fire embers
 }
 function ratingSun(stars){
-  Sound.glory(); flash();
-  const bursts = stars===5 ? 4 : 2;
-  for (let k=0;k<bursts;k++) setTimeout(()=>{ ratingBurst(0xffe08a, 34, 3.4); if (k>0) flash(); }, k*220);  // golden sparkle showers
+  Sound.glory(); flash(); $('ratingRays').classList.add('show');           // golden rays fan out behind it
+  const showers = stars===5 ? 6 : 4;
+  for (let k=0;k<showers;k++) setTimeout(()=>{ ratingBurst(0xffe08a, 40, 3.6); if (k%2===1) flash(); }, k*240);  // golden sparkle showers
 }
 
 function advance(len){
