@@ -1336,6 +1336,9 @@ function showRating(){
   else if (stars>=4) { tint.style.background = 'radial-gradient(ellipse at 50% 38%, rgba(255,210,90,.32) 0%, transparent 40%, rgba(55,30,0,.5) 95%)'; tint.classList.add('sun'); }
   else                 tint.style.background = 'radial-gradient(ellipse at 50% 50%, transparent 24%, rgba(15,10,18,.55) 92%)';
   $('ratingRays').classList.remove('show'); $('ratingFlames').classList.remove('show');
+  // clear the in-game HUD so the rating screen is a clean cinematic beat over the pyramid
+  $('hud').style.display='none'; $('coinHud').classList.add('hidden');
+  $('menuBtn').style.display='none'; $('restartBtn').style.display='none'; $('combo').classList.remove('show');
   $('ratingOverlay').classList.add('show');
   if (stars<=2) ratingStorm(stars);     // bad → flame band + lightning + heavy shake + fire embers + thunder buzz
   else if (stars>=4) ratingSun(stars);  // good → sun rays + sun-burst flash + golden sparkles
@@ -1551,6 +1554,9 @@ function beginClimb(){
   const r = S.run; if (!r || !r.awaitStart) return;
   r.awaitStart = false;
   $('ratingOverlay').classList.remove('show');
+  // bring the run HUD back for the actual climb
+  $('hud').style.display='flex'; $('coinHud').classList.remove('hidden');
+  $('menuBtn').style.display='block'; $('restartBtn').style.display='block';
   const gaps = r.tiles.some(t => t.gap);
   showPop(gaps ? 'JUMP THE GAPS!' : 'CLIMB!');
   if (firstTime){ showHint('TAP/↑ JUMP · ⟷ MOVE · ↓ SLIDE · DOUBLE ↑↓ ROLL', 5200); }
