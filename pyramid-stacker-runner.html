@@ -89,8 +89,8 @@
   #ratingTint.sun { animation:sunPulse 1.8s ease-in-out infinite; }
   @keyframes stormPulse { 0%,100%{opacity:.8;} 50%{opacity:1;} }
   @keyframes sunPulse { 0%,100%{opacity:.85;} 55%{opacity:1;} }
-  #ratingRays { position:absolute; left:50%; top:36%; width:170vmax; height:170vmax; transform:translate(-50%,-50%);
-    display:none; pointer-events:none; mix-blend-mode:screen; opacity:.55;
+  #ratingRays { position:absolute; left:50%; top:36%; width:260vmax; height:260vmax; transform:translate(-50%,-50%);
+    display:none; pointer-events:none; mix-blend-mode:screen; opacity:.55; border-radius:50%;
     background:repeating-conic-gradient(from 0deg, rgba(255,222,130,.55) 0deg 5deg, transparent 5deg 15deg); }
   #ratingRays.show { display:block; animation:raySpin 22s linear infinite; }
   @keyframes raySpin { to { transform:translate(-50%,-50%) rotate(360deg); } }
