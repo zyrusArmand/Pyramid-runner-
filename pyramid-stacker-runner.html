@@ -795,11 +795,14 @@ let firstTime = !Store.get('tut', 0);             // show the onboarding hints o
 // To turn the leaderboard from local-only into a shared global board, paste your project's values below.
 // Find them in Supabase → Project Settings → API:  "Project URL"  and the public "anon" key (safe in a static page).
 // One-time table setup (run in Supabase → SQL editor):
-//   create table public.scores (id bigint generated always as identity primary key,
+//   create table if not exists public.scores (id bigint generated always as identity primary key,
 //     name text not null, score integer not null, level integer, height real, created_at timestamptz default now());
+//   grant select, insert on table public.scores to anon, authenticated;     -- the public roles must be allowed to read+write
 //   alter table public.scores enable row level security;
-//   create policy "read"   on public.scores for select using (true);
-//   create policy "insert" on public.scores for insert with check (char_length(name) between 1 and 12 and score >= 0 and score < 100000000);
+//   drop policy if exists "public read" on public.scores;
+//   create policy "public read" on public.scores for select using (true);
+//   drop policy if exists "public insert" on public.scores;
+//   create policy "public insert" on public.scores for insert with check (true);
 const SUPABASE_URL  = 'https://eledsvekpphdvhvsqneu.supabase.co';
 const SUPABASE_ANON = 'sb_publishable_KVhLKKac6j9wmVvPts6OcA_QbfIiSVz';   // public browser-safe key (safe to ship)
 const RemoteBoard = {
@@ -812,12 +815,13 @@ const RemoteBoard = {
   },
   async submit(entry){
     if (!this.enabled()) return false;
+    this.lastError = '';
     try {
       const r = await this._fetch('/rest/v1/scores', { method:'POST',
         headers:this._h({ 'Content-Type':'application/json', Prefer:'return=minimal' }), body:JSON.stringify(entry) });
-      if (!r.ok){ try { console.warn('leaderboard submit failed', r.status, await r.text()); } catch(e){} }
+      if (!r.ok){ let t=''; try { t = await r.text(); } catch(e){} this.lastError = 'HTTP ' + r.status + (t ? ' — ' + t.slice(0,90) : ''); console.warn('leaderboard submit failed', this.lastError); }
       return r.ok;
-    } catch(e){ console.warn('leaderboard submit error', e); return false; }
+    } catch(e){ this.lastError = (e && e.name==='AbortError') ? 'timed out' : 'network blocked'; console.warn('leaderboard submit error', e); return false; }
   },
   async top(n){
     if (!this.enabled()) return null;
@@ -3229,8 +3233,8 @@ function endGame(won, how){
     }
     const nm = playerName || 'ANON';
     if (bEl) bEl.textContent = '⏳ posting to leaderboard…';
-    RemoteBoard.submit({ name: nm, score: S.score, level: gameLevel, height: Math.round((S.peakY||0)*10)/10 })
-      .then(ok => { if (bEl) bEl.textContent = ok ? ('🏆 posted to GLOBAL leaderboard as ' + nm) : '⚠️ couldn’t reach the leaderboard'; });
+    RemoteBoard.submit({ name: nm.slice(0,12), score: Math.max(0, Math.round(S.score||0)), level: Math.round(gameLevel)||1, height: Math.round((S.peakY||0)*10)/10 })
+      .then(ok => { if (bEl) bEl.textContent = ok ? ('🏆 posted to GLOBAL leaderboard as ' + nm) : ('⚠️ leaderboard: ' + (RemoteBoard.lastError || 'no connection')); });
   }
   if (firstTime){ firstTime = false; Store.set('tut', 1); }   // onboarding only on the first game
   setTimeout(()=>{
