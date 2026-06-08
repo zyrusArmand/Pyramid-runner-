@@ -370,6 +370,7 @@
   /* shop action bar: act on the item you're PREVIEWING (clicking a grid item only views it) */
   #shopActions { display:flex; flex-direction:column; align-items:center; gap:9px; }
   #shopItemName { font-family:'Cinzel',serif; font-weight:700; font-size:18px; letter-spacing:2px; color:#f3d99a; }
+  #shopItemPerk { font-size:11px; letter-spacing:0.5px; color:#8fe3c4; margin-top:3px; min-height:14px; font-weight:600; }
   #shopBtnRow { display:flex; gap:12px; justify-content:center; }
   .sbtn { pointer-events:auto; cursor:pointer; font-family:'Space Mono',monospace; font-weight:700; font-size:13px;
     letter-spacing:2px; padding:11px 26px; border-radius:30px; border:1.5px solid rgba(243,200,120,.5);
@@ -656,6 +657,7 @@
   <div id="charStage"><canvas id="charPreviewCanvas"></canvas></div>
   <div id="shopActions">
     <div id="shopItemName">EXPLORER</div>
+    <div id="shopItemPerk"></div>
     <div id="shopBtnRow">
       <div class="sbtn buy" id="shopBuyBtn">PURCHASE</div>
       <div class="sbtn equip" id="shopEquipBtn">EQUIP</div>
@@ -986,6 +988,44 @@ function charStatus(key){
     if (it.tier===3 && maxLevel < it.unlock) return 'lock-boss';
   }
   return 'buy';
+}
+// ---- character perks (FAIR: coins + survivability only, never score) ----
+// each era boss gets one signature ability; mid-tiers get a small starting edge
+const BOSS_ABILITY = {
+  egypt:  { freeSaves:1,    text:'Soul of Anubis — revive once per run' },
+  aztec:  { startMagnet:1,  text:'Feathered Serpent — start each climb with the magnet' },
+  greek:  { shieldCharges:2,text:'Wrath of Ares — begin every climb with 2 shields' },
+  norse:  { freeSaves:1,    text:'Berserker Rage — shrug off one fatal hit per run' },
+  nippon: { shieldCharges:2,text:'Oni Fury — begin every climb with 2 shields' },
+  alien:  { startMagnet:1,  text:'Hive Mind — start each climb with the magnet' },
+  cosmos: { startSlow:1,    text:'Time Dilation — begin every climb in slow-motion' },
+  heaven: { freeSaves:1,    text:'Divine Grace — revive once per run' },
+};
+function charPerks(key){
+  const it = CHARACTERS[key] || {};
+  const tier = (typeof it.tier === 'number') ? it.tier : 0;
+  const p = { coinMul: 1 + [0.12,0.20,0.32,0.45][tier],
+              shieldCharges: tier>=1 ? 1 : 0,
+              freeSaves: 0, startMagnet: 0, startSlow: 0 };
+  if (tier===3 && it.era && BOSS_ABILITY[it.era]){
+    const b = BOSS_ABILITY[it.era];
+    if (b.freeSaves)     p.freeSaves     += b.freeSaves;
+    if (b.startMagnet)   p.startMagnet    = 1;
+    if (b.startSlow)     p.startSlow      = 1;
+    if (b.shieldCharges) p.shieldCharges  = Math.max(p.shieldCharges, b.shieldCharges);
+  }
+  return p;
+}
+function perkText(key){
+  const it = CHARACTERS[key]; if (!it) return '';
+  const p = charPerks(key); const lines = [];
+  const bonus = Math.round((p.coinMul-1)*100);
+  if (bonus>0) lines.push('+'+bonus+'% '+COIN_NAME);
+  if (it.tier===3 && it.era && BOSS_ABILITY[it.era]) lines.push(BOSS_ABILITY[it.era].text);
+  else {
+    if (p.shieldCharges>0) lines.push('Start with a free shield');
+  }
+  return lines.join(' · ');
 }
 let ownedStones = Store.get('ownedStones', ['sand']);
 let curStone    = Store.get('stone', 'sand');
@@ -2736,12 +2776,15 @@ function startRun(){
     new THREE.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:0.32 }));
   sh.rotation.x = -Math.PI/2; scene.add(sh); S.shadow = sh;
 
+  const perks = charPerks(curChar);                     // FAIR perks: coins + survivability only
   S.run = { tiles, idx:0, t:0, speed:4.0, jumping:false, jumpT:0, jumpDur:0.42, jumpH:0.42,
             falling:false, fallV:0, yOff:0, startDelay:0.6, awaitStart:true,
             lane:0, laneX:0, sliding:false, slideT:0, slideDur:0.5,
             rolling:false, rollT:0, rollDur:0.5, rollDir:1, rollCD:0,
             magnet:0, shield:0, slow:0, bubble:null, hazardMul, dressed:false,
             gMult:1, gMultT:0, gMultMax:1,                      // golden-block score multiplier (+ peak reached this run)
+            perkShield: perks.shieldCharges, perkMagnet: perks.startMagnet, perkSlow: perks.startSlow,
+            freeSaves: perks.freeSaves, coinMul: perks.coinMul,
             storms, revives:0, usedAdRevive:false, invuln:0, dead:false, deathReason:'fell' };
   // NB: obstacles / coins / power-ups / lane guides are NOT created yet — only when the climb starts
   // (loadRunDressing in beginClimb), so the rating screen shows a clean pyramid with nothing moving on it.
@@ -2791,6 +2834,10 @@ function startClimbNow(){
   $('hud').style.display='flex'; $('coinHud').classList.remove('hidden'); setLevelName(true);
   $('menuBtn').style.display='block'; $('restartBtn').style.display='block';
   $('meterWrap').style.opacity='0';   // keep the bottom of the screen clean during the climb
+  // apply character start-of-climb perks (survivability only — never score)
+  if (r.perkShield > 0){ r.shield = r.perkShield; addShieldBubble(r); }
+  if (r.perkMagnet){ r.magnet = 9999; }
+  if (r.perkSlow){ r.slow = Math.max(r.slow, 6.5); }
   const gaps = r.tiles.some(t => t.gap);
   showPop(gaps ? 'JUMP THE GAPS!' : 'CLIMB!');
 }
@@ -3048,8 +3095,14 @@ function reviveCost(){ return 200 * (((S.run && S.run.revives) || 0) + 1); }
 function die(reason){
   const r = S.run; if (!r || r.dead || r.falling) return;
   if (r.shield > 0){                                    // a shield soaks one lethal hit, then pops
-    r.shield = 0; removeShieldBubble(r); r.invuln = Math.max(r.invuln, 1.0);
-    Sound.land(); shake(0.35); sparkle(S.runner.position.clone()); showPop('SHIELD!');
+    r.shield -= 1; if (r.shield <= 0) removeShieldBubble(r);
+    r.invuln = Math.max(r.invuln, 1.0);
+    Sound.land(); shake(0.35); sparkle(S.runner.position.clone()); showPop(r.shield>0 ? 'SHIELD!' : 'SHIELD!');
+    return;
+  }
+  if (r.freeSaves > 0){                                 // boss signature: shrug off one fatal hit / revive for free
+    r.freeSaves -= 1; r.invuln = Math.max(r.invuln, 1.2);
+    Sound.land(); shake(0.45); sparkle(S.runner.position.clone()); showPop('SECOND WIND!');
     return;
   }
   r.dead = true; r.deathReason = reason;
@@ -3167,13 +3220,14 @@ function collectCoin(t, r, force){
   t.coin.got = true;
   const bonus = Math.round((t.coin.air ? 2 : 1) * (S.climbCoinMul || 1));   // airborne grabs pay double; better builds pay more
   const gm = (r && r.gMult) || 1;                                           // golden-block multiplier boosts coin SCORE
-  S.coins += bonus; S.score += 50 * bonus * gm;
-  bank += bonus; Store.set('coins', bank);    // bank instantly so coins persist even if you quit mid-run
+  const coinGain = Math.max(1, Math.round(bonus * ((r && r.coinMul) || 1)));// character perk boosts DEBEN only (never score)
+  S.coins += coinGain; S.score += 50 * bonus * gm;
+  bank += coinGain; Store.set('coins', bank);    // bank instantly so coins persist even if you quit mid-run
   missionEvent('runCoins', S.coins);          // goal: coins in one run
   Sound.coin(S.coins);
   sparkle(t.coin.mesh.position.clone());
   scene.remove(t.coin.mesh);
-  updateCoinHud(true); coinPop(bonus);
+  updateCoinHud(true); coinPop(coinGain);
 }
 function updateCoinHud(pulse){
   const h = $('coinHud'); $('coinVal').textContent = bank;   // show total coins you own (persists, grows live)
@@ -3190,7 +3244,8 @@ function collectGold(t, r){
   r.gMultMax = Math.max(r.gMultMax||1, r.gMult);                            // remember the run's best chain for the summary
   r.gMultT = 6.5;                                                           // refresh the chain window
   S.score += 120 * r.gMult;
-  S.coins += r.gMult; bank += r.gMult; Store.set('coins', bank);
+  const goldGain = Math.max(1, Math.round(r.gMult * ((r.coinMul) || 1)));   // perk boosts DEBEN only
+  S.coins += goldGain; bank += goldGain; Store.set('coins', bank);
   updateCoinHud(true); updateMultHud();
   showPop('✦ GOLD ×' + r.gMult);
 }
@@ -3576,6 +3631,7 @@ function renderShop(){
   // action bar for the previewed item
   const it = set[sel], st = isChar ? charStatus(sel) : (own.includes(sel) ? (sel===equipped?'worn':'owned') : (it.account?'account':'buy'));
   $('shopItemName').textContent = it.name + (isChar && it.tier!=null ? ' · ' + TIER_LABEL[it.tier] : '');
+  { const pe = $('shopItemPerk'); if (pe) pe.textContent = isChar ? perkText(sel) : ''; }
   const buyBtn = $('shopBuyBtn'), eqBtn = $('shopEquipBtn');
   if (st==='worn' || st==='owned'){
     buyBtn.style.display = 'none'; eqBtn.style.display = '';
