@@ -434,8 +434,6 @@
     border-radius:8px; color:#ffe6b0; font-family:'Space Mono',monospace; font-size:11px; letter-spacing:2px; font-weight:700;
     padding:8px 12px; cursor:pointer; }
   #lbName button:active { transform:scale(.95); }
-  #lbDiag { font-family:'Space Mono',monospace; font-size:11px; line-height:1.4; letter-spacing:.5px; color:#ffce8a;
-    max-width:min(360px,90vw); text-align:center; margin-top:8px; min-height:14px; word-break:break-word; }
   /* create-account panel */
   .acctIntro { font-family:'Space Mono',monospace; font-size:13px; line-height:1.5; color:#f3e6cf; opacity:.92;
     max-width:min(380px,86vw); text-align:center; }
@@ -633,8 +631,6 @@
   </div>
   <div id="lbName">YOUR NAME <input id="nameInput" maxlength="12" placeholder="SET HANDLE" autocomplete="off" spellcheck="false" enterkeyhint="done" /><button id="nameSave">SAVE</button></div>
   <div id="lb"></div>
-  <div id="lbDiag"></div>
-  <div class="midBtn" id="lbTestBtn" style="margin-top:6px">🛠 TEST CONNECTION</div>
   <div class="backBtn" id="leaderBack">◀ BACK</div>
 </div>
 
@@ -3261,19 +3257,7 @@ function renderLeader(){
   const nameWrap = $('lbName'), nameInput = $('nameInput');
   // only prompt for a handle here until one is set; afterwards it's tucked away (change it in Settings)
   if (nameWrap){ nameWrap.style.display = (RemoteBoard.enabled() && !playerName) ? 'flex' : 'none'; if (nameInput) nameInput.value = playerName || ''; }
-  const tb = $('lbTestBtn'), dg = $('lbDiag');
-  if (tb) tb.style.display = RemoteBoard.enabled() ? 'flex' : 'none';
-  if (dg){ const lp = Store.get('lastPost', null);
-    dg.textContent = lp ? ('last run post → ' + lp.status + (lp.extra ? ' — ' + lp.extra : '') + '  [' + lp.name + ' · ' + (lp.score||0).toLocaleString() + (lp.daily ? ' · DAILY' : '') + ']') : ''; }
   renderLeaderboard();
-}
-// one-tap diagnostic: post a test row and show the EXACT server result so a failure is readable
-async function testLeaderboard(){
-  const dg = $('lbDiag'); if (!dg) return;
-  dg.textContent = '⏳ testing connection…';
-  const ok = await RemoteBoard.submit({ name:'TESTPOST', score: Math.floor(Math.random()*9000)+100, level:1, height:0.1 });
-  dg.textContent = ok ? '✅ POSTED OK — the leaderboard works! Reopening…' : ('❌ ' + (RemoteBoard.lastError || 'no connection'));
-  if (ok) setTimeout(renderLeaderboard, 400);
 }
 function renderShop(){
   $('shopCoins').textContent = bank;
@@ -3426,7 +3410,6 @@ btn('homeHelp',      showHow);
 btn('howClose',      closeHow);
 btn('coinsChip',     ()=>showShop());
 btn('leaderBack',    backHome);
-btn('lbTestBtn',     testLeaderboard);
 btn('shopBack',      backHome);
 btn('goalsBack',     backHome);
 btn('settingsBack',  backHome);
