@@ -319,7 +319,7 @@
   .loadTxt { font-family:'Space Mono',monospace; font-size:12px; letter-spacing:5px; color:#e8c98a; opacity:.8; }
 
   /* ---------- leaderboard / shop panels ---------- */
-  .panel { justify-content:flex-start; padding-top:max(46px,calc(env(safe-area-inset-top) + 30px)); gap:16px;
+  .panel { justify-content:flex-start; padding-top:max(74px,calc(env(safe-area-inset-top) + 58px)); gap:16px;
     background:radial-gradient(ellipse at 50% 28%, rgba(28,18,38,1), rgba(7,4,11,1)); }   /* fully opaque — no bleed-through */
   .panelTitle { font-family:'Cinzel',serif; font-weight:700; font-size:clamp(24px,7vw,38px); color:#f3d99a;
     letter-spacing:3px; text-shadow:0 0 22px rgba(243,200,120,.4); }
@@ -386,6 +386,10 @@
   #lbName input { flex:1; background:rgba(255,255,255,.06); border:1px solid rgba(243,200,120,.3); border-radius:8px;
     color:#ffe9b8; font-family:'Space Mono',monospace; font-size:13px; letter-spacing:2px; padding:7px 10px; text-transform:uppercase; outline:none; }
   #lbName input:focus { border-color:#f3c878; }
+  #lbName button { pointer-events:auto; flex:0 0 auto; background:rgba(243,200,120,.16); border:1px solid #f3c878;
+    border-radius:8px; color:#ffe6b0; font-family:'Space Mono',monospace; font-size:11px; letter-spacing:2px; font-weight:700;
+    padding:8px 12px; cursor:pointer; }
+  #lbName button:active { transform:scale(.95); }
 
   /* over-screen action buttons (share / double coins) */
   .obtnRow { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-top:18px; }
@@ -537,7 +541,7 @@
     <div class="lbStat"><div class="lbStatV" id="lbStreak">0</div><div class="lbStatL">BEST STREAK</div></div>
     <div class="lbStat"><div class="lbStatV" id="lbMaxLvl">1</div><div class="lbStatL">MAX LEVEL</div></div>
   </div>
-  <div id="lbName">YOUR NAME <input id="nameInput" maxlength="12" placeholder="SET HANDLE" autocomplete="off" spellcheck="false" /></div>
+  <div id="lbName">YOUR NAME <input id="nameInput" maxlength="12" placeholder="SET HANDLE" autocomplete="off" spellcheck="false" enterkeyhint="done" /><button id="nameSave">SAVE</button></div>
   <div id="lb"></div>
   <div class="backBtn" id="leaderBack">◀ BACK</div>
 </div>
@@ -594,6 +598,7 @@
   <div class="bigscore" id="finalScore">0</div>
   <div class="gostat" id="finalStat"></div>
   <div class="gostat" id="finalReward" style="margin-top:14px;color:#ffe08a"></div>
+  <div class="gostat" id="finalBoard" style="margin-top:6px;font-size:12px;opacity:.85"></div>
   <div class="cta hero" id="retryBtn" style="pointer-events:auto;margin-top:22px">RETRY</div>
   <div class="obtnRow">
     <div class="obtn gold" id="dblBtn">2× DEBEN ▶</div>
@@ -700,20 +705,27 @@ const SUPABASE_ANON = 'sb_publishable_KVhLKKac6j9wmVvPts6OcA_QbfIiSVz';   // pub
 const RemoteBoard = {
   enabled(){ return !!(SUPABASE_URL && SUPABASE_ANON); },
   _h(extra){ return Object.assign({ apikey:SUPABASE_ANON, Authorization:'Bearer '+SUPABASE_ANON }, extra||{}); },
+  _fetch(path, opts){                                   // fetch with an 8s timeout so the UI never hangs on "loading…"
+    const c = (typeof AbortController!=='undefined') ? new AbortController() : null;
+    const t = c ? setTimeout(()=>c.abort(), 8000) : 0;
+    return fetch(SUPABASE_URL + path, Object.assign({ signal: c ? c.signal : undefined }, opts)).finally(()=>{ if (t) clearTimeout(t); });
+  },
   async submit(entry){
     if (!this.enabled()) return false;
     try {
-      const r = await fetch(SUPABASE_URL+'/rest/v1/scores', { method:'POST',
+      const r = await this._fetch('/rest/v1/scores', { method:'POST',
         headers:this._h({ 'Content-Type':'application/json', Prefer:'return=minimal' }), body:JSON.stringify(entry) });
+      if (!r.ok){ try { console.warn('leaderboard submit failed', r.status, await r.text()); } catch(e){} }
       return r.ok;
-    } catch(e){ return false; }
+    } catch(e){ console.warn('leaderboard submit error', e); return false; }
   },
   async top(n){
     if (!this.enabled()) return null;
     try {
-      const r = await fetch(SUPABASE_URL+'/rest/v1/scores?select=name,score,level&order=score.desc&limit='+(n||20), { headers:this._h() });
-      return r.ok ? await r.json() : null;
-    } catch(e){ return null; }
+      const r = await this._fetch('/rest/v1/scores?select=name,score,level&order=score.desc&limit='+(n||20), { headers:this._h() });
+      if (!r.ok){ try { console.warn('leaderboard read failed', r.status, await r.text()); } catch(e){} return null; }
+      return await r.json();
+    } catch(e){ console.warn('leaderboard read error', e); return null; }
   }
 };
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -1847,12 +1859,11 @@ function climbPath(){
     });
     return { cx, H, y, slot };
   }
-  // STRAIGHT climb up the FRONT FACE's centre column. Because each course insets half a block, gridPos puts every
-  // front-wall layer's centre at x = -BLOCK_SIZE/2 (NOT 0 — the capstone/ring axis sits at 0, half a block to the side).
-  // Climbing at -0.5 keeps the path glued to the actual placed stones the whole way up (a stone sits exactly there on
-  // odd courses, a mortar seam on even ones); the capstone steps then ease across to the capstone's true x at the peak.
+  // DEAD-STRAIGHT climb up the pyramid's centre axis (x = 0) to the capstone. The capstone sits at x=0, so a straight
+  // line leads right to the peak with NO sideways jog at the top (climbing the front-face column at -0.5 instead would
+  // hug the stones but then have to veer half a block onto the capstone — that veer read as a "twist").
   const fis = []; for (let L=0; L<=maxL; L++) fis.push(frontInfo(L));
-  const climbX = -BLOCK_SIZE/2;
+  const climbX = 0;
   for (let L=0; L<=maxL; L++){
     const fi = fis[L], placed = fi.slot ? fi.slot.placed : false;
     const weak = fi.slot ? !!fi.slot.weak : false, mesh = fi.slot ? fi.slot.mesh : null;
@@ -2422,17 +2433,17 @@ function placeShadow(g, r){
 // a soft circular pillar of light rising from the conquered peak (where the climber stands) up into the sky
 function victoryBeam(pos){
   removeVictoryBeam();
-  const H = 42, R = 0.42, grp = new THREE.Group();
+  const H = 42, R = 0.16, grp = new THREE.Group();   // a SLIM pillar — only a touch wider than the tiny climber
   const tube = (rad, op, col) => {
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(rad*0.55, rad, H, 26, 1, true),
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(rad*0.6, rad, H, 26, 1, true),
       new THREE.MeshBasicMaterial({ color:col, transparent:true, opacity:op, side:THREE.DoubleSide, depthWrite:false, blending:THREE.AdditiveBlending }));
     m.position.y = H/2; grp.add(m); return m;
   };
   tube(R*1.5, 0.10, 0xffd98a);          // soft outer halo
   tube(R,     0.22, 0xfff0c4);          // bright inner core
-  const disc = new THREE.Mesh(new THREE.CircleGeometry(R*1.7, 30),
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(R*1.25, 28),   // a small footprint glow, just around the feet
     new THREE.MeshBasicMaterial({ color:0xfff2cc, transparent:true, opacity:0.34, depthWrite:false, blending:THREE.AdditiveBlending }));
-  disc.rotation.x = -Math.PI/2; disc.position.y = 0.03; grp.add(disc);   // glowing footprint where the climber stands
+  disc.rotation.x = -Math.PI/2; disc.position.y = 0.03; grp.add(disc);
   grp.position.set(pos.x, pos.y, pos.z);
   scene.add(grp); S.beam = grp; S.beamT = 0;
 }
@@ -2898,13 +2909,18 @@ function endGame(won, how){
   if (peak > (bestHeight||0)){ bestHeight = peak; Store.set('height', bestHeight); }
   if (dailyMode){ const k='daily_'+todayKey(); if (S.score > Store.get(k,0)) Store.set(k, S.score); }
   recordScore({ score:S.score, daily:dailyMode, date:Date.now() });
-  // push the run to the shared global board (no-op until Supabase is configured). Ask for a name once, the first time.
+  // push the run to the shared global board, and report whether it landed (so a missing name / offline is obvious)
+  const bEl = $('finalBoard'); if (bEl) bEl.textContent = '';
+  if (RemoteBoard.enabled() && dailyMode && bEl) bEl.textContent = '◈ daily runs aren’t posted to the global board';
   if (RemoteBoard.enabled() && !dailyMode && S.score > 0){
     if (!playerName){
       let nm = ''; try { nm = sanitizeName(window.prompt && window.prompt('Enter a name for the GLOBAL leaderboard (max 12):','')); } catch(e){}
       if (nm){ playerName = nm; Store.set('name', playerName); }
     }
-    RemoteBoard.submit({ name: playerName || 'ANON', score: S.score, level: gameLevel, height: Math.round((S.peakY||0)*10)/10 });
+    const nm = playerName || 'ANON';
+    if (bEl) bEl.textContent = '⏳ posting to leaderboard…';
+    RemoteBoard.submit({ name: nm, score: S.score, level: gameLevel, height: Math.round((S.peakY||0)*10)/10 })
+      .then(ok => { if (bEl) bEl.textContent = ok ? ('🏆 posted to GLOBAL leaderboard as ' + nm) : '⚠️ couldn’t reach the leaderboard'; });
   }
   if (firstTime){ firstTime = false; Store.set('tut', 1); }   // onboarding only on the first game
   setTimeout(()=>{
@@ -2960,11 +2976,16 @@ btn('reviveAd',      reviveWithAd);
 btn('reviveGiveup',  giveUp);
 btn('menuBtn',       goMenu);
 btn('menuFromOver',  goMenu);
-// leaderboard handle: persist whatever the player types as their global name
-(function(){ const ni = $('nameInput'); if (ni && ni.addEventListener){
-  const save = () => { playerName = sanitizeName(ni.value); Store.set('name', playerName); ni.value = playerName; };
-  ni.addEventListener('change', save); ni.addEventListener('blur', save);
-}})();
+// leaderboard handle: keep playerName live as they type, and commit (tidy + confirm) on SAVE / Enter / blur
+(function(){ const ni = $('nameInput'), sv = $('nameSave'); if (!ni || !ni.addEventListener) return;
+  const live   = () => { playerName = sanitizeName(ni.value); Store.set('name', playerName); };
+  const commit = () => { live(); ni.value = playerName; if (ni.blur) ni.blur(); if (playerName) showPop('NAME SAVED'); };
+  ni.addEventListener('input', live);
+  ni.addEventListener('change', commit);
+  ni.addEventListener('blur', live);
+  ni.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); commit(); } });
+  if (sv) sv.addEventListener('click', commit);
+})();
 btn('retryBtn',      ()=>startGame());
 btn('restartBtn',    showRestartConfirm);   // in-game restart → ask first
 btn('restartYes',    ()=>{ hideRestartConfirm(); startGame(); });
