@@ -369,6 +369,17 @@
   .midBtn.circBtn { width:44px; height:44px; padding:0; gap:0; border-radius:50%; justify-content:center; flex:0 0 auto; }
   .midBtn.circBtn .bicon { width:20px; height:20px; }
   .bicon { width:15px; height:15px; }
+
+  /* JOURNEY MAP — full-bleed 3D bird's-eye of the eras */
+  #mapPanel { padding:0; background:#06040c; }
+  #mapCanvas { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+  #mapHud { position:fixed; top:max(58px,calc(env(safe-area-inset-top) + 44px)); left:0; right:0; z-index:2;
+    pointer-events:none; text-align:center; color:#f6e9d2; }
+  #mapTitle { font-family:'Cinzel',serif; font-weight:700; font-size:clamp(20px,6vw,30px); letter-spacing:3px;
+    color:#f3d99a; text-shadow:0 0 22px rgba(243,200,120,.45); }
+  #mapEraName { font-family:'Cinzel',serif; font-weight:700; font-size:15px; letter-spacing:2px; margin-top:10px;
+    color:#ffe9b8; text-shadow:0 2px 10px rgba(0,0,0,.7); }
+  #mapEraSub { font-family:'Space Mono',monospace; font-size:10px; letter-spacing:3px; opacity:.7; margin-top:3px; }
   #homePlay { pointer-events:auto; cursor:pointer; margin-top:4px; }
   .cta.hero { border:none; color:#3a2410; font-weight:700; padding:12px 36px; font-size:15px; letter-spacing:3px; white-space:nowrap;
     background:linear-gradient(180deg,#ffe79a,#e2a93f); border-radius:30px; animation:heroGlow 2.2s ease-in-out infinite; }
@@ -630,14 +641,14 @@
     <div class="tagline">BUILD&nbsp;IT&nbsp;·&nbsp;CLIMB&nbsp;IT</div>
     <div class="chips">
       <div class="chip"><span class="chipLbl">BEST</span><span class="chipVal" id="bestScore">0</span></div>
-      <div class="chip"><span class="chipLbl">CLIMB</span><span class="chipVal" id="bestHeight">0m</span></div>
-      <div class="chip chipTap" id="coinsChip"><span class="chipLbl">COINS</span><span class="chipVal" id="bankCoins">0</span></div>
+      <div class="chip chipTap" id="coinsChip"><span class="chipLbl coinLbl">COINS</span><span class="chipVal" id="bankCoins">0</span></div>
     </div>
     <div class="cta hero" id="homePlay">PLAY</div>
     <div class="homeRow">
       <div class="midBtn" id="homeLeader"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4a5 5 0 0 1-10 0V4z"/><path d="M7 6H4v1.5A3.5 3.5 0 0 0 7.5 11"/><path d="M17 6h3v1.5A3.5 3.5 0 0 1 16.5 11"/><path d="M9.5 18h5"/><path d="M12 14.5V18"/></svg>LEADERBOARD</div>
       <div class="midBtn" id="homeShop"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12l-1 11H7L6 8z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg>SHOP</div>
-      <div class="midBtn circBtn" id="homeGoalsBtn" title="Daily Goals"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/></svg></div>
+      <div class="midBtn circBtn" id="homeMapBtn" title="Journey Map"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4z"/><path d="M9 4v13"/><path d="M15 6.5v13"/></svg></div>
+      <div class="midBtn circBtn" id="homeGoalsBtn" title="Daily Goals"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18"/><path d="M8 2.5v4"/><path d="M16 2.5v4"/><path d="M8.5 14.5l2.2 2.2 4.3-4.3"/></svg></div>
     </div>
   </div>
 </div>
@@ -719,6 +730,16 @@
   <div class="goalsHd">ACHIEVEMENTS <span id="achCount"></span></div>
   <div id="achList"></div>
   <div class="backBtn" id="goalsBack">◀ BACK</div>
+</div>
+
+<div class="overlay hidden" id="mapPanel">
+  <canvas id="mapCanvas"></canvas>
+  <div id="mapHud">
+    <div id="mapTitle">JOURNEY MAP</div>
+    <div id="mapEraName">EGYPT</div>
+    <div id="mapEraSub">LEVEL 1</div>
+  </div>
+  <div class="backBtn" id="mapBack">◀ BACK</div>
 </div>
 
 <div class="overlay hidden panel" id="settingsPanel">
@@ -1083,7 +1104,7 @@ let curChar     = Store.get('char', 'explorer');
 grantEraChars();                                  // give the player every peasant for eras they've already reached
 let selChar     = curChar, selStone = curStone;   // shop PREVIEW selection (what you're viewing, not necessarily worn)
 const COIN_NAME = 'DEBEN';                          // what the in-game currency is called (change this one word to rename the labels)
-try { document.querySelectorAll('.coinLbl, .chipLbl').forEach(e => e.textContent = COIN_NAME); } catch(e){}
+try { document.querySelectorAll('.coinLbl').forEach(e => e.textContent = COIN_NAME); } catch(e){}
 
 // ---------- ACHIEVEMENTS: one-time lifetime milestones (paid out in DEBEN, never affect score) ----------
 let records    = Store.get('records', {});         // lifetime bests: bestStars, bestStreak, bestGold, guardians
@@ -3605,6 +3626,7 @@ function showStart(){            // the main "home" menu (cover art + PLAY / LEA
   S.phase = null; S.gameOver = false;
   $('overScreen').classList.add('hidden');
   $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden'); $('profilePanel').classList.add('hidden');
+  $('mapPanel').classList.add('hidden'); WorldMap.close();
   $('nextLevelWrap').classList.remove('show'); $('introOverlay').classList.remove('show');
   $('startScreen').classList.remove('hidden');
   $('coinHud').classList.add('hidden'); $('combo').classList.remove('show'); $('vignette').style.opacity='0';
@@ -3615,7 +3637,7 @@ function showStart(){            // the main "home" menu (cover art + PLAY / LEA
 }
 function renderHome(){
   $('bestScore').textContent  = bestScore;
-  $('bestHeight').textContent = (bestHeight||0).toFixed(0)+'m';
+  { const bh=$('bestHeight'); if (bh) bh.textContent = (bestHeight||0).toFixed(0)+'m'; }   // CLIMB chip removed from home; guard
   $('bankCoins').textContent  = bank;
   ensureMissions();
   const gb = $('homeGoalsBtn'); if (gb){ gb.classList.toggle('hasNew', goalsNew); gb.title = 'Daily Goals' + (dailyStreak>0 ? ' · Day ' + dailyStreak : ''); }
@@ -3786,7 +3808,111 @@ function howTab(which){
   $('howTabAbout').classList.toggle('sel', !play);
 }
 function closeHow(){ $('howtoPanel').classList.add('hidden'); Store.set('how', 1); }
-function backHome(){ charPrevOn = false; $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden'); $('goalsPanel').classList.add('hidden'); $('settingsPanel').classList.add('hidden'); $('profilePanel').classList.add('hidden'); $('startScreen').classList.remove('hidden'); renderHome(); }
+function backHome(){ charPrevOn = false; WorldMap.close(); $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden'); $('goalsPanel').classList.add('hidden'); $('settingsPanel').classList.add('hidden'); $('profilePanel').classList.add('hidden'); $('mapPanel').classList.add('hidden'); $('startScreen').classList.remove('hidden'); renderHome(); }
+
+// ---------- JOURNEY MAP: a bird's-eye 3D tour of the 8 eras, marking where you are ----------
+const WorldMap = (function(){
+  let R=null, sc=null, cam=null, raf=0, t0=0, open=false, items=[], marker=null, target={x:0,z:0}, camA=0.6, dragA=0;
+  const SPACING=5.6, CURVE=3.2, PADH=0.42;
+  const nodePos = i => ({ x:(i-(ERA_ORDER.length-1)/2)*SPACING, z:Math.sin(i*0.85)*CURVE });
+  const mat   = (c,r)=> new THREE.MeshStandardMaterial({ color:c, roughness:r==null?0.85:r });
+  const glow  = (c,e)=> new THREE.MeshStandardMaterial({ color:c, emissive:c, emissiveIntensity:e==null?0.5:e, roughness:0.4, metalness:0.2 });
+  const grey  = ()=> new THREE.MeshStandardMaterial({ color:0x3a3a46, roughness:0.96 });
+  function ensure(){
+    if (R) return true;
+    try {
+      R = new THREE.WebGLRenderer({ canvas:$('mapCanvas'), antialias:true });
+      if (R.setPixelRatio) R.setPixelRatio(Math.min(2, window.devicePixelRatio||1));
+      sc = new THREE.Scene(); sc.fog = new THREE.Fog(0x06040c, 24, 64);
+      cam = new THREE.PerspectiveCamera(46, 1, 0.1, 200);
+      sc.add(new THREE.HemisphereLight(0xdde6ff, 0x20131a, 1.0));
+      const dl = new THREE.DirectionalLight(0xffffff, 0.95); dl.position.set(6,14,8); sc.add(dl);
+      const dl2 = new THREE.DirectionalLight(0x8aa0ff, 0.4); dl2.position.set(-8,6,-10); sc.add(dl2);
+      // drag to spin the camera around
+      const cv = $('mapCanvas'); let dx0=null, a0=0;
+      if (cv && cv.addEventListener){
+        cv.addEventListener('pointerdown', e=>{ dx0=e.clientX; a0=dragA; });
+        cv.addEventListener('pointermove', e=>{ if(dx0!=null) dragA = a0 + (e.clientX-dx0)*0.006; });
+        window.addEventListener('pointerup', ()=>{ dx0=null; });
+      }
+      return true;
+    } catch(e){ R=null; return false; }
+  }
+  // one themed landmark per era, sitting on its terrain pad (grey silhouette if still locked)
+  function landmark(i, lit){
+    const g = new THREE.Group();
+    const A = c => lit ? mat(c) : grey(), GL = (c,e) => lit ? glow(c,e) : grey();
+    if (i===0){ const p=new THREE.Mesh(new THREE.ConeGeometry(1.0,1.7,4), GL(0xe0c060,0.22)); p.rotation.y=Math.PI/4; p.position.y=0.85; g.add(p); }
+    else if (i===1){ for(let k=0;k<4;k++){ const w=1.8-k*0.42; const b=new THREE.Mesh(new THREE.BoxGeometry(w,0.32,w), A(0x9a7a52)); b.position.y=k*0.32+0.16; g.add(b);} const t=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.5,0.7), A(0xb08a4a)); t.position.y=1.5; g.add(t); }
+    else if (i===2){ [-0.75,0,0.75].forEach(px=>{ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.16,1.5,12), A(0xeee6d4)); c.position.set(px,0.75,0); g.add(c); }); const ar=new THREE.Mesh(new THREE.BoxGeometry(2.1,0.28,0.6), A(0xf2ecde)); ar.position.y=1.62; g.add(ar); }
+    else if (i===3){ const b=new THREE.Mesh(new THREE.BoxGeometry(1.9,0.95,1.1), A(0x6a4a30)); b.position.y=0.48; g.add(b); const rf=new THREE.Mesh(new THREE.ConeGeometry(1.25,0.85,4), A(0x4a3320)); rf.rotation.y=Math.PI/4; rf.position.y=1.3; g.add(rf); }
+    else if (i===4){ [-0.72,0.72].forEach(px=>{ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.11,1.7,10), GL(0xc0392b,0.18)); c.position.set(px,0.85,0); g.add(c); }); const l1=new THREE.Mesh(new THREE.BoxGeometry(2.1,0.2,0.26), GL(0xc0392b,0.18)); l1.position.y=1.62; g.add(l1); const l2=new THREE.Mesh(new THREE.BoxGeometry(1.8,0.13,0.22), A(0x8a2a20)); l2.position.y=1.34; g.add(l2); }
+    else if (i===5){ const d=new THREE.Mesh(new THREE.CylinderGeometry(1.0,1.0,0.2,18), GL(0x9a4aca,0.5)); d.position.y=1.5; g.add(d); const dome=new THREE.Mesh(new THREE.SphereGeometry(0.5,16,12), GL(0xc89cff,0.6)); dome.position.y=1.62; g.add(dome); const st=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,1.5,8), A(0x4a3a66)); st.position.y=0.75; g.add(st); }
+    else if (i===6){ const pl=new THREE.Mesh(new THREE.SphereGeometry(0.85,20,14), GL(0x4a6aca,0.45)); pl.position.y=1.2; g.add(pl); const rg=new THREE.Mesh(new THREE.RingGeometry(1.05,1.6,30), new THREE.MeshBasicMaterial({ color:lit?0xa9c0ff:0x55586a, transparent:true, opacity:0.8, side:THREE.DoubleSide, depthWrite:false })); rg.rotation.x=1.15; rg.position.y=1.2; g.add(rg); }
+    else { [-0.75,0.75].forEach(px=>{ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.15,1.7,12), GL(0xffe9a8,0.4)); c.position.set(px,0.85,0); g.add(c); }); const ar=new THREE.Mesh(new THREE.BoxGeometry(2.0,0.26,0.4), GL(0xffe9a8,0.4)); ar.position.y=1.68; g.add(ar); const cl=new THREE.Mesh(new THREE.SphereGeometry(0.7,14,12), new THREE.MeshStandardMaterial({ color:0xffffff, emissive:0xeae6ff, emissiveIntensity:0.4, roughness:1 })); cl.position.set(0,0.45,0.2); g.add(cl); }
+    g.position.y = PADH; return g;
+  }
+  function makePad(i, lit){
+    const e = ERAS[i] || ERAS[0];
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(2.1,2.4,PADH,8), mat(lit ? e.dune : 0x2c2c36, 0.95));
+    pad.position.y = PADH/2; return pad;
+  }
+  function clear(){ items.forEach(o=>{ try{ sc.remove(o); }catch(e){} }); items=[]; marker=null; }
+  function build(){
+    if (!ensure()) return;
+    clear();
+    const reachedIdx = ERA_ORDER.indexOf(eraFor(Math.max(1,maxLevel)).key);
+    const curIdx     = ERA_ORDER.indexOf(eraFor(Math.max(1,resumeLevel||1)).key);
+    // connecting path: stepping stones between consecutive era pads
+    for (let i=0;i<ERA_ORDER.length-1;i++){
+      const a=nodePos(i), b=nodePos(i+1), lit=(i+1)<=reachedIdx;
+      for (let s=1;s<=3;s++){ const f=s/4; const st=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.18,0.5),
+        mat(lit?0x6a5a3a:0x2e2e38, 0.9)); st.position.set(a.x+(b.x-a.x)*f, 0.1, a.z+(b.z-a.z)*f); st.rotation.y=0.5; sc.add(st); items.push(st); }
+    }
+    // era nodes
+    ERA_ORDER.forEach((key,i)=>{
+      const p=nodePos(i), lit=(i<=reachedIdx), grp=new THREE.Group();
+      grp.position.set(p.x,0,p.z);
+      grp.add(makePad(i,lit)); grp.add(landmark(i,lit));
+      if (!lit){ const lock=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.5,0.32), glow(0x88889a,0.25)); lock.position.y=PADH+1.0; grp.add(lock); }
+      sc.add(grp); items.push(grp);
+      if (i===curIdx){ // YOU-ARE-HERE marker
+        const mk=new THREE.Group();
+        const pin=new THREE.Mesh(new THREE.ConeGeometry(0.34,0.7,4), glow(0xffe08a,0.85)); pin.rotation.x=Math.PI; pin.position.y=3.1; mk.add(pin);
+        const ball=new THREE.Mesh(new THREE.SphereGeometry(0.17,14,12), glow(0xfff0c0,0.95)); ball.position.y=3.6; mk.add(ball);
+        const beam=new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.05,3.0,16,1,true),
+          new THREE.MeshBasicMaterial({ color:0xffe08a, transparent:true, opacity:0.18, side:THREE.DoubleSide, depthWrite:false, blending:THREE.AdditiveBlending }));
+        beam.position.y=1.6; mk.add(beam);
+        grp.add(mk); marker=mk;
+      }
+    });
+    target = nodePos(curIdx);
+    const e = ERAS[curIdx] || ERAS[0];
+    try { $('mapEraName').textContent = e.name; $('mapEraSub').textContent = 'LEVEL ' + Math.max(1,resumeLevel||1) + ' · ' + (curIdx+1) + '/' + ERA_ORDER.length + ' ERAS'; } catch(e2){}
+  }
+  function resize(){
+    if (!R) return;
+    const w = window.innerWidth||390, h = window.innerHeight||780;
+    if (R.setSize) R.setSize(w,h,false); cam.aspect = w/h; if (cam.updateProjectionMatrix) cam.updateProjectionMatrix();
+  }
+  function loop(){
+    if (!open) return;
+    raf = (window.requestAnimationFrame||(()=>0))(loop);
+    const t=(performance.now()-t0)*0.001;
+    camA += 0.0015;
+    const A = camA + dragA, rad=16, hgt=12.5;
+    cam.position.set(target.x + Math.sin(A)*rad, hgt, target.z + Math.cos(A)*rad);
+    if (cam.lookAt) cam.lookAt(target.x, 1.3, target.z);
+    if (marker){ marker.position.y = Math.sin(t*2.2)*0.18; marker.rotation.y += 0.02; }
+    try { R.render(sc,cam); } catch(e){}
+  }
+  return {
+    open(){ if (!ensure()) return; open=true; t0=performance.now(); camA=0.6; dragA=0; build(); resize(); loop(); },
+    close(){ open=false; try{ (window.cancelAnimationFrame||function(){})(raf); }catch(e){} },
+    resize
+  };
+})();
+function showMap(){ $('startScreen').classList.add('hidden'); $('mapPanel').classList.remove('hidden'); WorldMap.open(); }
 function renderLeader(){
   $('lbBest').textContent   = (bestScore||0).toLocaleString();
   $('lbHeight').textContent = (bestHeight||0).toFixed(0)+'m';
@@ -3972,6 +4098,8 @@ btn('homePlay',      ()=>startGame());
 btn('homeLeader',    showLeader);
 btn('homeShop',      ()=>showShop());
 btn('homeGoalsBtn',  showGoals);
+btn('homeMapBtn',    showMap);
+btn('mapBack',       backHome);
 btn('homeSettings',  showSettings);
 btn('homeHelp',      showHow);
 btn('howClose',      closeHow);
@@ -4225,7 +4353,7 @@ if (!Store.get('how', 0)) showHow();   // first-ever launch → show the how-to-
 animate();
 requestAnimationFrame(()=>{ const l=$('loader'); if (l){ l.classList.add('hidden'); setTimeout(()=>l.style.display='none', 600); } });   // reveal once ready
 
-addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); if (composer) composer.setSize(innerWidth,innerHeight); });
+addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); if (composer) composer.setSize(innerWidth,innerHeight); try{ WorldMap.resize(); }catch(e){} });
 </script>
 </body>
 </html>
