@@ -390,6 +390,18 @@
     border-radius:8px; color:#ffe6b0; font-family:'Space Mono',monospace; font-size:11px; letter-spacing:2px; font-weight:700;
     padding:8px 12px; cursor:pointer; }
   #lbName button:active { transform:scale(.95); }
+  /* create-account panel */
+  .acctIntro { font-family:'Space Mono',monospace; font-size:13px; line-height:1.5; color:#f3e6cf; opacity:.92;
+    max-width:min(380px,86vw); text-align:center; }
+  .acctIntro b { color:#ffd98a; }
+  .acctForm { display:flex; flex-direction:column; gap:14px; width:min(360px,86vw); margin-top:6px; }
+  .acctField { display:flex; flex-direction:column; gap:5px; font-family:'Space Mono',monospace; font-size:11px;
+    letter-spacing:2px; color:#cdbb95; text-align:left; }
+  .acctField input { background:rgba(255,255,255,.06); border:1px solid rgba(243,200,120,.3); border-radius:9px;
+    color:#ffe9b8; font-family:'Space Mono',monospace; font-size:15px; letter-spacing:1px; padding:11px 13px; outline:none; }
+  .acctField input:focus { border-color:#f3c878; }
+  #acctMsg { font-family:'Space Mono',monospace; font-size:12px; letter-spacing:1px; text-align:center; min-height:16px; color:#8fe0b0; }
+  #homeAccount { color:#ffe6b0; border-color:rgba(243,200,120,.45); background:rgba(243,200,120,.1); }
 
   /* over-screen action buttons (share / double coins) */
   .obtnRow { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-top:18px; }
@@ -528,7 +540,20 @@
       <div class="midBtn" id="homeShop"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12l-1 11H7L6 8z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg>SHOP</div>
     </div>
     <div class="midBtn" id="homeGoalsBtn"><span id="homeGoalsLbl">DAILY GOALS</span></div>
+    <div class="midBtn" id="homeAccount">★ SIGN UP — FREE SKIN</div>
   </div>
+</div>
+
+<div class="overlay hidden panel" id="accountPanel">
+  <div class="panelTitle">CREATE ACCOUNT</div>
+  <div class="acctIntro">Sign up with your email and we’ll unlock the <b>FERRO</b> metal pyramid skin — <b>free</b>.</div>
+  <div class="acctForm">
+    <label class="acctField">NAME<input id="acctName" maxlength="12" placeholder="HANDLE" autocomplete="off" spellcheck="false" /></label>
+    <label class="acctField">EMAIL<input id="acctEmail" type="email" placeholder="you@email.com" autocomplete="email" inputmode="email" /></label>
+    <div class="cta hero" id="acctCreate" style="pointer-events:auto">CREATE ACCOUNT</div>
+    <div id="acctMsg"></div>
+  </div>
+  <div class="backBtn" id="accountBack">◀ BACK</div>
 </div>
 
 <div class="overlay hidden panel" id="leaderPanel">
@@ -689,6 +714,7 @@ let bestStreak  = Store.get('bestStreak', 0);     // lifetime best PERFECT strea
 let maxLevel    = Store.get('maxLevel', 1);       // highest level reached
 let resumeLevel = Store.get('resumeLevel', 1);    // level a new game CONTINUES from (progress is saved, not reset to 1)
 let playerName  = Store.get('name', '');          // handle shown on the global leaderboard
+let account     = Store.get('account', null);     // {name,email} once the player signs up (unlocks the FERRO skin)
 let firstTime = !Store.get('tut', 0);             // show the onboarding hints once
 
 // ---------- GLOBAL LEADERBOARD (Supabase) ----------
@@ -726,6 +752,15 @@ const RemoteBoard = {
       if (!r.ok){ try { console.warn('leaderboard read failed', r.status, await r.text()); } catch(e){} return null; }
       return await r.json();
     } catch(e){ console.warn('leaderboard read error', e); return null; }
+  },
+  async account(entry){                                 // best-effort: store an account profile (name + email)
+    if (!this.enabled()) return false;
+    try {
+      const r = await this._fetch('/rest/v1/accounts', { method:'POST',
+        headers:this._h({ 'Content-Type':'application/json', Prefer:'return=minimal,resolution=merge-duplicates' }), body:JSON.stringify(entry) });
+      if (!r.ok){ try { console.warn('account save failed', r.status, await r.text()); } catch(e){} }
+      return r.ok;
+    } catch(e){ console.warn('account save error', e); return false; }
   }
 };
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -777,7 +812,8 @@ const STONES = {
   rose:  { name:'ROSE',      cost:450,  swatch:'#d87a98', hue:330, sat:48, lig:66 },
   jade:  { name:'JADE',      cost:800,  swatch:'#4ec98a', hue:150, sat:48, lig:58 },
   gold:  { name:'GOLD',      cost:1200, swatch:'#e8c45a', hue:45,  sat:62, lig:60 },
-  night: { name:'OBSIDIAN',  cost:1800, swatch:'#6a5a86', hue:265, sat:30, lig:44 }
+  night: { name:'OBSIDIAN',  cost:1800, swatch:'#6a5a86', hue:265, sat:30, lig:44 },
+  ferro: { name:'FERRO',     cost:2000, swatch:'#8b96a3', hue:212, sat:12, lig:54, account:true }   // free when you make an account
 };
 const CHARACTERS = {
   explorer:{ name:'EXPLORER', cost:0,    swatch:'#3ad6c5', color:0x3ad6c5, style:'explorer' },
@@ -2764,7 +2800,7 @@ function showStart(){            // the main "home" menu (cover art + PLAY / LEA
   $('ratingOverlay').classList.remove('show');
   S.phase = null; S.gameOver = false;
   $('overScreen').classList.add('hidden');
-  $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden');
+  $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden'); $('accountPanel').classList.add('hidden');
   $('nextLevelWrap').classList.remove('show'); $('introOverlay').classList.remove('show');
   $('startScreen').classList.remove('hidden');
   $('coinHud').classList.add('hidden'); $('combo').classList.remove('show'); $('vignette').style.opacity='0';
@@ -2781,6 +2817,7 @@ function renderHome(){
   $('homeGoalsLbl').textContent = 'DAILY GOALS' + (dailyStreak>0 ? ' · DAY ' + dailyStreak : '');
   $('homeGoalsBtn').classList.toggle('hasNew', goalsNew);
   const pl = $('homePlay'); if (pl) pl.textContent = (!dailyMode && resumeLevel > 1) ? ('CONTINUE · LV ' + resumeLevel) : 'PLAY';
+  const ha = $('homeAccount'); if (ha) ha.textContent = account ? '★ ACCOUNT ✓ · FERRO UNLOCKED' : '★ SIGN UP — FREE SKIN';
 }
 function renderSettings(){
   const d = $('ddaBtn'); d.textContent = DDA.on ? 'ON' : 'OFF'; d.classList.toggle('on', DDA.on);
@@ -2798,6 +2835,38 @@ function resetProgress(){
   FEATURES.forEach(f => Store.set('feat_'+f.key, 0));   // let the intros teach again on a fresh run
   Store.set('tut', 0); firstTime = true;
   renderSettings(); renderHome(); showPop('PROGRESS RESET — LEVEL 1');
+}
+// ---------- account: name + email → free FERRO skin ----------
+function showAcctMsg(t, good){ const m = $('acctMsg'); if (m){ m.textContent = t; m.style.color = (good===false) ? '#ffae8a' : '#8fe0b0'; } }
+function showAccount(){ $('startScreen').classList.add('hidden'); $('accountPanel').classList.remove('hidden'); renderAccount(); }
+function renderAccount(){
+  const ni = $('acctName'), ei = $('acctEmail'), btn = $('acctCreate');
+  if (account){
+    if (ni) ni.value = account.name || playerName || '';
+    if (ei) ei.value = account.email || '';
+    if (btn) btn.textContent = 'UPDATE ACCOUNT';
+    showAcctMsg('✓ Signed up — FERRO skin unlocked. Update any time.');
+  } else {
+    if (ni && !ni.value) ni.value = playerName || '';
+    if (btn) btn.textContent = 'CREATE ACCOUNT';
+    showAcctMsg('');
+  }
+}
+function createAccount(){
+  const name = sanitizeName($('acctName').value);
+  const email = ($('acctEmail').value || '').trim();
+  if (!name){ showAcctMsg('Please enter a name.', false); return; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ showAcctMsg('Please enter a valid email.', false); return; }
+  const fresh = !account;
+  playerName = name; Store.set('name', name);
+  account = { name, email, t:Date.now() }; Store.set('account', account);
+  let granted = false;
+  if (!ownedStones.includes('ferro')){ ownedStones.push('ferro'); Store.set('ownedStones', ownedStones); granted = true; }
+  curStone = 'ferro'; Store.set('stone', 'ferro');     // equip the reward as a welcome
+  RemoteBoard.account({ name, email });                // best-effort cloud save of the profile
+  if (Sound.buy) Sound.buy();
+  showAcctMsg(granted ? '✓ Account created — FERRO skin unlocked & equipped!' : (fresh ? '✓ Account created!' : '✓ Account updated.'));
+  renderHome();
 }
 function renderGoals(){
   ensureMissions();
@@ -2817,7 +2886,7 @@ function showGoals(){ goalsNew = false; $('startScreen').classList.add('hidden')
 function showSettings(){ $('startScreen').classList.add('hidden'); $('settingsPanel').classList.remove('hidden'); renderSettings(); }
 function showHow(){ $('howtoPanel').classList.remove('hidden'); }
 function closeHow(){ $('howtoPanel').classList.add('hidden'); Store.set('how', 1); }
-function backHome(){ charPrevOn = false; $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden'); $('goalsPanel').classList.add('hidden'); $('settingsPanel').classList.add('hidden'); $('startScreen').classList.remove('hidden'); renderHome(); }
+function backHome(){ charPrevOn = false; $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden'); $('goalsPanel').classList.add('hidden'); $('settingsPanel').classList.add('hidden'); $('accountPanel').classList.add('hidden'); $('startScreen').classList.remove('hidden'); renderHome(); }
 function renderLeader(){
   $('lbBest').textContent   = (bestScore||0).toLocaleString();
   $('lbHeight').textContent = (bestHeight||0).toFixed(0)+'m';
@@ -2968,6 +3037,9 @@ btn('shopBuyBtn',    purchaseSel);
 btn('shopEquipBtn',  equipSel);
 btn('dailyBtn',      ()=>{ dailyMode = !dailyMode; renderSettings(); });
 btn('resetProgBtn',  resetProgress);   // wipe saved level progress → back to Level 1
+btn('homeAccount',   showAccount);
+btn('accountBack',   backHome);
+btn('acctCreate',    createAccount);
 btn('ddaBtn',        ()=>{ DDA.on = !DDA.on; Store.set('dda', DDA.on?1:0); renderSettings(); });
 btn('musicBtn',      ()=>{ Music.toggle(!Music.on); renderSettings(); });
 btn('dblBtn',        doubleCoins);
