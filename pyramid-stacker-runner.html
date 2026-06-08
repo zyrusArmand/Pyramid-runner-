@@ -243,8 +243,10 @@
     width:42px; height:42px; display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer;
     color:#f3d99a; background:rgba(20,12,28,.55); border:1px solid rgba(243,200,120,.35); border-radius:50%; transition:transform .2s; }
   #homeProfile svg { width:22px; height:22px; }
+  #homeProfile { background-size:cover; background-position:center top; overflow:hidden; }
+  #homeProfile.hasImg svg { display:none; }
   #homeProfile.hasDot::after { content:''; position:absolute; top:2px; right:2px; width:9px; height:9px; border-radius:50%;
-    background:#ffcf3a; box-shadow:0 0 7px rgba(255,200,60,.9); }
+    background:#ffcf3a; box-shadow:0 0 7px rgba(255,200,60,.9); z-index:1; }
   #homeProfile:active { transform:scale(.92); }
   /* NEW dot on the goals button */
   #homeGoalsBtn { position:relative; }
@@ -368,7 +370,8 @@
     cursor:pointer; pointer-events:auto; transition:all .16s; }
   .shopItem.sel { border-color:#f3d99a; background:rgba(243,200,120,.16); box-shadow:0 0 14px rgba(243,200,120,.3); }
   .shopItem.locked { opacity:.7; }
-  .shopItem .swatch { width:28px; height:28px; border-radius:7px; box-shadow:inset 0 -6px 8px rgba(0,0,0,.3); }
+  .shopItem .swatch { position:relative; width:28px; height:28px; border-radius:7px; box-shadow:inset 0 -6px 8px rgba(0,0,0,.3); display:flex; align-items:center; justify-content:center; }
+  .shopItem .lockKey { font-size:14px; filter:drop-shadow(0 1px 2px rgba(0,0,0,.7)); }
   .shopItem .iName { font-size:8.5px; letter-spacing:.5px; opacity:.85; }
   .shopItem .iCost { font-size:9px; color:#ffe08a; font-weight:700; }
 
@@ -388,9 +391,16 @@
   #lbStats, #profStats { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; width:min(360px,90vw); margin:4px 0 8px; }
   /* profile header: avatar + name + sub */
   .profHead { display:flex; align-items:center; gap:14px; width:min(360px,90vw); margin-bottom:2px; }
-  .profAvatar { width:54px; height:54px; flex:0 0 auto; border-radius:50%; display:flex; align-items:center; justify-content:center;
-    font-family:'Cinzel',serif; font-weight:700; font-size:24px; color:#1a1018; border:2px solid rgba(255,255,255,.5);
-    box-shadow:0 2px 12px rgba(0,0,0,.4); }
+  .profAvatar { position:relative; width:60px; height:60px; flex:0 0 auto; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    border:2px solid rgba(255,255,255,.5); box-shadow:0 2px 12px rgba(0,0,0,.4); cursor:pointer; pointer-events:auto;
+    background-size:cover; background-position:center top; overflow:hidden; }
+  .profAvLetter { font-family:'Cinzel',serif; font-weight:700; font-size:26px; color:#1a1018; }
+  .profAvatar.hasImg .profAvLetter { display:none; }
+  .profAvCam { position:absolute; right:-2px; bottom:-2px; width:20px; height:20px; border-radius:50%; font-size:10px;
+    display:flex; align-items:center; justify-content:center; background:#2a1d33; border:1px solid rgba(243,200,120,.5); }
+  .profAvatar input[type=file] { display:none; }
+  .profAvReset { font-family:'Space Mono',monospace; font-size:10px; letter-spacing:1px; color:#9fc7e8; opacity:.85;
+    cursor:pointer; pointer-events:auto; margin-top:2px; display:none; }
   .profMeta { display:flex; flex-direction:column; gap:3px; min-width:0; }
   .profName { font-family:'Cinzel',serif; font-weight:700; font-size:22px; color:#ffe9b8; letter-spacing:1px; line-height:1;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -573,10 +583,15 @@
 <div class="overlay hidden panel" id="profilePanel">
   <div class="panelTitle">PROFILE</div>
   <div class="profHead">
-    <div class="profAvatar" id="profAvatar">A</div>
+    <div class="profAvatar" id="profAvatar" title="Tap to upload a photo">
+      <span class="profAvLetter" id="profAvLetter">A</span>
+      <span class="profAvCam">📷</span>
+      <input type="file" id="avatarUpload" accept="image/*" />
+    </div>
     <div class="profMeta">
       <div class="profName" id="profName">PLAYER</div>
       <div class="profSub" id="profSub"></div>
+      <div class="profAvReset" id="profAvReset">↺ use my character</div>
     </div>
   </div>
   <div id="profStats">
@@ -587,7 +602,7 @@
     <div class="lbStat"><div class="lbStatV" id="pfStreak">0</div><div class="lbStatL">BEST STREAK</div></div>
     <div class="lbStat"><div class="lbStatV" id="pfLvl">1</div><div class="lbStatL">MAX LEVEL</div></div>
   </div>
-  <div class="acctIntro" id="profSignupNote">Sign up with your email and we’ll unlock the <b>FERRO</b> metal pyramid skin — <b>free</b>.</div>
+  <div class="acctIntro" id="profSignupNote">Sign up with your email and we’ll unlock the <b>FERRO</b> metal character — <b>free</b>.</div>
   <div class="acctForm">
     <label class="acctField">NAME<input id="acctName" maxlength="12" placeholder="HANDLE" autocomplete="off" spellcheck="false" /></label>
     <label class="acctField" id="acctEmailField">EMAIL<input id="acctEmail" type="email" placeholder="you@email.com" autocomplete="email" inputmode="email" /></label>
@@ -864,8 +879,7 @@ const STONES = {
   rose:  { name:'ROSE',      cost:450,  swatch:'#d87a98', hue:330, sat:48, lig:66 },
   jade:  { name:'JADE',      cost:800,  swatch:'#4ec98a', hue:150, sat:48, lig:58 },
   gold:  { name:'GOLD',      cost:1200, swatch:'#e8c45a', hue:45,  sat:62, lig:60 },
-  night: { name:'OBSIDIAN',  cost:1800, swatch:'#6a5a86', hue:265, sat:30, lig:44 },
-  ferro: { name:'FERRO',     cost:2000, swatch:'#8b96a3', hue:212, sat:12, lig:54, account:true }   // free when you make an account
+  night: { name:'OBSIDIAN',  cost:1800, swatch:'#6a5a86', hue:265, sat:30, lig:44 }
 };
 const CHARACTERS = {
   explorer:{ name:'EXPLORER', cost:0,    swatch:'#3ad6c5', color:0x3ad6c5, style:'explorer' },
@@ -875,7 +889,8 @@ const CHARACTERS = {
   frost:   { name:'FROST',    cost:900,  swatch:'#eaf6ff', color:0xeaf6ff, style:'explorer' },
   mummy:   { name:'MUMMY',    cost:1100, swatch:'#e6dcc2', color:0xe6dcc2, style:'mummy'   },
   gold:    { name:'PHARAOH',  cost:1500, swatch:'#ffd86a', color:0xd9a93a, style:'pharaoh' },
-  anubis:  { name:'ANUBIS',   cost:2200, swatch:'#2b2b3a', color:0x26262f, style:'anubis'  }
+  anubis:  { name:'ANUBIS',   cost:2200, swatch:'#2b2b3a', color:0x26262f, style:'anubis'  },
+  ferro:   { name:'FERRO',    cost:0,    swatch:'#9aa6b2', color:0x9aa6b2, style:'explorer', metal:true, account:true }   // unlocked free by signing up
 };
 let ownedStones = Store.get('ownedStones', ['sand']);
 let curStone    = Store.get('stone', 'sand');
@@ -893,7 +908,7 @@ function character(){ return CHARACTERS[curChar] || CHARACTERS.explorer; }
 function makeRunner(){
   const ch = character(), style = ch.style || 'explorer';
   const g = new THREE.Group();
-  const cMat   = new THREE.MeshStandardMaterial({ color:ch.color, emissive:0x070707, roughness:0.55, metalness: style==='pharaoh'?0.4:0.06 });
+  const cMat   = new THREE.MeshStandardMaterial({ color:ch.color, emissive:0x070707, roughness: ch.metal?0.3:0.55, metalness: ch.metal?0.6:(style==='pharaoh'?0.4:0.06) });
   const skinCol = style==='mummy' ? 0xe6dcc2 : style==='anubis' ? 0x2a2a35 : 0xf0c79a;
   const skinMat = new THREE.MeshStandardMaterial({ color:skinCol, emissive:(style==='explorer'||style==='pharaoh')?0x241806:0x060606, roughness:0.6 });
   const gold   = () => new THREE.MeshStandardMaterial({ color:0xe8c45a, emissive:0x3a2600, metalness:0.75, roughness:0.28 });
@@ -1067,6 +1082,26 @@ function resizeCharPreview(){
   const c = charPrev.rend.domElement, w = c.clientWidth || 300, h = c.clientHeight || 150;
   charPrev.rend.setSize(w, h, false);
   charPrev.cam.aspect = w/h; charPrev.cam.updateProjectionMatrix();
+}
+// render a square head-shot of a character to a PNG data-URL (used as the default profile avatar). Cached per character.
+let _charThumbCache = {};
+function characterThumb(charKey){
+  const ckey = (charKey && CHARACTERS[charKey]) ? charKey : curChar;
+  if (_charThumbCache[ckey]) return _charThumbCache[ckey];
+  try {
+    initCharPreview();
+    const cp = charPrev; if (!cp || !cp.rend || !cp.rend.domElement || !cp.rend.domElement.toDataURL) return null;
+    if (cp.runner){ cp.sc.remove(cp.runner); cp.runner = null; }
+    const save = curChar; curChar = (charKey && CHARACTERS[charKey]) ? charKey : curChar;
+    const g = makeRunner(); curChar = save;
+    g.rotation.y = 0.5; cp.sc.add(g);
+    cp.rend.setSize(200, 200, false); cp.cam.aspect = 1; cp.cam.updateProjectionMatrix();
+    cp.rend.render(cp.sc, cp.cam);
+    const url = cp.rend.domElement.toDataURL('image/png');
+    cp.sc.remove(g);
+    if (url) _charThumbCache[ckey] = url;
+    return url;
+  } catch(e){ return null; }
 }
 
 // ---------- adaptive difficulty (DDA) — watches how cleanly & precisely you play and gently nudges the
@@ -2868,7 +2903,13 @@ function renderHome(){
   $('homeGoalsLbl').textContent = 'DAILY GOALS' + (dailyStreak>0 ? ' · DAY ' + dailyStreak : '');
   $('homeGoalsBtn').classList.toggle('hasNew', goalsNew);
   const pl = $('homePlay'); if (pl) pl.textContent = (!dailyMode && resumeLevel > 1) ? ('CONTINUE · LV ' + resumeLevel) : 'PLAY';
-  const hp = $('homeProfile'); if (hp) hp.classList.toggle('hasDot', !account);   // nudge to sign up when no account yet
+  const hp = $('homeProfile');
+  if (hp){
+    hp.classList.toggle('hasDot', !account);                        // nudge to sign up when no account yet
+    const img = Store.get('avatar', null) || characterThumb(curChar);   // your photo, else the current character
+    if (img){ hp.style.backgroundImage = 'url(' + img + ')'; hp.classList.add('hasImg'); }
+    else hp.classList.remove('hasImg');
+  }
 }
 function renderSettings(){
   const d = $('ddaBtn'); d.textContent = DDA.on ? 'ON' : 'OFF'; d.classList.toggle('on', DDA.on);
@@ -2892,10 +2933,18 @@ function resetProgress(){
 function showAcctMsg(t, good){ const m = $('acctMsg'); if (m){ m.textContent = t; m.style.color = (good===false) ? '#ffae8a' : '#8fe0b0'; } }
 function showProfile(){ $('startScreen').classList.add('hidden'); $('profilePanel').classList.remove('hidden'); renderProfile(); }
 function renderProfile(){
+  if (account && !ownedChars.includes('ferro')){ ownedChars.push('ferro'); Store.set('ownedChars', ownedChars); }   // signed-up players own FERRO
   const ch = (typeof CHARACTERS!=='undefined' && CHARACTERS[curChar]) ? CHARACTERS[curChar] : null;
   const nm = playerName || (account && account.name) || 'PLAYER';
-  const av = $('profAvatar');
-  if (av){ av.textContent = (nm.charAt(0) || 'P').toUpperCase(); if (ch && ch.swatch) av.style.background = ch.swatch; }
+  const av = $('profAvatar'), lt = $('profAvLetter'), rs = $('profAvReset');
+  if (av){
+    if (ch && ch.swatch) av.style.backgroundColor = ch.swatch;
+    const custom = Store.get('avatar', null);                 // user-uploaded photo overrides the character render
+    const img = custom || characterThumb(curChar);
+    if (img){ av.style.backgroundImage = 'url(' + img + ')'; av.classList.add('hasImg'); }
+    else { av.style.backgroundImage = 'none'; av.classList.remove('hasImg'); if (lt) lt.textContent = (nm.charAt(0) || 'P').toUpperCase(); }
+    if (rs) rs.style.display = custom ? 'block' : 'none';      // offer to revert to the character render
+  }
   $('profName').textContent = nm;
   $('profSub').textContent  = (ch ? ch.name : 'EXPLORER') + ' · ◎ ' + (bank||0).toLocaleString() + ' deben' + (account ? '  ·  ' + account.email : '');
   $('pfBest').textContent   = (bestScore||0).toLocaleString();
@@ -2913,7 +2962,7 @@ function renderProfile(){
   } else {
     if (ni && !ni.value) ni.value = playerName || '';
     if (btn) btn.textContent = 'CREATE ACCOUNT';
-    if (note) note.innerHTML = 'Sign up with your email and we’ll unlock the <b>FERRO</b> metal pyramid skin — <b>free</b>.';
+    if (note) note.innerHTML = 'Sign up with your email and we’ll unlock the <b>FERRO</b> metal character — <b>free</b>.';
   }
   showAcctMsg('');
 }
@@ -2926,13 +2975,41 @@ function createAccount(){
   playerName = name; Store.set('name', name);
   account = { name, email, t:Date.now() }; Store.set('account', account);
   let granted = false;
-  if (!ownedStones.includes('ferro')){ ownedStones.push('ferro'); Store.set('ownedStones', ownedStones); granted = true; }
-  curStone = 'ferro'; Store.set('stone', 'ferro');     // equip the reward as a welcome
+  if (!ownedChars.includes('ferro')){ ownedChars.push('ferro'); Store.set('ownedChars', ownedChars); granted = true; }
+  curChar = 'ferro'; Store.set('char', 'ferro');       // unlock + wear the FERRO character as a welcome
   RemoteBoard.account({ name, email });                // best-effort cloud save of the profile
   if (Sound.buy) Sound.buy();
   renderProfile(); renderHome();
   showAcctMsg(granted ? '✓ FERRO skin unlocked & equipped!' : (fresh ? '✓ Account created!' : '✓ Account updated.'));
 }
+// read an uploaded photo, centre-crop it to a small square, and store it as the avatar
+function handleAvatarFile(file){
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const sz = 256, cv = document.createElement('canvas'); cv.width = cv.height = sz;
+        const cx = cv.getContext('2d'), s = Math.min(img.width, img.height);
+        cx.drawImage(img, (img.width-s)/2, (img.height-s)/2, s, s, 0, 0, sz, sz);
+        Store.set('avatar', cv.toDataURL('image/jpeg', 0.85));
+      } catch(err){ Store.set('avatar', e.target.result); }
+      renderProfile(); renderHome();
+    };
+    img.onerror = () => { Store.set('avatar', e.target.result); renderProfile(); };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+(function(){
+  const av = $('profAvatar'), up = $('avatarUpload'), rs = $('profAvReset');
+  if (av && up && av.addEventListener){
+    av.addEventListener('click', () => { if (up.click) up.click(); });
+    up.addEventListener('change', e => { handleAvatarFile(e.target.files && e.target.files[0]); up.value = ''; });
+  }
+  if (rs && rs.addEventListener) rs.addEventListener('click', e => { e.stopPropagation(); Store.set('avatar', null); renderProfile(); });
+})();
 function renderGoals(){
   ensureMissions();
   $('goalsStreak').textContent = dailyStreak>0 ? ('DAY ' + dailyStreak + ' PLAY STREAK 🔥') : '';
@@ -2985,10 +3062,11 @@ function renderShop(){
   Object.keys(set).forEach(key => {
     const it = set[key], have = own.includes(key), isSel = key===sel, isEq = key===equipped;
     const el = document.createElement('div');
+    const acctLock = !have && it.account;                              // unlock-by-signup item, not buyable with coins
     el.className = 'shopItem' + (isSel?' sel':'') + (have?'':' locked');
-    el.innerHTML = `<div class="swatch" style="background:${it.swatch}"></div>`+
+    el.innerHTML = `<div class="swatch" style="background:${it.swatch}">${acctLock ? '<span class="lockKey">🔒</span>' : ''}</div>`+
       `<div class="iName">${it.name}</div>`+
-      `<div class="iCost">${have ? (isEq?'✓ WORN':'OWNED') : '◎'+it.cost}</div>`;
+      `<div class="iCost">${have ? (isEq?'✓ WORN':'OWNED') : (acctLock ? 'SIGN UP' : '◎'+it.cost)}</div>`;
     // clicking only PREVIEWS the item — purchasing/equipping is done with the buttons below the preview
     el.addEventListener('pointerdown', ev => { ev.stopPropagation(); ev.preventDefault(); isChar ? pickChar(key) : pickStone(key); });
     grid.appendChild(el);
@@ -3002,6 +3080,11 @@ function renderShop(){
     eqBtn.style.display = '';
     eqBtn.textContent = isEq ? '✓ EQUIPPED' : 'EQUIP';
     eqBtn.classList.toggle('disabled', isEq);
+  } else if (it.account){
+    eqBtn.style.display = 'none';
+    buyBtn.style.display = '';
+    buyBtn.textContent = '🔒 SIGN UP TO UNLOCK';
+    buyBtn.classList.remove('disabled');
   } else {
     eqBtn.style.display = 'none';
     buyBtn.style.display = '';
@@ -3023,6 +3106,7 @@ function purchaseSel(){
   const ownedKey = isChar ? 'ownedChars' : 'ownedStones', key = isChar ? selChar : selStone;
   if (!key || own.includes(key)) return;
   const it = set[key];
+  if (it.account){ backHome(); showProfile(); showPop('SIGN UP TO UNLOCK FERRO'); return; }   // not buyable — granted by signing up
   if (bank >= it.cost){ bank -= it.cost; Store.set('coins', bank); own.push(key); Store.set(ownedKey, own); Sound.buy(); showPop('UNLOCKED — TAP EQUIP'); }
   else { Sound.blip(150,0.16,'sawtooth',0.14); showPop('NEED MORE DEBEN'); }
   renderShop();
