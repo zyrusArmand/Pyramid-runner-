@@ -1669,6 +1669,7 @@ function applyBiome(level){
   if (sunCore){ sunCore.material.color.setHex(b.sun); sunHalo.material.color.setHex(b.skyBot); }
   if (ground) ground.material.color.setHex(e.ground);
   if (typeof duneMat !== 'undefined' && duneMat) duneMat.color.setHex(e.dune);
+  if (typeof baseMound !== 'undefined' && baseMound) baseMound.material.color.setHex(e.dune);   // sand berm matches the era
   curEra = e; curEraBlock = e.block;
   applyGrade(e);                          // tint the screen colour-grade + rim light to the era
   buildBackdrop(e);                       // swap the background props when the era changes
@@ -1718,12 +1719,20 @@ const ground = new THREE.Mesh(new THREE.CircleGeometry(64,56),
   new THREE.MeshStandardMaterial({ color:0x6b4a32, roughness:1, bumpMap:SAND_BUMP||undefined, bumpScale:0.06 }));
 ground.rotation.x = -Math.PI/2; ground.position.y = -0.5; ground.receiveShadow = true;
 scene.add(ground);
+// a soft sand mound the pyramid is bedded into, so its base sits IN the ground instead of floating above it.
+// top sits at ~-0.2 (just under the lowest course at -0.26); recoloured to the era ground in applyBiome.
+const baseMoundMat = new THREE.MeshStandardMaterial({ color:0xc9a96a, roughness:1, bumpMap:SAND_BUMP||undefined, bumpScale:0.05 });
+const baseMound = new THREE.Mesh(new THREE.SphereGeometry(12, 30, 18), baseMoundMat);
+baseMound.scale.set(1, 0.07, 1); baseMound.position.y = -1.04;   // top = -1.04 + 12*0.07 ≈ -0.2
+baseMound.receiveShadow = true; baseMound.__env = true; scene.add(baseMound);
+// low, natural rolling dunes on the horizon (small humps that don't block the skyline)
 const duneMat = new THREE.MeshStandardMaterial({ color:0x946642, roughness:1, bumpMap:SAND_BUMP||undefined, bumpScale:0.1 });
-for (let i=0;i<11;i++){
-  const a=(i/11)*Math.PI*2 + 0.4, dist=36+Math.random()*9;
-  const d=new THREE.Mesh(new THREE.SphereGeometry(8+Math.random()*7, 18, 12), duneMat);
-  d.position.set(Math.sin(a)*dist, -7-Math.random()*2, Math.cos(a)*dist);
-  d.scale.set(1.7+Math.random(), 0.45+Math.random()*0.3, 1.7+Math.random());
+for (let i=0;i<20;i++){
+  const a=(i/20)*Math.PI*2 + Math.random()*0.4, dist=30+Math.random()*24;
+  const d=new THREE.Mesh(new THREE.SphereGeometry(5+Math.random()*6, 16, 10), duneMat);
+  d.position.set(Math.sin(a)*dist, -0.5, Math.cos(a)*dist);                 // centred on the ground line
+  d.scale.set(1.3+Math.random()*0.7, 0.13+Math.random()*0.11, 1.3+Math.random()*0.7);   // wide & flat → gentle hills
+  d.rotation.y = Math.random()*6.28;
   d.__env = true; scene.add(d);                          // __env = keep across game restarts
 }
 
@@ -1897,9 +1906,9 @@ function dBirds(count, col, radius){
   flock.__anim={t:'bird', d, y, ph, spd:0.05+Math.random()*0.05};
   addDecor(flock);
 }
-// a wide, flattened sand mound for rolling background dunes
+// a small, low sand hill — wide and flat so it reads as a gentle dune, never a blobby dome
 function dDune(x,z,s,col){ const m=new THREE.Mesh(new THREE.SphereGeometry(s,16,10), dMat(col==null?0xc9a96a:col));
-  m.position.set(x,-2.2,z); m.scale.set(1.6+Math.random()*0.9, 0.38+Math.random()*0.22, 1.4+Math.random()*0.7); m.rotation.y=Math.random()*6.28; addDecor(m); }
+  m.position.set(x,-0.5,z); m.scale.set(1.2+Math.random()*0.6, 0.15+Math.random()*0.12, 1.2+Math.random()*0.6); m.rotation.y=Math.random()*6.28; addDecor(m); }
 // the three Pyramids of Giza in their classic stagger, fronted by queen's pyramids — a big iconic skyline
 function dGiza(cx,cz){
   const col=0x9a7048;
@@ -1918,7 +1927,7 @@ function buildBackdrop(era){
       dPylon(0,-38,5);                                                  // a great temple gateway
       dSphinx(0,-26,5.5);                                              // a giant Sphinx fronting the pyramids, facing the player
       dSphinx(26,26,3.4); dSphinx(-30,20,3.0);
-      ringPlace(13,30,50,(x,z)=>dDune(x,z,8+Math.random()*6));          // rolling sand dunes on the horizon
+      ringPlace(30,22,56,(x,z)=>dDune(x,z,2.5+Math.random()*4));        // lots of small rolling sand dunes
       ringPlace(5,26,44,(x,z)=>dHieroWall(x,z,2.6+Math.random()));
       ringPlace(6,22,38,(x,z)=>dObelisk(x,z,3.5+Math.random()*2.5));
       ringPlace(12,18,40,(x,z)=>dPalm(x,z,0.9+Math.random()*0.6));
