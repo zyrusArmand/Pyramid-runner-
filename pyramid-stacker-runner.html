@@ -20,11 +20,14 @@
   /* three stacked readouts (SCORE / LEVEL / LAYER) top-right */
   .right { display:flex; flex-direction:column; align-items:flex-end; gap:5px; }
   .statBox { display:flex; align-items:baseline; justify-content:flex-end; gap:7px; }
-  /* current level / biome name, centred at the very top */
+  /* current level / biome name, centred at the very top — width-capped & ellipsised so a long biome name never
+     overlaps the corner buttons/stats and the layout is identical on every level */
   #levelName { position:fixed; top:max(14px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
-    z-index:5; pointer-events:none; text-align:center; color:#ffe9b8; text-shadow:0 2px 10px rgba(0,0,0,.7); display:none; }
-  #levelName .lnLv { font-family:'Space Mono',monospace; font-size:10px; letter-spacing:4px; opacity:.7; }
-  #levelName .lnName { font-family:'Cinzel',serif; font-weight:700; font-size:16px; letter-spacing:3px; line-height:1.15; }
+    z-index:5; pointer-events:none; text-align:center; color:#ffe9b8; text-shadow:0 2px 10px rgba(0,0,0,.7); display:none;
+    max-width:54vw; }
+  #levelName .lnLv { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:3px; opacity:.7; }
+  #levelName .lnName { font-family:'Cinzel',serif; font-weight:700; font-size:12px; letter-spacing:1.5px; line-height:1.25;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
   #meterWrap { position:fixed; left:50%; transform:translateX(-50%);
     bottom:max(26px,env(safe-area-inset-bottom)); width:min(320px,70vw); z-index:5;
@@ -244,7 +247,7 @@
     width:42px; height:42px; display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer;
     color:#f3d99a; background:rgba(20,12,28,.55); border:1px solid rgba(243,200,120,.35); border-radius:50%; transition:transform .2s; }
   #homeProfile svg { width:22px; height:22px; }
-  #homeProfile { background-size:cover; background-position:center top; overflow:hidden; }
+  #homeProfile { background-size:cover; background-position:center 30%; overflow:hidden; }
   #homeProfile.hasImg svg { display:none; }
   #homeProfile.hasDot::after { content:''; position:absolute; top:2px; right:2px; width:9px; height:9px; border-radius:50%;
     background:#ffcf3a; box-shadow:0 0 7px rgba(255,200,60,.9); z-index:1; }
@@ -396,7 +399,7 @@
   .profHead { display:flex; align-items:center; gap:14px; width:min(360px,90vw); margin-bottom:2px; }
   .profAvatar { position:relative; width:60px; height:60px; flex:0 0 auto; border-radius:50%; display:flex; align-items:center; justify-content:center;
     border:2px solid rgba(255,255,255,.5); box-shadow:0 2px 12px rgba(0,0,0,.4); cursor:pointer; pointer-events:auto;
-    background-size:cover; background-position:center top; overflow:hidden; }
+    background-size:cover; background-position:center 30%; overflow:hidden; }
   .profAvLetter { font-family:'Cinzel',serif; font-weight:700; font-size:26px; color:#1a1018; }
   .profAvatar.hasImg .profAvLetter { display:none; }
   .profAvCam { position:absolute; right:-2px; bottom:-2px; width:20px; height:20px; border-radius:50%; font-size:10px;
@@ -1177,8 +1180,8 @@ function characterThumb(charKey){
     g.rotation.y = 0.42; cp.sc.add(g);                              // static 3/4 portrait pose (never spinning)
     // dedicated CLOSE-UP camera framing the face + shoulders (separate from the shop's full-body cam)
     let pcam = cp.portraitCam;
-    if (!pcam){ pcam = new THREE.PerspectiveCamera(30, 1, 0.05, 12); cp.portraitCam = pcam; }
-    pcam.position.set(0.17, 0.605, 0.6); pcam.lookAt(0, 0.565, 0); pcam.aspect = 1; pcam.updateProjectionMatrix();
+    if (!pcam){ pcam = new THREE.PerspectiveCamera(32, 1, 0.05, 12); cp.portraitCam = pcam; }
+    pcam.position.set(0.2, 0.6, 0.92); pcam.lookAt(0, 0.52, 0); pcam.aspect = 1; pcam.updateProjectionMatrix();   // pulled back: head + shoulders, not a tight crop
     cp.rend.setSize(220, 220, false);
     cp.rend.render(cp.sc, pcam);
     const url = cp.rend.domElement.toDataURL('image/png');
