@@ -65,6 +65,13 @@
   .bigscore { font-family:'Cinzel',serif; font-size:54px; font-weight:700; color:#f3d99a;
     margin:6px 0; text-shadow:0 0 20px rgba(243,200,120,.4); }
   .gostat { font-size:13px; letter-spacing:2px; opacity:.8; }
+  #finalBadges { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; min-height:0; }
+  #finalBadges .badge { font-family:'Space Mono',monospace; font-size:10px; font-weight:700; letter-spacing:1.5px; color:#1a1208;
+    background:linear-gradient(180deg,#ffe79a,#e2a93f); border-radius:20px; padding:4px 12px; animation:ratePop .5s ease-out; }
+  #finalStats { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; width:min(320px,86vw); margin:12px auto 0; }
+  #finalStats .fstat { background:rgba(243,200,120,.08); border:1px solid rgba(243,200,120,.2); border-radius:11px; padding:9px 2px; text-align:center; }
+  #finalStats .fstatV { font-family:'Cinzel',serif; font-weight:700; font-size:18px; color:#f3d99a; line-height:1; }
+  #finalStats .fstatL { font-size:8px; letter-spacing:1px; opacity:.6; margin-top:4px; }
 
   /* coin counter (top-centre) */
   #coinHud { position:fixed; top:calc(max(16px,env(safe-area-inset-top)) + 46px); left:50%; transform:translateX(-50%);
@@ -700,9 +707,16 @@
 
 <div class="overlay hidden" id="overScreen">
   <div class="title" id="overTitle" style="font-size:clamp(26px,8vw,44px)">IT CRUMBLED</div>
+  <div id="finalBadges"></div>
   <div class="bigscore" id="finalScore">0</div>
   <div class="gostat" id="finalStat"></div>
-  <div class="gostat" id="finalReward" style="margin-top:14px;color:#ffe08a"></div>
+  <div id="finalStats">
+    <div class="fstat"><div class="fstatV" id="fsLevel">1</div><div class="fstatL">LEVEL</div></div>
+    <div class="fstat"><div class="fstatV" id="fsHeight">0m</div><div class="fstatL">HEIGHT</div></div>
+    <div class="fstat"><div class="fstatV" id="fsGold">×1</div><div class="fstatL">TOP GOLD</div></div>
+    <div class="fstat"><div class="fstatV" id="fsDeben">0</div><div class="fstatL">DEBEN</div></div>
+  </div>
+  <div class="gostat" id="finalReward" style="margin-top:10px;color:#ffe08a"></div>
   <div class="gostat" id="finalBoard" style="margin-top:6px;font-size:12px;opacity:.85"></div>
   <div class="cta hero" id="retryBtn" style="pointer-events:auto;margin-top:22px">RETRY</div>
   <div class="obtnRow">
@@ -1543,9 +1557,19 @@ for (let i=0;i<11;i++){
 
 // ---------- ERA BACKDROPS: themed background props (pyramids → temples → ruins → alien spires → heaven),
 // rebuilt only when the era changes. All tagged __env so they survive level resets. ----------
-let eraDecor = [], _backdropEra = null;
-function addDecor(o){ o.__env = true; eraDecor.push(o); scene.add(o); return o; }
-function clearEraDecor(){ eraDecor.forEach(o => scene.remove(o)); eraDecor = []; }
+let eraDecor = [], animProps = [], _backdropEra = null;
+function addDecor(o){ o.__env = true; eraDecor.push(o); if (o.__anim) animProps.push(o); scene.add(o); return o; }
+function clearEraDecor(){ eraDecor.forEach(o => scene.remove(o)); eraDecor = []; animProps = []; }
+// gently animate a curated handful of backdrop props (clouds drift, saucers spin & bob, aurora sways, stars twinkle)
+function animateBackdrop(T){
+  for (let i=0;i<animProps.length;i++){ const o=animProps[i], a=o.__anim; if (!a) continue;
+    if (a.t==='drift'){ const ang=a.a + T*0.012; o.position.set(a.d*Math.sin(ang), a.y + Math.sin(T*0.5+a.ph)*0.5, a.d*Math.cos(ang)); }
+    else if (a.t==='ufo'){ o.rotation.y += a.spd; o.position.y = a.y + Math.sin(T*0.8+a.ph)*0.3; }
+    else if (a.t==='aurora'){ o.rotation.z = a.rz + Math.sin(T*0.5+a.ph)*0.22; if (o.material) o.material.opacity = a.op*(0.55+0.45*Math.abs(Math.sin(T*0.35+a.ph))); }
+    else if (a.t==='star'){ const s=0.6+0.6*Math.abs(Math.sin(T*1.8+a.ph)); o.scale.set(s,s,s); }
+    else if (a.t==='sway'){ o.rotation.z = Math.sin(T*0.7+a.ph)*0.05; }
+  }
+}
 function ringPlace(n, near, far, fn){ for (let i=0;i<n;i++){ const a=Math.random()*6.28, d=near+Math.random()*(far-near); fn(Math.sin(a)*d, Math.cos(a)*d, a); } }
 function dMat(c, r){ return new THREE.MeshStandardMaterial({ color:c, roughness:r==null?1:r }); }
 function dGlow(c, e){ return new THREE.MeshStandardMaterial({ color:c, emissive:c, emissiveIntensity:e==null?0.5:e, metalness:0.3, roughness:0.35, transparent:true, opacity:0.92 }); }
@@ -1560,7 +1584,7 @@ function dStepPyr(x,z,s,col){ const g=new THREE.Group(); const tiers=5; for(let 
 function dTree(x,z,s){ const g=new THREE.Group(); const t=new THREE.Mesh(new THREE.CylinderGeometry(0.12*s,0.18*s,1.6*s,7), dMat(0x5a4326)); t.position.y=0.8*s; g.add(t); for(let i=0;i<3;i++){ const f=new THREE.Mesh(new THREE.ConeGeometry(0.85*s-i*0.2*s,1.0*s,8), dMat(0x2f6a34)); f.position.y=1.3*s+i*0.5*s; f.castShadow=true; g.add(f);} g.position.set(x,-0.5,z); addDecor(g); }
 function dCrystal(x,z,h,col){ const m=new THREE.Mesh(new THREE.ConeGeometry(0.5+Math.random()*0.4,h,6), dGlow(col,0.55)); m.position.set(x,-0.5+h/2,z); m.rotation.set((Math.random()-0.5)*0.4,Math.random()*3,(Math.random()-0.5)*0.4); addDecor(m); }
 function dMonolith(x,z,h,col){ const m=new THREE.Mesh(new THREE.BoxGeometry(1+Math.random(),h,0.6), dMat(col,0.4)); m.position.set(x,-0.5+h/2,z); m.rotation.y=Math.random(); m.castShadow=true; addDecor(m); }
-function dCloud(x,y,z,s){ const g=new THREE.Group(); for(let i=0;i<4;i++){ const b=new THREE.Mesh(new THREE.SphereGeometry(s*(0.7+Math.random()*0.6),12,10), new THREE.MeshStandardMaterial({color:0xfdfbff,emissive:0xece8ff,emissiveIntensity:0.3,roughness:1})); b.position.set((Math.random()-0.5)*s*2.4,(Math.random()-0.5)*s*0.5,(Math.random()-0.5)*s*1.4); g.add(b);} g.position.set(x,y,z); addDecor(g); }
+function dCloud(x,y,z,s){ const g=new THREE.Group(); for(let i=0;i<4;i++){ const b=new THREE.Mesh(new THREE.SphereGeometry(s*(0.7+Math.random()*0.6),12,10), new THREE.MeshStandardMaterial({color:0xfdfbff,emissive:0xece8ff,emissiveIntensity:0.3,roughness:1})); b.position.set((Math.random()-0.5)*s*2.4,(Math.random()-0.5)*s*0.5,(Math.random()-0.5)*s*1.4); g.add(b);} g.position.set(x,y,z); g.__anim={t:'drift',d:Math.hypot(x,z),a:Math.atan2(x,z),y,ph:Math.random()*6.28}; addDecor(g); }
 function dPillar(x,z,h,col){ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.62,h,16), new THREE.MeshStandardMaterial({color:col,emissive:0x6a5024,emissiveIntensity:0.3,metalness:0.6,roughness:0.3})); c.position.set(x,-0.5+h/2,z); addDecor(c); const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.78,0.7,0.4,16), dMat(col)); cap.position.set(x,-0.5+h+0.2,z); addDecor(cap); }
 const faceCentre = (x,z)=>Math.atan2(-x,-z);   // yaw so a prop faces the pyramid at the origin
 // EGYPT: a reclining Great Sphinx
@@ -1594,7 +1618,7 @@ function dPine(x,z,s){ const g=new THREE.Group(); const t=new THREE.Mesh(new THR
   for(let i=0;i<4;i++){ const c=new THREE.Mesh(new THREE.ConeGeometry(0.8*s-i*0.16*s,0.8*s,7), dMat(i===3?0xeaf2f6:0x2e5238)); c.position.y=0.8*s+i*0.5*s; g.add(c);} g.position.set(x,-0.5,z); addDecor(g); }
 function dMountain(x,z,s,col){ const m=new THREE.Mesh(new THREE.ConeGeometry(s,s*1.6,6), dMat(col||0x5a6470)); m.position.set(x,-1.4+s*0.8,z); addDecor(m);
   const cap=new THREE.Mesh(new THREE.ConeGeometry(s*0.42,s*0.6,6), dMat(0xeef4f8)); cap.position.set(x,-1.4+s*1.3,z); addDecor(cap); }
-function dAurora(x,z){ const m=new THREE.Mesh(new THREE.PlaneGeometry(9,16), new THREE.MeshBasicMaterial({color:[0x4affb0,0x4ad0ff,0xb06aff][Math.floor(Math.random()*3)],transparent:true,opacity:0.16,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending,fog:false})); m.position.set(x,9,z); m.rotation.y=Math.random()*6.28; m.rotation.z=(Math.random()-0.5)*0.3; addDecor(m); }
+function dAurora(x,z){ const m=new THREE.Mesh(new THREE.PlaneGeometry(9,16), new THREE.MeshBasicMaterial({color:[0x4affb0,0x4ad0ff,0xb06aff][Math.floor(Math.random()*3)],transparent:true,opacity:0.16,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending,fog:false})); m.position.set(x,9,z); m.rotation.y=Math.random()*6.28; m.rotation.z=(Math.random()-0.5)*0.3; m.__anim={t:'aurora',rz:m.rotation.z,op:0.16,ph:Math.random()*6.28}; addDecor(m); }
 // NIPPON: torii gate, pagoda, cherry blossom, Mt Fuji
 function dTorii(x,z,s){ const g=new THREE.Group(), red=dMat(0xc0392b);
   [-1,1].forEach(d=>{ const p=new THREE.Mesh(new THREE.CylinderGeometry(s*0.12,s*0.15,s*2,8), red); p.position.set(d*s*0.75,s,0); p.castShadow=true; g.add(p); });
@@ -1606,18 +1630,19 @@ function dPagoda(x,z,s){ const g=new THREE.Group(); const tiers=4;
     const roof=new THREE.Mesh(new THREE.ConeGeometry(w*0.78,s*0.4,4), dMat(0x2a2a2e)); roof.rotation.y=Math.PI/4; roof.position.y=i*s*0.85+s*0.75; g.add(roof); }
   const fin=new THREE.Mesh(new THREE.CylinderGeometry(s*0.03,s*0.03,s*0.5,6), dMat(0xd9b84a)); fin.position.y=tiers*s*0.85+s*0.1; g.add(fin); g.position.set(x,-0.5,z); addDecor(g); }
 function dBlossom(x,z,s){ const g=new THREE.Group(); const t=new THREE.Mesh(new THREE.CylinderGeometry(0.1*s,0.16*s,1.2*s,6), dMat(0x5a4030)); t.position.y=0.6*s; g.add(t);
-  for(let i=0;i<5;i++){ const f=new THREE.Mesh(new THREE.SphereGeometry(0.5*s+Math.random()*0.3*s,10,8), new THREE.MeshStandardMaterial({color:0xffb7d5,emissive:0x6a2a44,emissiveIntensity:0.15,roughness:1})); f.position.set((Math.random()-0.5)*s,1.2*s+Math.random()*0.6*s,(Math.random()-0.5)*s); g.add(f);} g.position.set(x,-0.5,z); addDecor(g); }
+  for(let i=0;i<5;i++){ const f=new THREE.Mesh(new THREE.SphereGeometry(0.5*s+Math.random()*0.3*s,10,8), new THREE.MeshStandardMaterial({color:0xffb7d5,emissive:0x6a2a44,emissiveIntensity:0.15,roughness:1})); f.position.set((Math.random()-0.5)*s,1.2*s+Math.random()*0.6*s,(Math.random()-0.5)*s); g.add(f);} g.position.set(x,-0.5,z); g.__anim={t:'sway',ph:Math.random()*6.28}; addDecor(g); }
 // XENON: a hovering UFO saucer
 function dUFO(x,y,z,s){ const g=new THREE.Group();
   const disc=new THREE.Mesh(new THREE.CylinderGeometry(s,s*0.45,s*0.35,18), dMat(0x3a3a4a,0.4)); g.add(disc);
   const dome=new THREE.Mesh(new THREE.SphereGeometry(s*0.45,16,10,0,6.28,0,1.4), dGlow(0x6affd0,0.6)); dome.position.y=s*0.16; g.add(dome);
   const ring=new THREE.Mesh(new THREE.CylinderGeometry(s*1.04,s*1.04,s*0.07,20), dGlow(0x4af0e0,0.7)); ring.position.y=-s*0.05; g.add(ring);
-  g.position.set(x,y,z); g.rotation.y=Math.random()*6.28; g.__ufo=true; addDecor(g); }
+  g.position.set(x,y,z); g.rotation.y=Math.random()*6.28; g.__anim={t:'ufo',y,ph:Math.random()*6.28,spd:0.005+Math.random()*0.006}; addDecor(g); }
 // COSMOS: planets, asteroid rocks, light pricks of stars
 function dPlanet(x,y,z,s,col){ const p=new THREE.Mesh(new THREE.SphereGeometry(s,20,16), new THREE.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:0.25,roughness:0.7,fog:false})); p.position.set(x,y,z); addDecor(p);
   if(Math.random()<0.6){ const ring=new THREE.Mesh(new THREE.RingGeometry(s*1.35,s*2.1,30), new THREE.MeshBasicMaterial({color:0xcaa0ff,transparent:true,opacity:0.4,side:THREE.DoubleSide,fog:false})); ring.position.set(x,y,z); ring.rotation.x=1.15; ring.rotation.y=0.5; addDecor(ring); } }
 function dStarfield(n){ for(let i=0;i<n;i++){ const a=Math.random()*6.28, d=30+Math.random()*30, yy=4+Math.random()*30;
-  const s=new THREE.Mesh(new THREE.SphereGeometry(0.12+Math.random()*0.18,6,6), new THREE.MeshBasicMaterial({color:0xfdfdff,fog:false})); s.position.set(Math.sin(a)*d,yy,Math.cos(a)*d); addDecor(s); } }
+  const s=new THREE.Mesh(new THREE.SphereGeometry(0.12+Math.random()*0.18,6,6), new THREE.MeshBasicMaterial({color:0xfdfdff,fog:false}));
+  s.position.set(Math.sin(a)*d,yy,Math.cos(a)*d); if (i%3===0) s.__anim={t:'star',ph:Math.random()*6.28}; addDecor(s); } }
 // EMPYREAN: a shaft of divine light
 function dLightBeam(x,z){ const m=new THREE.Mesh(new THREE.CylinderGeometry(0.9,1.6,42,16,1,true), new THREE.MeshBasicMaterial({color:0xfff2c0,transparent:true,opacity:0.12,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending,fog:false})); m.position.set(x,19,z); addDecor(m); }
 // ---- extra ICONIC landmarks (instantly read the era) ----
@@ -1658,7 +1683,7 @@ function dMothership(x,y,z,s){ const g=new THREE.Group();   // ALIEN mothership
   const dome=new THREE.Mesh(new THREE.SphereGeometry(s*0.5,18,12,0,6.28,0,1.4), dGlow(0x8a6aff,0.4)); dome.position.y=s*0.15; g.add(dome);
   for(let i=0;i<14;i++){ const a=i/14*6.28; const l=new THREE.Mesh(new THREE.SphereGeometry(s*0.05,6,6), dGlow([0x4af0e0,0xff5ad0][i%2],0.9)); l.position.set(Math.sin(a)*s*0.95,-s*0.05,Math.cos(a)*s*0.95); g.add(l);}
   const beam=new THREE.Mesh(new THREE.CylinderGeometry(s*0.2,s*0.6,y,12,1,true), new THREE.MeshBasicMaterial({color:0x8affe0,transparent:true,opacity:0.1,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending,fog:false})); beam.position.y=-y/2; g.add(beam);
-  g.position.set(x,y,z); g.__ufo=true; addDecor(g); }
+  g.position.set(x,y,z); g.__anim={t:'ufo',y,ph:Math.random()*6.28,spd:0.003+Math.random()*0.004}; addDecor(g); }
 function dShroom(x,z,s){ const g=new THREE.Group();   // ALIEN glowing flora
   const st=new THREE.Mesh(new THREE.CylinderGeometry(s*0.1,s*0.14,s*1.2,8), dMat(0x3a2a4a)); st.position.y=s*0.6; g.add(st);
   const cap=new THREE.Mesh(new THREE.SphereGeometry(s*0.4,12,8,0,6.28,0,1.6), dGlow([0x4af0e0,0xff5ad0,0xb46aff][Math.floor(Math.random()*3)],0.6)); cap.scale.set(1,0.6,1); cap.position.y=s*1.2; g.add(cap);
@@ -1667,7 +1692,7 @@ function dStation(x,y,z,s){ const g=new THREE.Group();   // COSMOS space station
   const core=new THREE.Mesh(new THREE.CylinderGeometry(s*0.3,s*0.3,s*1.4,12), dMat(0x9aa0b0,0.7)); core.rotation.z=Math.PI/2; g.add(core);
   const ring=new THREE.Mesh(new THREE.RingGeometry(s*0.9,s*1.1,28), new THREE.MeshStandardMaterial({color:0x8a90a0,metalness:0.6,roughness:0.4,side:THREE.DoubleSide,fog:false})); ring.rotation.x=1.2; g.add(ring);
   for(let i=0;i<10;i++){ const a=i/10*6.28; const l=new THREE.Mesh(new THREE.SphereGeometry(s*0.045,6,6), dGlow(0xffd24a,0.8)); l.position.set(0,Math.sin(a)*s,Math.cos(a)*s); g.add(l);}
-  g.position.set(x,y,z); g.__ufo=true; addDecor(g); }
+  g.position.set(x,y,z); g.__anim={t:'ufo',y,ph:Math.random()*6.28,spd:0.004+Math.random()*0.004}; addDecor(g); }
 function dGoldenGate(x,z,s){ const g=new THREE.Group(), gld=new THREE.MeshStandardMaterial({color:0xffe9a8,emissive:0x6a5024,emissiveIntensity:0.3,metalness:0.7,roughness:0.3});   // EMPYREAN gates
   [-1,1].forEach(d=>{ const p=new THREE.Mesh(new THREE.CylinderGeometry(s*0.3,s*0.34,s*3,16), gld); p.position.set(d*s*1.1,s*1.5,0); g.add(p);
     const cap=new THREE.Mesh(new THREE.SphereGeometry(s*0.36,12,10), gld); cap.position.set(d*s*1.1,s*3.05,0); g.add(cap); });
@@ -2273,6 +2298,9 @@ function pushCells(a, placed, weak, off=0){
 function blockPlaced(mesh, instability, capstone, len, consumed, bonus){
   S.layerBlocks.push(mesh);
   S.squash.push({ mesh, t:0 });                 // satisfying landing squash (juice)
+  if (capstone){                                // CAPSTONE IGNITE: a bright flash + golden burst crowns the pyramid
+    try { flash(); shake(0.25); if (mesh && mesh.position){ spawnDust(mesh.position.clone(), 0xffe6a0, 24, 3.0, 3.2); sparkle(mesh.position.clone()); } if (Sound.glory) Sound.glory(); } catch(e){}
+  }
   // accuracy tiers — PERFECT (exact) / GREAT / GOOD pay 3 / 2 / 1 coins; anything looser is a MISS
   let tier, coins, baseScore;
   if      (instability < perfectThreshold()){ tier='PERFECT'; coins=3; baseScore=100; }
@@ -2713,7 +2741,7 @@ function startRun(){
             lane:0, laneX:0, sliding:false, slideT:0, slideDur:0.5,
             rolling:false, rollT:0, rollDur:0.5, rollDir:1, rollCD:0,
             magnet:0, shield:0, slow:0, bubble:null, hazardMul, dressed:false,
-            gMult:1, gMultT:0,                                  // golden-block score multiplier + its countdown
+            gMult:1, gMultT:0, gMultMax:1,                      // golden-block score multiplier (+ peak reached this run)
             storms, revives:0, usedAdRevive:false, invuln:0, dead:false, deathReason:'fell' };
   // NB: obstacles / coins / power-ups / lane guides are NOT created yet — only when the climb starts
   // (loadRunDressing in beginClimb), so the rating screen shows a clean pyramid with nothing moving on it.
@@ -3159,6 +3187,7 @@ function collectGold(t, r){
   const pos = t.gold.mesh.position.clone();
   scene.remove(t.gold.mesh); sparkle(pos); Sound.treasure();
   r.gMult = Math.min(5, r.gMult + 1);                                       // each block bumps the multiplier, capped ×5
+  r.gMultMax = Math.max(r.gMultMax||1, r.gMult);                            // remember the run's best chain for the summary
   r.gMultT = 6.5;                                                           // refresh the chain window
   S.score += 120 * r.gMult;
   S.coins += r.gMult; bank += r.gMult; Store.set('coins', bank);
@@ -3619,7 +3648,9 @@ function endGame(won, how){
   const newBest = S.score > bestScore;
   if (newBest){ bestScore = S.score; Store.set('best', bestScore); }
   const peak = S.peakY || 0;
-  if (peak > (bestHeight||0)){ bestHeight = peak; Store.set('height', bestHeight); }
+  const newHeight = peak > (bestHeight||0);
+  if (newHeight){ bestHeight = peak; Store.set('height', bestHeight); }
+  const newMaxLvl = won && (gameLevel+1) > maxLevel;   // beating this level pushes your furthest
   if (dailyMode){ const k='daily_'+todayKey(); if (S.score > Store.get(k,0)) Store.set(k, S.score); }
   recordScore({ score:S.score, daily:dailyMode, date:Date.now() });
   // push the run to the shared global board, and report whether it landed (so a missing name / offline is obvious)
@@ -3637,12 +3668,20 @@ function endGame(won, how){
   if (firstTime){ firstTime = false; Store.set('tut', 1); }   // onboarding only on the first game
   setTimeout(()=>{
     $('overTitle').textContent = won ? 'YOU REACHED THE TOP' : (how==='fell' ? 'YOU FELL' : how==='hit' ? 'YOU CRASHED' : how==='collapsed' ? 'IT ALL CAME DOWN' : 'GAME OVER');
-    $('finalScore').textContent = S.score;
+    $('finalScore').textContent = (S.score||0).toLocaleString();
     $('finalStat').textContent = won
       ? 'Pyramid built and conquered.'
       : (how==='fell' ? 'So close to the summit.' : how==='hit' ? 'Hit an obstacle on the climb.' : `The structure gave way on layer ${S.layer+1}.`);
-    $('finalReward').innerHTML = (newBest ? '★ NEW BEST! &nbsp;·&nbsp; ' : '') +
-      `+${S.coins} deben collected &nbsp;·&nbsp; bank ◎${bank}`;
+    let badges = '';
+    if (newBest) badges += '<span class="badge">★ NEW BEST SCORE</span>';
+    if (newHeight) badges += '<span class="badge">▲ NEW HIGH CLIMB</span>';
+    if (newMaxLvl) badges += '<span class="badge">⚑ FURTHEST YET</span>';
+    $('finalBadges').innerHTML = badges;
+    $('fsLevel').textContent  = gameLevel;
+    $('fsHeight').textContent = Math.round(peak) + 'm';
+    $('fsGold').textContent   = '×' + (S.run ? (S.run.gMultMax||1) : 1);
+    $('fsDeben').textContent  = '+' + (S.coins||0);
+    $('finalReward').innerHTML = `bank ◎${bank.toLocaleString()}`;
     $('dblBtn').style.display = (S.coins > 0 && !S.coinsDoubled) ? '' : 'none';
     $('overScreen').classList.remove('hidden');
   }, 700);
@@ -3774,6 +3813,7 @@ function animate(){
   // slow-mo: timeScale dips on a clutch jump, then eases back to full speed
   S.timeScale = (S.timeScale||1) + (1 - (S.timeScale||1)) * Math.min(1, dt*3.5);
   const sdt = dt * (S.timeScale||1);
+  if (animProps.length) animateBackdrop(performance.now()*0.001);    // living backdrops
 
   if (S.active && S.phase==='build' && !S.paused){
     const a = S.active;
