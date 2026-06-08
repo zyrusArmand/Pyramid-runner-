@@ -18,16 +18,13 @@
   .stat { font-size:10px; letter-spacing:2px; opacity:.7; }
   .val  { font-size:18px; font-weight:700; line-height:1; }
   /* three stacked readouts (SCORE / LEVEL / LAYER) top-right */
-  .right { display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
-  .statBox { display:flex; align-items:baseline; justify-content:flex-end; gap:7px;
-    background:rgba(18,11,26,.34); -webkit-backdrop-filter:blur(7px); backdrop-filter:blur(7px);
-    border:1px solid rgba(243,200,120,.15); border-radius:13px; padding:4px 12px; }
+  .right { display:flex; flex-direction:column; align-items:flex-end; gap:5px; }
+  .statBox { display:flex; align-items:baseline; justify-content:flex-end; gap:7px; }
   /* current level / biome name, centred at the very top — width-capped & ellipsised so a long biome name never
      overlaps the corner buttons/stats and the layout is identical on every level */
-  #levelName { position:fixed; top:max(12px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
+  #levelName { position:fixed; top:max(14px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
     z-index:5; pointer-events:none; text-align:center; color:#ffe9b8; text-shadow:0 2px 10px rgba(0,0,0,.7); display:none;
-    max-width:54vw; background:rgba(18,11,26,.32); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
-    border:1px solid rgba(243,200,120,.13); border-radius:13px; padding:4px 16px; }
+    max-width:54vw; }
   #levelName .lnLv { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:3px; opacity:.7; }
   #levelName .lnName { font-family:'Cinzel',serif; font-weight:700; font-size:12px; letter-spacing:1.5px; line-height:1.25;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -77,11 +74,9 @@
   #finalStats .fstatL { font-size:8px; letter-spacing:1px; opacity:.6; margin-top:4px; }
 
   /* coin counter (top-centre) */
-  #coinHud { position:fixed; top:calc(max(16px,env(safe-area-inset-top)) + 50px); left:50%; transform:translateX(-50%);
+  #coinHud { position:fixed; top:calc(max(16px,env(safe-area-inset-top)) + 46px); left:50%; transform:translateX(-50%);
     z-index:5; pointer-events:none; font-family:'Space Mono',monospace; color:#ffe08a; font-weight:700;
-    font-size:16px; text-shadow:0 2px 6px rgba(0,0,0,.6); display:flex; align-items:center; gap:6px; transition:transform .12s;
-    background:rgba(18,11,26,.34); -webkit-backdrop-filter:blur(7px); backdrop-filter:blur(7px);
-    border:1px solid rgba(243,200,120,.18); border-radius:20px; padding:4px 13px; }
+    font-size:16px; text-shadow:0 2px 6px rgba(0,0,0,.6); display:flex; align-items:center; gap:6px; transition:transform .12s; }
   #coinHud.pulse { transform:translateX(-50%) scale(1.25); }
   /* stamped gold DEBEN coin — a struck disc with a raised rim and an ankh engraving */
   .coinIcon { position:relative; width:1em; height:1em; border-radius:50%; display:inline-block; flex:0 0 auto;
@@ -93,7 +88,7 @@
   #coinHud .coinIcon { font-size:16px; }
   #coinHud.hidden { display:none; }
   /* golden-block score multiplier badge — sits just under the coin counter, only while a chain is live */
-  #multHud { position:fixed; top:calc(max(16px,env(safe-area-inset-top)) + 86px); left:50%; transform:translateX(-50%);
+  #multHud { position:fixed; top:calc(max(16px,env(safe-area-inset-top)) + 70px); left:50%; transform:translateX(-50%);
     z-index:5; pointer-events:none; font-family:'Cinzel',serif; font-weight:700; font-size:18px; letter-spacing:1px;
     color:#ffd98a; text-shadow:0 2px 10px rgba(255,170,40,.75); animation:multPulse .7s ease-in-out infinite; }
   #multHud.hidden { display:none; }
@@ -641,11 +636,6 @@
   <div id="homeInner">
     <div class="title homeTitle">PYRAMID<br>STACKER</div>
     <div class="tagline">BUILD&nbsp;IT&nbsp;·&nbsp;CLIMB&nbsp;IT</div>
-    <div class="chips">
-      <div class="chip"><span class="chipLbl">BEST</span><span class="chipVal" id="bestScore">0</span></div>
-      <div class="chip"><span class="chipLbl">CLIMB</span><span class="chipVal" id="bestHeight">0m</span></div>
-      <div class="chip chipTap" id="coinsChip"><span class="chipLbl coinLbl">COINS</span><span class="chipVal" id="bankCoins">0</span></div>
-    </div>
     <div class="cta hero" id="homePlay">PLAY</div>
     <div class="homeRow">
       <div class="midBtn" id="homeLeader"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4a5 5 0 0 1-10 0V4z"/><path d="M7 6H4v1.5A3.5 3.5 0 0 0 7.5 11"/><path d="M17 6h3v1.5A3.5 3.5 0 0 1 16.5 11"/><path d="M9.5 18h5"/><path d="M12 14.5V18"/></svg>LEADERBOARD</div>
@@ -3639,9 +3629,10 @@ function showStart(){            // the main "home" menu (cover art + PLAY / LEA
   renderHome();
 }
 function renderHome(){
-  $('bestScore').textContent  = bestScore;
-  { const bh=$('bestHeight'); if (bh) bh.textContent = (bestHeight||0).toFixed(0)+'m'; }   // CLIMB chip removed from home; guard
-  $('bankCoins').textContent  = bank;
+  // home stat chips were removed — guard in case any of these elements aren't present
+  { const e=$('bestScore');  if (e) e.textContent = bestScore; }
+  { const e=$('bestHeight'); if (e) e.textContent = (bestHeight||0).toFixed(0)+'m'; }
+  { const e=$('bankCoins');  if (e) e.textContent = bank; }
   ensureMissions();
   const gb = $('homeGoalsBtn'); if (gb){ gb.classList.toggle('hasNew', goalsNew); gb.title = 'Daily Goals' + (dailyStreak>0 ? ' · Day ' + dailyStreak : ''); }
   const pl = $('homePlay'); if (pl) pl.textContent = (!dailyMode && resumeLevel > 1) ? ('CONTINUE · LV ' + resumeLevel) : 'PLAY';
@@ -4106,7 +4097,6 @@ btn('mapBack',       backHome);
 btn('homeSettings',  showSettings);
 btn('homeHelp',      showHow);
 btn('howClose',      closeHow);
-btn('coinsChip',     ()=>showShop());
 btn('leaderBack',    backHome);
 btn('shopBack',      backHome);
 btn('goalsBack',     backHome);
