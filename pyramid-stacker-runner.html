@@ -3146,7 +3146,8 @@ function renderLeader(){
   if (nameWrap){ nameWrap.style.display = (RemoteBoard.enabled() && !playerName) ? 'flex' : 'none'; if (nameInput) nameInput.value = playerName || ''; }
   const tb = $('lbTestBtn'), dg = $('lbDiag');
   if (tb) tb.style.display = RemoteBoard.enabled() ? 'flex' : 'none';
-  if (dg) dg.textContent = '';
+  if (dg){ const lp = Store.get('lastPost', null);
+    dg.textContent = lp ? ('last run post → ' + lp.status + (lp.extra ? ' — ' + lp.extra : '') + '  [' + lp.name + ' · ' + (lp.score||0).toLocaleString() + (lp.daily ? ' · DAILY' : '') + ']') : ''; }
   renderLeaderboard();
 }
 // one-tap diagnostic: post a test row and show the EXACT server result so a failure is readable
@@ -3235,12 +3236,16 @@ function equipSel(){
 // `force` posts the definitive final score at game-over. Returns Promise<boolean|null> (null = skipped/daily/disabled).
 let _runPostedScore = -1;
 function postScore(force){
-  if (!RemoteBoard.enabled() || dailyMode) return Promise.resolve(null);
+  const rec = (status, extra) => { try { Store.set('lastPost', { t:Date.now(), status, score:Math.round(S.score||0), name:(playerName||'ANON'), daily:!!dailyMode, extra:extra||'' }); } catch(e){} };
+  if (!RemoteBoard.enabled()){ rec('disabled'); return Promise.resolve(null); }
+  if (dailyMode){ rec('skipped: daily mode ON'); return Promise.resolve(null); }
   const sc = Math.max(0, Math.round(S.score||0));
-  if (sc <= 0) return Promise.resolve(null);
-  if (!force && sc <= _runPostedScore) return Promise.resolve(null);
+  if (sc <= 0){ rec('skipped: score is 0'); return Promise.resolve(null); }
+  if (!force && sc <= _runPostedScore){ rec('skipped: already posted this score'); return Promise.resolve(null); }
   _runPostedScore = sc;
-  return RemoteBoard.submit({ name:(playerName||'ANON').slice(0,12), score:sc, level:Math.round(gameLevel)||1, height:Math.round((S.peakY||0)*10)/10 });
+  rec('posting…');
+  return RemoteBoard.submit({ name:(playerName||'ANON').slice(0,12), score:sc, level:Math.round(gameLevel)||1, height:Math.round((S.peakY||0)*10)/10 })
+    .then(ok => { rec(ok ? 'POSTED OK' : 'FAILED', ok ? '' : (RemoteBoard.lastError||'')); return ok; });
 }
 function endGame(won, how){
   if (S.gameOver) return;
