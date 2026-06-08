@@ -1527,6 +1527,11 @@ const ERAS = [
 function eraFor(level){ return ERAS[Math.min(ERAS.length-1, Math.floor((Math.max(1,level)-1)/10))]; }
 function bandFor(level){ const e=eraFor(level); return e.bands[Math.floor((Math.max(1,level)-1)/5) % e.bands.length]; }
 function biomeFor(level){ const b=bandFor(level), e=eraFor(level); return { name: b.name, era: e.name, storm: b.storm }; }
+// ---- GUARDIAN LEVELS: the last level of each era (10, 20, … 80) is a boss "guardian climb" ----
+function isGuardianLevel(level){ return level>0 && level % 10 === 0; }
+function eraBossKey(eraKey){ const s = CHAR_SPEC.find(x => x[0]===eraKey && x[1]===3); return s ? s[2] : null; }
+function guardianName(level){ const k = eraBossKey(eraFor(level).key); return (k && CHARACTERS[k]) ? CHARACTERS[k].name : 'GUARDIAN'; }
+function guardianReward(level){ return 300 + Math.floor((level-1)/10)*150; }   // bigger payout deeper in
 let curEra = null, curEraBlock = null;
 function applyBiome(level){
   const b = bandFor(level), e = eraFor(level);
@@ -2593,7 +2598,7 @@ function loadRunDressing(){
   // procedural obstacles: only the hazard TYPES unlocked at this level appear, at a level-scaled density (level 1
   // has none). The mix is drawn from whatever has been introduced so far, so the climb grows busier as you progress.
   const haz = hazardsUnlocked(gameLevel);
-  const density = obstacleDensity(gameLevel);
+  const density = obstacleDensity(gameLevel) * (isGuardianLevel(gameLevel) ? 1.5 : 1);   // guardian climbs run hotter
   let lastOb = 2;
   for (let i = 5; haz.length && i < tiles.length - 2; i++){
     const t = tiles[i];
@@ -2730,6 +2735,63 @@ function loadRunDressing(){
     }
   }
   addLaneGuides(tiles);                                  // the three glowing paths you're restricted to
+  spawnGuardian();                                       // boss looms on the summit during an era-final (guardian) level
+}
+
+// the era boss looms huge on the conquered summit during a guardian level — climb up and topple it
+function spawnGuardian(){
+  S.guardian = null;
+  if (!isGuardianLevel(gameLevel)) return;
+  const r = S.run; if (!r || !r.tiles || !r.tiles.length) return;
+  const apex = r.tiles[r.tiles.length-1].pos;
+  const bossKey = eraBossKey(eraFor(gameLevel).key); if (!bossKey) return;
+  try {
+    const save = curChar; curChar = bossKey;
+    const g = makeRunner();                              // build the boss model
+    curChar = save;
+    const GS = RUN_SCALE * 3.2;                          // towers over the tiny climber
+    g.scale.set(GS, GS, GS);
+    g.position.set(apex.x, apex.y, apex.z);
+    g.rotation.y = Math.PI;                              // glare back down the path at the climber
+    scene.add(g);
+    // a menacing ground glow at its feet
+    let ring = null;
+    try {
+      ring = new THREE.Mesh(new THREE.CircleGeometry(0.5, 28),
+        new THREE.MeshBasicMaterial({ color:0xff3a2a, transparent:true, opacity:0.3, depthWrite:false }));
+      ring.rotation.x = -Math.PI/2; ring.position.set(apex.x, apex.y+0.02, apex.z); scene.add(ring);
+    } catch(e){}
+    S.guardian = { mesh:g, ring, baseY:apex.y, t:0, alive:true, defeatT:0 };
+  } catch(e){ S.guardian = null; }
+}
+// idle hover / breathing while alive; topple + dissolve once the climber reaches the summit
+function updateGuardian(dt){
+  const gd = S.guardian; if (!gd || !gd.mesh) return;
+  gd.t += dt;
+  if (gd.alive){
+    const m = gd.mesh;
+    m.position.y = gd.baseY + Math.sin(gd.t*1.6)*0.04;   // slow looming bob
+    m.rotation.y = Math.PI + Math.sin(gd.t*0.8)*0.18;    // sways, watching
+    if (gd.ring) gd.ring.material.opacity = 0.22 + Math.sin(gd.t*3)*0.1;
+  } else {
+    gd.defeatT += dt;
+    const m = gd.mesh, p = Math.min(gd.defeatT/1.0, 1);
+    m.rotation.z = p * 1.7;                              // topples backward
+    m.position.y = gd.baseY - p*0.5;                     // sinks through the summit
+    if (m.traverse) m.traverse(o => { if (o.isMesh && o.material && 'opacity' in o.material){ o.material.transparent=true; o.material.opacity = 1-p; } });
+    if (gd.ring) gd.ring.material.opacity = 0.3*(1-p);
+    if (p >= 1){ scene.remove(m); if (gd.ring) scene.remove(gd.ring); S.guardian = null; }
+  }
+}
+// climber reached the top of a guardian level → topple the boss + pay the bounty
+function defeatGuardian(){
+  const gd = S.guardian; if (!gd || !gd.alive) return;
+  gd.alive = false; gd.defeatT = 0;
+  const reward = guardianReward(gameLevel);
+  bank += reward; S.coins += reward; Store.set('coins', bank); updateCoinHud(true);
+  try { sparkle(gd.mesh.position.clone()); } catch(e){}
+  flash(); shake(0.5); Sound.glory();
+  showPop('⚔ ' + guardianName(gameLevel) + ' VANQUISHED  +' + reward + ' ' + COIN_NAME);
 }
 
 function startRun(){
@@ -2839,7 +2901,8 @@ function startClimbNow(){
   if (r.perkMagnet){ r.magnet = 9999; }
   if (r.perkSlow){ r.slow = Math.max(r.slow, 6.5); }
   const gaps = r.tiles.some(t => t.gap);
-  showPop(gaps ? 'JUMP THE GAPS!' : 'CLIMB!');
+  if (isGuardianLevel(gameLevel)) showPop('⚔ TOPPLE ' + guardianName(gameLevel) + '!');
+  else showPop(gaps ? 'JUMP THE GAPS!' : 'CLIMB!');
 }
 
 function runJump(){
@@ -2880,6 +2943,8 @@ function updateRun(dt){
     followCam(dt, true); return;
   }
   if (r.dead){ followCam(dt, false); return; }     // frozen while the revive prompt is up
+
+  if (S.guardian) updateGuardian(dt);              // boss looms / topples on guardian levels
 
   if (r.celebrating){                               // VICTORY: planted on the summit, both fists thrown straight up
     r.celebT = (r.celebT || 0) + dt;
@@ -2931,6 +2996,7 @@ function updateRun(dt){
     r.t -= 1; r.idx++;
     if (r.idx >= r.tiles.length-1){     // reached the summit → celebrate on the flat top, then offer NEXT LEVEL
       r.idx = r.tiles.length-1; r.t = 0; r.celebrating = true; r.celebT = 0; r.celebDone = false; Sound.win();
+      if (S.guardian) defeatGuardian();                                // topple the era boss on a guardian summit
       g.position.copy(r.tiles[r.idx].pos);
       if (S.shadow) S.shadow.visible = false;                         // no shadow disc on the victory peak
       if (g.traverse) g.traverse(o => { if (o.isMesh) o.castShadow = false; });   // and the climber casts no dark blob on the summit
@@ -3390,7 +3456,8 @@ function nextLevel(){
   $('hud').style.display='flex';
   $('reviveScreen').classList.add('hidden'); $('hint').classList.remove('show');
   $('menuBtn').style.display='block'; $('restartBtn').style.display='block';
-  { const b=biomeFor(gameLevel); showPop('LEVEL ' + gameLevel + ' · ' + b.era + ' — ' + b.name); }   // quick banner of the new level/era
+  if (isGuardianLevel(gameLevel)) showPop('⚔ GUARDIAN OF ' + biomeFor(gameLevel).era + ' — ' + guardianName(gameLevel) + ' AWAITS');
+  else { const b=biomeFor(gameLevel); showPop('LEVEL ' + gameLevel + ' · ' + b.era + ' — ' + b.name); }   // quick banner of the new level/era
   updateHUD(); spawnBlock(); setLevelName(true);
 }
 
