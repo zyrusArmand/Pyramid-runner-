@@ -2734,9 +2734,13 @@ function renderLeaderboard(){
   if (RemoteBoard.enabled()){
     lb.innerHTML = '<div class="lbttl">GLOBAL TOP RUNS</div><div class="lbrow"><span class="lbrank">·</span><b>loading…</b></div>';
     const token = (renderLeaderboard._t = (renderLeaderboard._t||0) + 1);   // ignore a stale fetch if reopened fast
-    RemoteBoard.top(12).then(rows => {
+    RemoteBoard.top(120).then(rows => {
       if (token !== renderLeaderboard._t) return;
       if (!rows){ renderLocalBoard(lb, 'TOP RUNS · OFFLINE'); return; }
+      // keep only each player's BEST score (we post several times per run), then take the top 12
+      const best = {};
+      rows.forEach(s => { const k=(s.name||'ANON').toString().toUpperCase().slice(0,12); if (!(k in best) || (s.score||0) > best[k].score) best[k] = { name:k, score:s.score||0 }; });
+      rows = Object.values(best).sort((a,b)=> b.score - a.score).slice(0,12);
       if (!rows.length){ lb.innerHTML = '<div class="lbttl">GLOBAL TOP RUNS</div><div class="lbttl">BE THE FIRST — PLAY A RUN!</div>'; return; }
       lb.innerHTML = '<div class="lbttl">GLOBAL TOP RUNS</div>' + rows.map((s,i)=>{
         const rankStyle = i<3 ? `color:${MEDAL[i]};border-color:${MEDAL[i]}` : '';
@@ -2907,6 +2911,7 @@ function buzz(pattern){ try { if (navigator.vibrate) navigator.vibrate(pattern);
 
 function startGame(){
   charPrevOn = false;
+  _runPostedScore = -1;                          // fresh run → allow posting its scores again
   gameLevel = dailyMode ? 1 : Math.max(1, resumeLevel);   // CONTINUE from your saved progress (Daily always starts at 1)
   applyBiome(gameLevel);                        // biome for the level you're resuming at
   checkDailyStreak();                          // first game of the day → streak bump + bonus coins
@@ -2943,6 +2948,7 @@ function nextLevel(){
   resetState();
   S.score = keepScore + 150 + gameLevel*50;               // level-clear bonus
   S.coins = keepCoins; S.bestPerfect = keepBest;
+  postScore();                                            // clearing a level posts your running score (don't wait for death)
   [...scene.children].forEach(o => { if (o.__env || o===ground || o===sky) return; if (o.isMesh||o.isGroup) scene.remove(o); });
   S.phase = 'build';
   $('storm').style.opacity='0'; scene.fog.near=16; scene.fog.far=46; S.stormA=0; sun.position.set(7,16,9); sun.intensity = 0.72; hemi.intensity = 0.55;
@@ -3225,6 +3231,17 @@ function equipSel(){
   renderShop();
 }
 
+// post the current run's score to the global board. Guarded so the same/lower score isn't re-posted within one run;
+// `force` posts the definitive final score at game-over. Returns Promise<boolean|null> (null = skipped/daily/disabled).
+let _runPostedScore = -1;
+function postScore(force){
+  if (!RemoteBoard.enabled() || dailyMode) return Promise.resolve(null);
+  const sc = Math.max(0, Math.round(S.score||0));
+  if (sc <= 0) return Promise.resolve(null);
+  if (!force && sc <= _runPostedScore) return Promise.resolve(null);
+  _runPostedScore = sc;
+  return RemoteBoard.submit({ name:(playerName||'ANON').slice(0,12), score:sc, level:Math.round(gameLevel)||1, height:Math.round((S.peakY||0)*10)/10 });
+}
 function endGame(won, how){
   if (S.gameOver) return;
   S.gameOver = true; S.won = won; S.phase = 'over';
@@ -3246,10 +3263,9 @@ function endGame(won, how){
       let nm = ''; try { nm = sanitizeName(window.prompt && window.prompt('Enter a name for the GLOBAL leaderboard (max 12):','')); } catch(e){}
       if (nm){ playerName = nm; Store.set('name', playerName); }
     }
-    const nm = playerName || 'ANON';
     if (bEl) bEl.textContent = '⏳ posting to leaderboard…';
-    RemoteBoard.submit({ name: nm.slice(0,12), score: Math.max(0, Math.round(S.score||0)), level: Math.round(gameLevel)||1, height: Math.round((S.peakY||0)*10)/10 })
-      .then(ok => { if (bEl) bEl.textContent = ok ? ('🏆 posted to GLOBAL leaderboard as ' + nm) : ('⚠️ leaderboard: ' + (RemoteBoard.lastError || 'no connection')); });
+    postScore(true).then(ok => { if (bEl) bEl.textContent = (ok===false) ? ('⚠️ leaderboard: ' + (RemoteBoard.lastError || 'no connection'))
+      : ('🏆 ' + Math.round(S.score).toLocaleString() + ' posted to the GLOBAL leaderboard'); });
   }
   if (firstTime){ firstTime = false; Store.set('tut', 1); }   // onboarding only on the first game
   setTimeout(()=>{
@@ -3338,7 +3354,7 @@ btn('climbBtn',      beginClimb);        // start the climb from the rating scre
 btn('introBtn',      beginBuild);        // start building from the between-level intro card
 btn('introOverlay',  beginBuild);        // …or tap anywhere on the card
 btn('nextLevelBtn',  nextLevel);         // advance after the victory celebration
-function goMenu(){ endRevivePrompt(); $('adModal').classList.add('hidden'); showStart(); }   // quit to main menu mid-game
+function goMenu(){ if (!atMenu) postScore(true); endRevivePrompt(); $('adModal').classList.add('hidden'); showStart(); }   // quit to main menu mid-game → still post your score
 // restart confirmation — pause the game while the player decides
 function showRestartConfirm(){ if (atMenu || S.gameOver) return; S.paused = true; $('restartConfirm').classList.remove('hidden'); }
 function hideRestartConfirm(){ S.paused = false; $('restartConfirm').classList.add('hidden'); }
