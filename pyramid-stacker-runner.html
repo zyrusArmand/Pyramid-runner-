@@ -560,6 +560,7 @@
     <div class="setRow"><div class="setName">ADAPTIVE DIFFICULTY<span class="setHint">tunes the pace to your skill</span></div><div id="ddaBtn">ON</div></div>
     <div class="setRow"><div class="setName">MUSIC<span class="setHint">generative desert score</span></div><div id="musicBtn">ON</div></div>
     <div class="setRow"><div class="setName">DAILY CHALLENGE<span class="setHint" id="dailyHint">same seeded pyramid for everyone today</span></div><div id="dailyBtn">OFF</div></div>
+    <div class="setRow"><div class="setName">PROGRESS<span class="setHint" id="progHint">continue from your highest level</span></div><div id="resetProgBtn">RESET</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
 </div>
@@ -667,6 +668,7 @@ let scores    = Store.get('scores', []);          // local leaderboard (top 10)
 let totalBuilds = Store.get('builds', 0);         // lifetime pyramids built
 let bestStreak  = Store.get('bestStreak', 0);     // lifetime best PERFECT streak
 let maxLevel    = Store.get('maxLevel', 1);       // highest level reached
+let resumeLevel = Store.get('resumeLevel', 1);    // level a new game CONTINUES from (progress is saved, not reset to 1)
 let firstTime = !Store.get('tut', 0);             // show the onboarding hints once
 let dailyMode = false;
 let goalsNew  = false;                            // a goal completed / streak bonus is waiting to be seen
@@ -946,17 +948,25 @@ function levelSpeed(){ return 1 + (gameLevel-1)*0.08; }   // +8% pace per level
 // ---------- progressive unlocks: new hazards & rewards roll in level by level. The FIRST time the player
 // meets one, the climb briefly freezes and a card explains it. Early levels stay gentle (small pyramid, few/no
 // hazards) so the ramp feels fair. ----------
+// Each NEW thing — a control, a hazard, a power-up, a reward — unlocks on its own level and is introduced ONCE with a
+// freeze-frame mini-tutorial. Rewards and hazards alternate so the difficulty climbs gently and every level teaches one
+// idea. Level 1 is a pure introduction (just the climb).
 const FEATURES = [
-  { key:'golden', level:2, hazard:false, title:'✦ GOLDEN BLOCKS',   desc:'Grab the floating gold blocks to build a SCORE MULTIPLIER. Chain them quickly to push it up to ×5 — let a few seconds pass without one and it resets.' },
-  { key:'spike',  level:3, hazard:true,  title:'△ SPIKE TRAPS',     desc:'A row of bronze spikes slides across the lanes. Swipe LEFT/RIGHT into a clear lane to slip past.' },
-  { key:'hammer', level:4, hazard:true,  title:'⚒ SWINGING HAMMERS', desc:'Stone hammers slam down onto ONE lane on a timer. Watch the swing and dodge to another lane.' },
-  { key:'lintel', level:5, hazard:true,  title:'⌐ LOW LINTELS',     desc:'A carved gate spans the whole path at head height. Swipe DOWN to SLIDE under it.' },
-  { key:'flame',  level:6, hazard:true,  title:'♨ FLAME JETS',      desc:'Fire erupts from a lane on a timer. Time your run so you pass while the flame is down.' },
+  { key:'welcome', level:1, type:'intro',  title:'⛏ REACH THE PEAK',    desc:'Climb the pyramid you built! Swipe LEFT / RIGHT to change lane, swipe UP or TAP to jump a gap, swipe DOWN to slide. Grab coins and reach the capstone to clear the level.' },
+  { key:'golden',  level:2, type:'reward', title:'✦ GOLDEN BLOCKS',     desc:'Grab the floating gold blocks to build a SCORE MULTIPLIER. Chain them quickly to push it to ×5 — let a few seconds pass without one and it resets.' },
+  { key:'spike',   level:3, type:'hazard', title:'△ SPIKE TRAPS',       desc:'A row of bronze spikes blocks a lane. Swipe LEFT / RIGHT into a clear lane to slip past.' },
+  { key:'shield',  level:4, type:'power', power:'shield', title:'🛡 SHIELD',     desc:'Collect the green SHIELD to survive ONE hit. Grab it whenever you can — it can save a run.' },
+  { key:'hammer',  level:5, type:'hazard', title:'⚒ SWINGING HAMMERS',  desc:'Stone hammers slam down onto ONE lane on a timer. Watch the swing and dodge to another lane.' },
+  { key:'magnet',  level:6, type:'power', power:'magnet', title:'⚡ COIN MAGNET', desc:'The blue COIN MAGNET vacuums up nearby coins for a few seconds. Steer near a cluster to sweep them in.' },
+  { key:'lintel',  level:7, type:'hazard', title:'⌐ LOW LINTELS',       desc:'A carved gate spans the whole path at head height. Swipe DOWN to SLIDE under it — you can’t lane-dodge it.' },
+  { key:'slow',    level:8, type:'power', power:'slow',   title:'⏱ SLOW-MO',     desc:'The purple SLOW-MO briefly slows everything down so you can thread a tricky stretch of hazards.' },
+  { key:'flame',   level:9, type:'hazard', title:'♨ FLAME JETS',        desc:'Fire erupts from a lane on a timer. Time your run to pass while the flame is down.' },
 ];
-function hazardsUnlocked(level){ return FEATURES.filter(f => f.hazard && level >= f.level).map(f => f.key); }
+function hazardsUnlocked(level){ return FEATURES.filter(f => f.type==='hazard' && level >= f.level).map(f => f.key); }
+function powersUnlocked(level){ return FEATURES.filter(f => f.type==='power' && level >= f.level).map(f => f.power); }
 function goldenUnlocked(level){ return level >= 2; }
-// how busy a climb gets: nothing on level 1, then a gentle ramp up to a sane cap
-function obstacleDensity(level){ return level < 2 ? 0 : Math.min(0.34, 0.1 + (level-2)*0.05); }
+// how busy a climb gets: no hazards before level 3, then a gentle ramp up to a sane cap
+function obstacleDensity(level){ return level < 3 ? 0 : Math.min(0.34, 0.08 + (level-3)*0.045); }
 // feature intros not yet shown to this player (persisted so each is explained only once, ever)
 function pendingFeatureIntros(level){ return FEATURES.filter(f => level >= f.level && !Store.get('feat_'+f.key, 0)); }
 
@@ -1783,12 +1793,12 @@ function climbPath(){
     });
     return { cx, H, y, slot };
   }
-  // STRAIGHT climb up the pyramid's centre axis to the peak. A pyramid insets HALF a block per layer, so the parity
-  // of "is a stone centred on the axis" flips every course — there is NO straight column of stones up the face, and a
-  // path that literally hugs each stone is forced to weave half a block per layer (looks drunken). A clean central
-  // staircase reads right; on the odd layers it just crosses a mortar seam, which is invisible and natural for stairs.
+  // STRAIGHT climb up the FRONT FACE's centre column. Because each course insets half a block, gridPos puts every
+  // front-wall layer's centre at x = -BLOCK_SIZE/2 (NOT 0 — the capstone/ring axis sits at 0, half a block to the side).
+  // Climbing at -0.5 keeps the path glued to the actual placed stones the whole way up (a stone sits exactly there on
+  // odd courses, a mortar seam on even ones); the capstone steps then ease across to the capstone's true x at the peak.
   const fis = []; for (let L=0; L<=maxL; L++) fis.push(frontInfo(L));
-  const climbX = 0;
+  const climbX = -BLOCK_SIZE/2;
   for (let L=0; L<=maxL; L++){
     const fi = fis[L], placed = fi.slot ? fi.slot.placed : false;
     const weak = fi.slot ? !!fi.slot.weak : false, mesh = fi.slot ? fi.slot.mesh : null;
@@ -1977,13 +1987,14 @@ function loadRunDressing(){
       lastCoin = i;
     }
   }
-  // ---- power-ups: occasional pickups (magnet / shield / slow-mo), also placed on a random lane ----
+  // ---- power-ups: occasional pickups, only the TYPES unlocked at this level (shield L4 / magnet L6 / slow L8) ----
+  const powers = powersUnlocked(gameLevel);
   let lastPow = 0;
-  for (let i = 12; i < tiles.length - 5; i++){
+  for (let i = 12; powers.length && i < tiles.length - 5; i++){
     const t = tiles[i];
-    if (t.gap || t.weak || t.ob || t.coin || i - lastPow < 16) continue;
+    if (t.gap || t.weak || t.ob || t.coin || t.gold || i - lastPow < 16) continue;
     if (RND() < 0.55) continue;                                    // sparse — a treat, not a guarantee
-    const type = ['magnet','shield','slow'][Math.floor(RND()*3)];
+    const type = powers[Math.floor(RND()*powers.length)];
     const col = type==='magnet' ? 0x46d6ff : type==='shield' ? 0x57e08a : 0xc59cff;
     const lane = rndLane();
     const grp = new THREE.Group();
@@ -2576,8 +2587,8 @@ function buzz(pattern){ try { if (navigator.vibrate) navigator.vibrate(pattern);
 
 function startGame(){
   charPrevOn = false;
-  gameLevel = 1;
-  applyBiome(gameLevel);                        // level-1 biome: sky / fog / light
+  gameLevel = dailyMode ? 1 : Math.max(1, resumeLevel);   // CONTINUE from your saved progress (Daily always starts at 1)
+  applyBiome(gameLevel);                        // biome for the level you're resuming at
   checkDailyStreak();                          // first game of the day → streak bump + bonus coins
   $('ratingOverlay').classList.remove('show'); $('nextLevelWrap').classList.remove('show'); $('introOverlay').classList.remove('show'); $('featureIntro').classList.remove('show'); $('multHud').classList.add('hidden');
   resetState();
@@ -2604,6 +2615,7 @@ function startGame(){
 function nextLevel(){
   $('nextLevelWrap').classList.remove('show');
   gameLevel++;
+  if (!dailyMode && gameLevel > resumeLevel){ resumeLevel = gameLevel; Store.set('resumeLevel', resumeLevel); }  // SAVE progress
   applyBiome(gameLevel);                                   // shift the biome (sky / fog / light) for the new level
   missionEvent('level', gameLevel);                        // goal: reach a level
   DDA.note(0.85);                                          // finishing a pyramid means you're playing well
@@ -2662,6 +2674,7 @@ function renderHome(){
   ensureMissions();
   $('homeGoalsLbl').textContent = 'DAILY GOALS' + (dailyStreak>0 ? ' · DAY ' + dailyStreak : '');
   $('homeGoalsBtn').classList.toggle('hasNew', goalsNew);
+  const pl = $('homePlay'); if (pl) pl.textContent = (!dailyMode && resumeLevel > 1) ? ('CONTINUE · LV ' + resumeLevel) : 'PLAY';
 }
 function renderSettings(){
   const d = $('ddaBtn'); d.textContent = DDA.on ? 'ON' : 'OFF'; d.classList.toggle('on', DDA.on);
@@ -2669,6 +2682,16 @@ function renderSettings(){
   const db = $('dailyBtn'), dbest = Store.get('daily_'+todayKey(), 0);
   db.textContent = dailyMode ? 'ON' : 'OFF'; db.classList.toggle('on', dailyMode);
   $('dailyHint').textContent = dailyMode && dbest ? ('today’s best: ' + dbest) : 'same seeded pyramid for everyone today';
+  const pb = $('resetProgBtn'), ph = $('progHint');
+  if (pb && ph){ ph.textContent = resumeLevel > 1 ? ('continuing from Level ' + resumeLevel) : 'start from Level 1'; pb.textContent = resumeLevel > 1 ? 'RESET' : 'LV 1'; }
+}
+// wipe saved level progress so the next game starts from Level 1 again (mini-tutorials replay too)
+function resetProgress(){
+  if (resumeLevel <= 1) { showPop('ALREADY AT LEVEL 1'); return; }
+  resumeLevel = 1; Store.set('resumeLevel', 1);
+  FEATURES.forEach(f => Store.set('feat_'+f.key, 0));   // let the intros teach again on a fresh run
+  Store.set('tut', 0); firstTime = true;
+  renderSettings(); renderHome(); showPop('PROGRESS RESET — LEVEL 1');
 }
 function renderGoals(){
   ensureMissions();
@@ -2823,6 +2846,7 @@ btn('tabStones',     ()=>{ shopTab='stones'; renderShop(); });
 btn('shopBuyBtn',    purchaseSel);
 btn('shopEquipBtn',  equipSel);
 btn('dailyBtn',      ()=>{ dailyMode = !dailyMode; renderSettings(); });
+btn('resetProgBtn',  resetProgress);   // wipe saved level progress → back to Level 1
 btn('ddaBtn',        ()=>{ DDA.on = !DDA.on; Store.set('dda', DDA.on?1:0); renderSettings(); });
 btn('musicBtn',      ()=>{ Music.toggle(!Music.on); renderSettings(); });
 btn('dblBtn',        doubleCoins);
