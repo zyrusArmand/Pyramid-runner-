@@ -750,7 +750,7 @@
 
 const BASE_BLOCKS_PER_WALL  = 4;     // legacy default base ring (overall reference / cap baseline)
 // pyramids start small and grow: L1-2 base 3, then +1 every two levels, capped so phones stay smooth
-function baseForLevel(level){ return Math.min(7, 3 + Math.floor((Math.max(1,level)-1)/2)); }
+function baseForLevel(level){ return Math.min(7, 3 + Math.floor((Math.max(1,level)-1)/5)); }   // base grows 1 every 5 levels (3→7)
 let baseBlocks = baseForLevel(1);    // the CURRENT pyramid's base ring (set per level in resetState)
 const BLOCK_SIZE            = 1;
 const LAYER_HEIGHT          = 0.55;  // flatter courses → clean, climbable pyramid steps
@@ -1213,7 +1213,8 @@ function perfectThreshold(){ return TIER_PERFECT * DDA.perfectW(); }   // the li
 
 // ---------- level progression: each pyramid you finish bumps the level and ups the pace ----------
 let gameLevel = 1;
-function levelSpeed(){ return 1 + (gameLevel-1)*0.08; }   // +8% pace per level
+// pace steps up once per 5-level band and stays flat within a band (so each block of 5 feels the same, then harder)
+function levelSpeed(){ return 1 + Math.floor((gameLevel-1)/5)*0.1; }
 
 // ---------- progressive unlocks: new hazards & rewards roll in level by level. The FIRST time the player
 // meets one, the climb briefly freezes and a card explains it. Early levels stay gentle (small pyramid, few/no
@@ -1228,15 +1229,15 @@ const FEATURES = [
   { key:'shield',  level:4, type:'power', power:'shield', title:'🛡 SHIELD',     desc:'Collect the green SHIELD to survive ONE hit. Grab it whenever you can — it can save a run.' },
   { key:'hammer',  level:5, type:'hazard', title:'⚒ SWINGING HAMMERS',  desc:'Stone hammers slam down onto ONE lane on a timer. Watch the swing and dodge to another lane.' },
   { key:'magnet',  level:6, type:'power', power:'magnet', title:'⚡ COIN MAGNET', desc:'The blue COIN MAGNET vacuums up nearby coins for a few seconds. Steer near a cluster to sweep them in.' },
-  { key:'lintel',  level:7, type:'hazard', title:'⌐ LOW LINTELS',       desc:'A carved gate spans the whole path at head height. Swipe DOWN to SLIDE under it — you can’t lane-dodge it.' },
-  { key:'slow',    level:8, type:'power', power:'slow',   title:'⏱ SLOW-MO',     desc:'The purple SLOW-MO briefly slows everything down so you can thread a tricky stretch of hazards.' },
-  { key:'flame',   level:9, type:'hazard', title:'♨ FLAME JETS',        desc:'Fire erupts from a lane on a timer. Time your run to pass while the flame is down.' },
+  { key:'lintel',  level:8, type:'hazard', title:'⌐ LOW LINTELS',       desc:'A carved gate spans the whole path at head height. Swipe DOWN to SLIDE under it — you can’t lane-dodge it.' },
+  { key:'slow',    level:11, type:'power', power:'slow',  title:'⏱ SLOW-MO',     desc:'The purple SLOW-MO briefly slows everything down so you can thread a tricky stretch of hazards.' },
+  { key:'flame',   level:13, type:'hazard', title:'♨ FLAME JETS',       desc:'Fire erupts from a lane on a timer. Time your run to pass while the flame is down.' },
 ];
 function hazardsUnlocked(level){ return FEATURES.filter(f => f.type==='hazard' && level >= f.level).map(f => f.key); }
 function powersUnlocked(level){ return FEATURES.filter(f => f.type==='power' && level >= f.level).map(f => f.power); }
 function goldenUnlocked(level){ return level >= 2; }
-// how busy a climb gets: no hazards before level 3, then a gentle ramp up to a sane cap
-function obstacleDensity(level){ return level < 3 ? 0 : Math.min(0.34, 0.08 + (level-3)*0.045); }
+// how busy a climb gets: flat within each 5-level band, stepping up one band at a time (hazards still gated by unlock)
+function obstacleDensity(level){ return Math.min(0.34, 0.10 + Math.floor((Math.max(1,level)-1)/5)*0.06); }
 // feature intros not yet shown to this player (persisted so each is explained only once, ever)
 function pendingFeatureIntros(level){ return FEATURES.filter(f => level >= f.level && !Store.get('feat_'+f.key, 0)); }
 
