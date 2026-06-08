@@ -1938,9 +1938,11 @@ function loadRunDressing(){
 function startRun(){
   S.phase = 'run';
   Sound.cap();
-  // polish the built stones for the close-up climb: drop the grainy bump map but keep them FULLY MATTE so the
-  // sun shades each step (tread bright, riser shadowed) and the staircase still reads in 3D — just clean, not noisy.
-  S.allBlocks.forEach(b => { if (b && b.material){ b.material.bumpMap = null; b.material.bumpScale = 0; b.material.roughness = 0.98; b.material.metalness = 0.0; b.material.needsUpdate = true; } });
+  // polish the built stones for the close-up climb: drop the grainy bump map but keep them matte
+  S.allBlocks.forEach(b => { if (b && b.material){ b.material.bumpMap = null; b.material.bumpScale = 0; b.material.roughness = 0.95; b.material.metalness = 0.0; b.material.needsUpdate = true; } });
+  // CLIMB LIGHTING: high side-key + low ambient so each step's vertical riser falls into shadow while the
+  // flat tread stays bright → the staircase reads in crisp 3D (instead of looking like flat painted bands).
+  sun.position.set(9, 14, 2); sun.intensity = 1.0; hemi.intensity = 0.24;
   // BUILD → CLIMB: the quality of the pyramid you built shapes the climb. A clean build means a
   // safer path and richer coins; a sloppy one means a treacherous climb.
   const stars = pyramidRating(); S.buildStars = stars;
@@ -2436,7 +2438,7 @@ function startGame(){
   $('meterWrap').style.opacity='1';
   $('coinHud').classList.remove('hidden'); $('combo').classList.remove('show'); $('vignette').style.opacity='0';
   $('hud').style.display='flex'; updateCoinHud(false);     // coin counter visible the whole game
-  $('storm').style.opacity='0'; scene.fog.near=16; scene.fog.far=46; S.stormA=0;
+  $('storm').style.opacity='0'; scene.fog.near=16; scene.fog.far=46; S.stormA=0; sun.position.set(7,16,9); sun.intensity = 0.72; hemi.intensity = 0.55;
   $('reviveScreen').classList.add('hidden'); $('adModal').classList.add('hidden'); $('hint').classList.remove('show');
   $('menuBtn').style.display = 'block'; $('restartBtn').style.display='block';
   if (firstTime) showHint('TAP to drop the stone INTO the glowing outline — nail it for a PERFECT', 5500);
@@ -2457,7 +2459,7 @@ function nextLevel(){
   S.coins = keepCoins; S.bestPerfect = keepBest;
   [...scene.children].forEach(o => { if (o.__env || o===ground || o===sky) return; if (o.isMesh||o.isGroup) scene.remove(o); });
   S.phase = 'build';
-  $('storm').style.opacity='0'; scene.fog.near=16; scene.fog.far=46; S.stormA=0;
+  $('storm').style.opacity='0'; scene.fog.near=16; scene.fog.far=46; S.stormA=0; sun.position.set(7,16,9); sun.intensity = 0.72; hemi.intensity = 0.55;
   $('lblA').textContent='SCORE'; $('lblB').textContent='LAYER';
   $('lives').style.display='none'; $('meterLabel').textContent='STRUCTURAL INTEGRITY'; $('meterBar').style.display='block';
   $('meterWrap').style.opacity='1'; $('vignette').style.opacity='0';
