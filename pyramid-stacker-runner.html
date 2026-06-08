@@ -636,12 +636,14 @@
   <div id="homeInner">
     <div class="title homeTitle">PYRAMID<br>STACKER</div>
     <div class="tagline">BUILD&nbsp;IT&nbsp;·&nbsp;CLIMB&nbsp;IT</div>
+    <div class="homeRow">
+      <div class="midBtn" id="homeMapBtn" title="Journey Map"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4z"/><path d="M9 4v13"/><path d="M15 6.5v13"/></svg>MAP</div>
+      <div class="midBtn" id="homeGoalsBtn" title="Daily Goals"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18"/><path d="M8 2.5v4"/><path d="M16 2.5v4"/><path d="M8.5 14.5l2.2 2.2 4.3-4.3"/></svg>GOALS</div>
+    </div>
     <div class="cta hero" id="homePlay">PLAY</div>
     <div class="homeRow">
       <div class="midBtn" id="homeLeader"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4a5 5 0 0 1-10 0V4z"/><path d="M7 6H4v1.5A3.5 3.5 0 0 0 7.5 11"/><path d="M17 6h3v1.5A3.5 3.5 0 0 1 16.5 11"/><path d="M9.5 18h5"/><path d="M12 14.5V18"/></svg>LEADERBOARD</div>
       <div class="midBtn" id="homeShop"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12l-1 11H7L6 8z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg>SHOP</div>
-      <div class="midBtn circBtn" id="homeMapBtn" title="Journey Map"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4z"/><path d="M9 4v13"/><path d="M15 6.5v13"/></svg></div>
-      <div class="midBtn circBtn" id="homeGoalsBtn" title="Daily Goals"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18"/><path d="M8 2.5v4"/><path d="M16 2.5v4"/><path d="M8.5 14.5l2.2 2.2 4.3-4.3"/></svg></div>
     </div>
   </div>
 </div>
@@ -1601,7 +1603,7 @@ const rim = new THREE.DirectionalLight(0xffe8c4, 0.0); rim.position.set(-8, 5, -
 // ---------- ERAS: the climb travels through civilizations & realms. Each era spans ~10 levels with two 5-level
 // sub-variants (same vibe, slightly shifted), and brings its own sky, ground, stone palette and backdrop props. ----------
 const ERAS = [
-  { key:'egypt',  name:'EGYPT',     ground:0x6b4a32, dune:0x946642, block:{hue:36,  sat:34, lig:62},
+  { key:'egypt',  name:'EGYPT',     ground:0xc9a96a, dune:0xd9b87a, block:{hue:36,  sat:34, lig:62},
     bands:[ { name:'DUSK SANDS',    skyTop:0x241a36, skyBot:0xc9714e, fog:0x2a1d33, sun:0xfff0d0, hSky:0xffd9a8, hGnd:0x33203a, storm:0.05 },
             { name:'NILE DAWN',     skyTop:0x183a3a, skyBot:0xe0a85a, fog:0x243028, sun:0xfff2c8, hSky:0xffe8b0, hGnd:0x2a3a2a, storm:0.04 } ] },
   { key:'aztec',  name:'AZTEC',     ground:0x3b5236, dune:0x4a6a40, block:{hue:16,  sat:30, lig:50},
@@ -1738,6 +1740,12 @@ function animateBackdrop(T){
     else if (a.t==='aurora'){ o.rotation.z = a.rz + Math.sin(T*0.5+a.ph)*0.22; if (o.material) o.material.opacity = a.op*(0.55+0.45*Math.abs(Math.sin(T*0.35+a.ph))); }
     else if (a.t==='star'){ const s=0.6+0.6*Math.abs(Math.sin(T*1.8+a.ph)); o.scale.set(s,s,s); }
     else if (a.t==='sway'){ o.rotation.z = Math.sin(T*0.7+a.ph)*0.05; }
+    else if (a.t==='bird'){                                  // a flock wheeling across the sky, wings flapping
+      const ang = a.ph + T*a.spd;
+      o.position.set(a.d*Math.sin(ang), a.y + Math.sin(T*0.4+a.ph)*1.1, a.d*Math.cos(ang));
+      o.rotation.y = -ang;
+      const bb=o.__birds; if (bb){ for (let k=0;k<bb.length;k++){ const bd=bb[k]; if (bd.__w){ const f=Math.sin(T*7+bd.__ph)*0.6; bd.__w[0].rotation.z=f; bd.__w[1].rotation.z=-f; } } }
+    }
   }
 }
 function ringPlace(n, near, far, fn){ for (let i=0;i<n;i++){ const a=Math.random()*6.28, d=near+Math.random()*(far-near); fn(Math.sin(a)*d, Math.cos(a)*d, a); } }
@@ -1872,6 +1880,32 @@ function dFloatIsland(x,y,z,s){ const g=new THREE.Group();   // EMPYREAN floatin
   const rock=new THREE.Mesh(new THREE.ConeGeometry(s,s*1.2,7), dMat(0x9a8a76)); rock.position.y=-s*0.4; g.add(rock);
   const top=new THREE.Mesh(new THREE.CylinderGeometry(s,s*0.9,s*0.3,12), dMat(0x7ab06a)); top.position.y=s*0.1; g.add(top);
   g.position.set(x,y,z); addDecor(g); }
+// a flock of birds wheeling high over the scene (themed colour); flaps + orbits via the 'bird' anim type
+function dBirds(count, col, radius){
+  const flock=new THREE.Group(), birds=[];
+  for(let i=0;i<count;i++){
+    const b=new THREE.Group(), wMat=dMat(col==null?0x2a2a2e:col);
+    const wL=new THREE.Mesh(new THREE.BoxGeometry(0.95,0.05,0.34), wMat); wL.position.x=-0.5; b.add(wL);
+    const wR=new THREE.Mesh(new THREE.BoxGeometry(0.95,0.05,0.34), wMat); wR.position.x= 0.5; b.add(wR);
+    b.__w=[wL,wR]; b.__ph=Math.random()*6.28;
+    b.position.set((Math.random()-0.5)*7,(Math.random()-0.5)*3.5,(Math.random()-0.5)*7);
+    flock.add(b); birds.push(b);
+  }
+  flock.__birds=birds;
+  const y=15+Math.random()*7, d=radius||(28+Math.random()*10), ph=Math.random()*6.28;
+  flock.position.set(d*Math.sin(ph), y, d*Math.cos(ph));
+  flock.__anim={t:'bird', d, y, ph, spd:0.05+Math.random()*0.05};
+  addDecor(flock);
+}
+// a wide, flattened sand mound for rolling background dunes
+function dDune(x,z,s,col){ const m=new THREE.Mesh(new THREE.SphereGeometry(s,16,10), dMat(col==null?0xc9a96a:col));
+  m.position.set(x,-2.2,z); m.scale.set(1.6+Math.random()*0.9, 0.38+Math.random()*0.22, 1.4+Math.random()*0.7); m.rotation.y=Math.random()*6.28; addDecor(m); }
+// the three Pyramids of Giza in their classic stagger, fronted by queen's pyramids — a big iconic skyline
+function dGiza(cx,cz){
+  const col=0x9a7048;
+  dPyramid(cx-16, cz-4, 20, col); dPyramid(cx, cz, 17, col); dPyramid(cx+14, cz+3, 13, col);   // the three greats
+  dPyramid(cx+22, cz+9, 4.5, col); dPyramid(cx+27, cz+11, 4, col); dPyramid(cx+31, cz+13, 3.6, col);  // queens' pyramids
+}
 function buildBackdrop(era){
   if (!era || era.key === _backdropEra) return;          // only rebuild when the era actually changes
   _backdropEra = era.key;
@@ -1879,25 +1913,34 @@ function buildBackdrop(era){
     clearEraDecor();
     // NB: nothing is placed inside ~18 units so the props never block the camera's view of the pyramid.
     if (era.key === 'egypt'){
-      [[-46,-32,15],[36,-44,18],[-56,18,13],[52,30,14],[10,-58,17],[-26,-52,12],[40,48,12],[58,-12,11]].forEach(p=>dPyramid(p[0],p[1],p[2],0x6f4f31));
-      dPylon(0,-40,5);                                                  // a great temple gateway dead ahead
-      dSphinx(24,26,3.6); dSphinx(-28,20,3.0);
+      dGiza(-6,-52);                                                    // the three Pyramids of Giza on the skyline dead ahead
+      [[-50,-30,15],[44,-42,17],[-58,18,13],[54,30,14],[40,50,12],[60,-12,11]].forEach(p=>dPyramid(p[0],p[1],p[2],0x6f4f31));
+      dPylon(0,-38,5);                                                  // a great temple gateway
+      dSphinx(0,-26,5.5);                                              // a giant Sphinx fronting the pyramids, facing the player
+      dSphinx(26,26,3.4); dSphinx(-30,20,3.0);
+      ringPlace(13,30,50,(x,z)=>dDune(x,z,8+Math.random()*6));          // rolling sand dunes on the horizon
       ringPlace(5,26,44,(x,z)=>dHieroWall(x,z,2.6+Math.random()));
       ringPlace(6,22,38,(x,z)=>dObelisk(x,z,3.5+Math.random()*2.5));
       ringPlace(12,18,40,(x,z)=>dPalm(x,z,0.9+Math.random()*0.6));
       ringPlace(14,18,42,(x,z)=>dRock(x,z,0.5+Math.random()*0.7,0x8a6a44));
+      for(let i=0;i<7;i++){ const a=Math.random()*6.28,d=26+Math.random()*22; dCloud(Math.sin(a)*d,15+Math.random()*9,Math.cos(a)*d,2.4+Math.random()*2.6); }
+      dBirds(9,0x3a2a22,30); dBirds(7,0x2a2018,38);                     // flocks wheeling over the desert
     } else if (era.key === 'aztec'){
       dHeroStep(0,-42,8); dHeroStep(-34,26,6.5);                        // Chichen-Itza temples
       ringPlace(6,26,50,(x,z)=>dStepPyr(x,z,7+Math.random()*6,0x6a5440));
       ringPlace(6,22,38,(x,z)=>dStoneHead(x,z,1.4+Math.random()*0.8));
       ringPlace(26,18,42,(x,z)=>dTree(x,z,1.1+Math.random()*0.9));      // dense jungle
       ringPlace(14,18,40,(x,z)=>dRock(x,z,0.5+Math.random()*0.7,0x4a5a3a));
+      for(let i=0;i<6;i++){ const a=Math.random()*6.28,d=26+Math.random()*20; dCloud(Math.sin(a)*d,16+Math.random()*8,Math.cos(a)*d,2.2+Math.random()*2.4); }
+      dBirds(8,0x1f8a4a,30); dBirds(6,0xc23a2a,40);                      // bright macaws over the canopy
     } else if (era.key === 'greek'){
       dParthenon(0,-40,4.5); dParthenon(38,30,3.4);                     // temples
       ringPlace(5,24,42,(x,z,a)=>{ const h=3+Math.random()*1.6; for(let k=-1;k<=1;k++) dColumn(x+Math.cos(a)*k*1.7, z-Math.sin(a)*k*1.7, h, 0xe8e2d4); });
       ringPlace(8,20,38,(x,z)=>dStatue(x,z,2+Math.random()));
       ringPlace(12,18,38,(x,z)=>dColumn(x,z,2+Math.random()*2.5,0xdcd4c2));
       ringPlace(10,18,40,(x,z)=>dTree(x,z,0.9+Math.random()*0.6));
+      for(let i=0;i<8;i++){ const a=Math.random()*6.28,d=26+Math.random()*22; dCloud(Math.sin(a)*d,15+Math.random()*9,Math.cos(a)*d,2.6+Math.random()*2.8); }
+      dBirds(9,0xf4f0e6,30); dBirds(6,0xe8e2d0,40);                      // white doves drifting over the marble
     } else if (era.key === 'norse'){
       ringPlace(9,34,62,(x,z)=>dMountain(x,z,14+Math.random()*9,0x586674));   // a wall of fjord peaks
       dLonghouse(0,-36,5); dLonghouse(30,24,4);
@@ -1905,6 +1948,8 @@ function buildBackdrop(era){
       ringPlace(7,18,34,(x,z)=>dRunestone(x,z,1.8+Math.random()*1.6));
       ringPlace(4,24,42,(x,z)=>dLongship(x,z,2.2+Math.random()*0.9));
       for(let i=0;i<7;i++){ const a=Math.random()*6.28,d=26+Math.random()*22; dAurora(Math.sin(a)*d, Math.cos(a)*d); }
+      for(let i=0;i<6;i++){ const a=Math.random()*6.28,d=28+Math.random()*20; dCloud(Math.sin(a)*d,16+Math.random()*8,Math.cos(a)*d,3+Math.random()*3); }
+      dBirds(11,0x14110e,32);                                           // a raven flock over the fjords
     } else if (era.key === 'nippon'){
       dMountain(0,-54,26,0x6a6a78);                                     // Mt Fuji
       ringPlace(5,26,46,(x,z)=>dPagoda(x,z,3.2+Math.random()*2.2));
@@ -1912,6 +1957,8 @@ function buildBackdrop(era){
       ringPlace(10,18,34,(x,z)=>dLantern(x,z,1.3+Math.random()*0.7));
       ringPlace(18,18,42,(x,z)=>dBlossom(x,z,1.3+Math.random()*0.9));   // cherry blossoms everywhere
       ringPlace(10,18,38,(x,z)=>dRock(x,z,0.4+Math.random()*0.6,0x5a5a4a));
+      for(let i=0;i<7;i++){ const a=Math.random()*6.28,d=26+Math.random()*22; dCloud(Math.sin(a)*d,16+Math.random()*9,Math.cos(a)*d,2.6+Math.random()*2.6); }
+      dBirds(9,0xf2f2f2,30); dBirds(6,0xe0e0e6,40);                      // white cranes over Fuji
     } else if (era.key === 'alien'){
       dMothership(0,28,-42,9); dMothership(-30,22,30,6);
       ringPlace(22,18,42,(x,z)=>dCrystal(x,z,2+Math.random()*6, [0xb46aff,0x4af0e0,0xff5ad0][Math.floor(Math.random()*3)]));
