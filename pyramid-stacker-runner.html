@@ -72,6 +72,12 @@
     font-size:.66em; line-height:1; color:rgba(108,66,12,.82); text-shadow:0 1px 0 rgba(255,247,205,.5); }
   #coinHud .coinIcon { font-size:16px; }
   #coinHud.hidden { display:none; }
+  /* golden-block score multiplier badge — sits just under the coin counter, only while a chain is live */
+  #multHud { position:fixed; top:calc(max(16px,env(safe-area-inset-top)) + 42px); left:50%; transform:translateX(-50%);
+    z-index:5; pointer-events:none; font-family:'Cinzel',serif; font-weight:700; font-size:18px; letter-spacing:1px;
+    color:#ffd98a; text-shadow:0 2px 10px rgba(255,170,40,.75); animation:multPulse .7s ease-in-out infinite; }
+  #multHud.hidden { display:none; }
+  @keyframes multPulse { 0%,100%{ transform:translateX(-50%) scale(1); } 50%{ transform:translateX(-50%) scale(1.12); } }
 
   /* PERFECT-streak combo badge — a guitar-hero style circle, bottom-left */
   #combo { position:fixed; left:max(16px,env(safe-area-inset-left)); bottom:calc(max(26px,env(safe-area-inset-bottom)) + 84px);
@@ -147,6 +153,18 @@
     letter-spacing:3px; max-width:92vw; line-height:1.1; text-shadow:0 2px 12px rgba(0,0,0,.7); }
   #introBtn { margin-top:30px; pointer-events:auto; }
   #introOverlay.show #introLevel { animation:ratePop .55s ease-out; }
+  /* NEW-MECHANIC intro card — freezes the start of the climb to explain a freshly unlocked hazard/reward */
+  #featureIntro { position:fixed; inset:0; z-index:11; display:none; flex-direction:column; align-items:center;
+    justify-content:center; gap:14px; text-align:center; opacity:0; transition:opacity .3s; pointer-events:none;
+    background:radial-gradient(ellipse at 50% 44%, rgba(40,26,10,.86), rgba(6,4,10,.97)); padding:0 26px; }
+  #featureIntro.show { display:flex; opacity:1; pointer-events:auto; }
+  #fiKicker { font-size:12px; letter-spacing:6px; opacity:.7; color:#f6e9d2; }
+  #fiTitle { font-family:'Cinzel',serif; font-weight:700; font-size:clamp(26px,8vw,44px); color:#ffd98a;
+    letter-spacing:2px; line-height:1.05; text-shadow:0 2px 22px rgba(255,190,90,.55); }
+  #fiDesc { font-family:'Space Mono',monospace; font-size:clamp(13px,4vw,16px); color:#f3e6cf; line-height:1.5;
+    max-width:440px; opacity:.92; }
+  #fiBtn { margin-top:20px; pointer-events:auto; }
+  #featureIntro.show #fiTitle { animation:ratePop .5s ease-out; }
   /* victory "NEXT LEVEL" prompt — sits over the spun-around pyramid, no full overlay */
   #nextLevelWrap { position:fixed; left:0; right:0; bottom:max(40px,calc(env(safe-area-inset-bottom) + 30px)); z-index:9;
     display:none; flex-direction:column; align-items:center; gap:14px; pointer-events:none; }
@@ -393,6 +411,7 @@
 </div>
 
 <div id="coinHud" class="hidden"><span class="coinIcon"></span><span id="coinVal">0</span><span class="coinLbl"></span></div>
+<div id="multHud" class="hidden">✦ ×<span id="multVal">2</span></div>
 <div id="combo"></div>
 <div id="coinPops"></div>
 <div id="menuBtn">☰</div>
@@ -426,6 +445,12 @@
 <div id="nextLevelWrap">
   <div id="nextLevelTitle">PYRAMID CONQUERED</div>
   <div class="cta hero" id="nextLevelBtn">NEXT LEVEL</div>
+</div>
+<div id="featureIntro">
+  <div id="fiKicker">NEW THIS CLIMB</div>
+  <div id="fiTitle">GOLDEN BLOCKS</div>
+  <div id="fiDesc">Grab the gold blocks to build a score multiplier.</div>
+  <div class="cta hero" id="fiBtn">GOT IT</div>
 </div>
 <div id="pop">PERFECT</div>
 <div id="hint"></div>
@@ -604,7 +629,10 @@
 //           Missed blocks = gaps. Tap to jump. Reach the capstone.
 // ============================================================
 
-const BASE_BLOCKS_PER_WALL  = 4;     // base ring; insets HALF a block per layer to a capstone
+const BASE_BLOCKS_PER_WALL  = 4;     // legacy default base ring (overall reference / cap baseline)
+// pyramids start small and grow: L1-2 base 3, then +1 every two levels, capped so phones stay smooth
+function baseForLevel(level){ return Math.min(7, 3 + Math.floor((Math.max(1,level)-1)/2)); }
+let baseBlocks = baseForLevel(1);    // the CURRENT pyramid's base ring (set per level in resetState)
 const BLOCK_SIZE            = 1;
 const LAYER_HEIGHT          = 0.55;  // flatter courses → clean, climbable pyramid steps
 const MISS_DISTANCE         = 0.85;
@@ -915,6 +943,23 @@ function perfectThreshold(){ return TIER_PERFECT * DDA.perfectW(); }   // the li
 let gameLevel = 1;
 function levelSpeed(){ return 1 + (gameLevel-1)*0.08; }   // +8% pace per level
 
+// ---------- progressive unlocks: new hazards & rewards roll in level by level. The FIRST time the player
+// meets one, the climb briefly freezes and a card explains it. Early levels stay gentle (small pyramid, few/no
+// hazards) so the ramp feels fair. ----------
+const FEATURES = [
+  { key:'golden', level:2, hazard:false, title:'✦ GOLDEN BLOCKS',   desc:'Grab the floating gold blocks to build a SCORE MULTIPLIER. Chain them quickly to push it up to ×5 — let a few seconds pass without one and it resets.' },
+  { key:'spike',  level:3, hazard:true,  title:'△ SPIKE TRAPS',     desc:'A row of bronze spikes slides across the lanes. Swipe LEFT/RIGHT into a clear lane to slip past.' },
+  { key:'hammer', level:4, hazard:true,  title:'⚒ SWINGING HAMMERS', desc:'Stone hammers slam down onto ONE lane on a timer. Watch the swing and dodge to another lane.' },
+  { key:'lintel', level:5, hazard:true,  title:'⌐ LOW LINTELS',     desc:'A carved gate spans the whole path at head height. Swipe DOWN to SLIDE under it.' },
+  { key:'flame',  level:6, hazard:true,  title:'♨ FLAME JETS',      desc:'Fire erupts from a lane on a timer. Time your run so you pass while the flame is down.' },
+];
+function hazardsUnlocked(level){ return FEATURES.filter(f => f.hazard && level >= f.level).map(f => f.key); }
+function goldenUnlocked(level){ return level >= 2; }
+// how busy a climb gets: nothing on level 1, then a gentle ramp up to a sane cap
+function obstacleDensity(level){ return level < 2 ? 0 : Math.min(0.34, 0.1 + (level-2)*0.05); }
+// feature intros not yet shown to this player (persisted so each is explained only once, ever)
+function pendingFeatureIntros(level){ return FEATURES.filter(f => level >= f.level && !Store.get('feat_'+f.key, 0)); }
+
 const app = document.getElementById('app');
 
 const scene = new THREE.Scene();
@@ -1064,7 +1109,7 @@ sunHalo.position.copy(sunCore.position); sunHalo.__env = true; scene.add(sunHalo
 // ---------- helpers ----------
 const $ = id => document.getElementById(id);
 function rand3(s){ return new THREE.Vector3((Math.random()-0.5)*s,(Math.random()-0.5)*s,(Math.random()-0.5)*s); }
-function nForLayer(L){ return BASE_BLOCKS_PER_WALL - L; }   // blocks per wall at layer L (half-block inset)
+function nForLayer(L){ return baseBlocks - L; }   // blocks per wall at layer L (half-block inset)
 function layerColor(L){ const s=stone(); const hue=(s.hue+L*6)%360; const lig=Math.max(36, s.lig - L*2); return new THREE.Color(`hsl(${hue},${s.sat}%,${lig}%)`); }
 
 function gridPos(wall, index, n, layer){
@@ -1267,9 +1312,10 @@ function shake(amt){ S.shakeAmt = Math.max(S.shakeAmt||0, amt); }
 // ---------- state ----------
 let S = {};
 function resetState(){
+  baseBlocks = baseForLevel(gameLevel);            // this pyramid's size grows with the level
   S = { phase:'build', gameOver:false, won:false,
     wall:0, cellIndex:0, layer:0, capstone:false, wallDrift:0,
-    camRot:0, camHeight:0, camR:BASE_BLOCKS_PER_WALL + 5,
+    camRot:0, camHeight:0, camR:baseBlocks + 5,
     fallen:0, score:0, streak:0, integrity:1, allBlocks:[],
     layerBlocks:[], layerBoxes:[], prevLayerBoxes:[], active:null, falling:[], dropAnims:[],
     fx:[], squash:[], shakeAmt:0, shadow:null,
@@ -1674,7 +1720,7 @@ function showRating(){
   else                 tint.style.background = 'radial-gradient(ellipse at 50% 50%, transparent 24%, rgba(15,10,18,.55) 92%)';
   $('ratingRays').classList.remove('show'); $('ratingFlames').classList.remove('show');
   // clear the in-game HUD so the rating screen is a clean cinematic beat over the pyramid
-  $('hud').style.display='none'; $('coinHud').classList.add('hidden');
+  $('hud').style.display='none'; $('coinHud').classList.add('hidden'); $('multHud').classList.add('hidden');
   $('menuBtn').style.display='none'; $('restartBtn').style.display='none'; $('combo').classList.remove('show');
   $('meterWrap').style.opacity='0';   // hide the bottom swipe-hint so it doesn't sit under START CLIMB
   $('ratingOverlay').classList.add('show');
@@ -1724,7 +1770,7 @@ function advance(len){
 function climbPath(){
   const tiles = [];
   const h = LAYER_HEIGHT*1.04, zHalf = BLOCK_SIZE*0.985/2, inset = 0.04, N = STEP_N, stepH = h/N;
-  const maxL = BASE_BLOCKS_PER_WALL - 1;
+  const maxL = baseBlocks - 1;
   function frontInfo(L){
     const n = nForLayer(L), H = (n*BLOCK_SIZE)/2, y = L*LAYER_HEIGHT;
     let cx = 0, bestDX = 1e9;                                   // front-centre cell x (closest to 0)
@@ -1781,10 +1827,10 @@ function climbPath(){
 function addLaneGuides(tiles){
   const guides = [];
   const baseY = tiles[0].pos.y, apexY = tiles[tiles.length-1].pos.y, span = (apexY - baseY) || 1;
-  const Hbase = BASE_BLOCKS_PER_WALL/2;
+  const Hbase = baseBlocks/2;
   const seg = (lane, x, y, z, w, hgt, dep) => {
-    const centre = lane===0, op = centre ? 0.55 : 0.36;
-    const mat = new THREE.MeshBasicMaterial({ color: centre?0xffeec0:0xffce72, transparent:true,
+    const centre = lane===0, op = centre ? 0.3 : 0.18;        // subtle warm glow, not a washed-out white band
+    const mat = new THREE.MeshBasicMaterial({ color: centre?0xffc066:0xe0973a, transparent:true,
       opacity:op, depthWrite:false, blending:THREE.AdditiveBlending });
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, hgt, dep), mat);
     m.position.set(x, y, z); m.baseOp = op; scene.add(m); guides.push(m);
@@ -1803,9 +1849,9 @@ function addLaneGuides(tiles){
       // continuous lit line with NO dark gap on the risers
       if (!B.gap){
         const dy = B.y - A.y, dz = B.z - A.z, len = Math.hypot(dy, dz) || 0.05, ang = Math.atan2(-dy, dz);
-        const op = lane===0 ? 0.5 : 0.32;
+        const op = lane===0 ? 0.26 : 0.16;
         const conn = new THREE.Mesh(new THREE.BoxGeometry(w*0.9, 0.008, len*1.5),
-          new THREE.MeshBasicMaterial({ color: lane===0?0xffeec0:0xffce72, transparent:true, opacity:op, depthWrite:false, blending:THREE.AdditiveBlending }));
+          new THREE.MeshBasicMaterial({ color: lane===0?0xffc066:0xe0973a, transparent:true, opacity:op, depthWrite:false, blending:THREE.AdditiveBlending }));
         conn.position.set((A.x+B.x)/2 + d, (A.y+B.y)/2 + 0.007, (A.z+B.z)/2); conn.rotation.x = ang;
         conn.baseOp = op; scene.add(conn); guides.push(conn);
       }
@@ -1835,16 +1881,19 @@ function loadRunDressing(){
   const r = S.run; if (!r || r.dressed) return; r.dressed = true;
   const tiles = r.tiles, hazardMul = r.hazardMul;
   const LANE = LANE_W, rndLane = () => [-1,0,1][Math.floor(RND()*3)];
-  // procedural obstacles: side-mounted swinging hammers to time + sliding spike traps to dodge
+  // procedural obstacles: only the hazard TYPES unlocked at this level appear, at a level-scaled density (level 1
+  // has none). The mix is drawn from whatever has been introduced so far, so the climb grows busier as you progress.
+  const haz = hazardsUnlocked(gameLevel);
+  const density = obstacleDensity(gameLevel);
   let lastOb = 2;
-  for (let i = 5; i < tiles.length - 2; i++){
+  for (let i = 5; haz.length && i < tiles.length - 2; i++){
     const t = tiles[i];
     if (t.gap || t.weak || i - lastOb < 3) continue;
     if ((tiles[i-1] && (tiles[i-1].gap || tiles[i-1].weak)) ||
         (tiles[i-2] && (tiles[i-2].gap || tiles[i-2].weak))) continue;   // leave landing room after a jump
-    if (RND() > 0.3 * DDA.obstacleW() * hazardMul) continue;   // adaptive + shaped by how well you built the pyramid (denser now)
-    const pick = RND();
-    if (pick < 0.3){
+    if (RND() > density * DDA.obstacleW() * hazardMul) continue;   // adaptive + shaped by how well you built the pyramid
+    const kind = haz[Math.floor(RND()*haz.length)];                // pick from the unlocked hazard mix
+    if (kind === 'hammer'){
       // SIDE HAMMER: pivots off one side and swings down to slam ONE lane. A longer arm reaches a farther
       // lane (1st / 2nd / 3rd path from that side), a shorter arm the nearest — dodge to a different lane.
       const side = RND()<0.5 ? -1 : 1;              // mounted on the left or right of the path
@@ -1864,7 +1913,7 @@ function loadRunDressing(){
       band.position.y = Larm; ham.add(band);
       ham.position.set(t.pos.x + side*0.5, t.pos.y, t.pos.z);             // pivot just outside the lanes, at tread level
       scene.add(ham); t.obMesh = ham;
-    } else if (pick < 0.58){
+    } else if (kind === 'spike'){
       // themed temple SPIKE TRAP — a clean row of bright bronze spikes, roots sunk into the stone — slides lane↔lane
       const spikeMat = new THREE.MeshStandardMaterial({ color:0xd9bd72, emissive:0x241808, metalness:0.75, roughness:0.28 });
       t.ob = { type:'lane', lane:0, moving:true, phase: RND()*6.28, spd:0.0016 + RND()*0.003, yOff:0, mat:spikeMat };
@@ -1876,7 +1925,7 @@ function loadRunDressing(){
       }
       trap.position.set(t.pos.x, t.pos.y, t.pos.z);
       scene.add(trap); t.obMesh = trap;
-    } else if (pick < 0.8){
+    } else if (kind === 'lintel'){
       // LOW LINTEL: a carved stone gate across the whole path at head height — SLIDE under it (can't be lane-dodged)
       t.ob = { type:'beam' };
       const beam = new THREE.Group();
@@ -1950,6 +1999,26 @@ function loadRunDressing(){
     t.power = { type, mesh:grp, core, ring, glyph, got:false, lane };
     lastPow = i;
   }
+  // ---- GOLDEN BLOCKS (level 2+): floating gold cubes that build a score multiplier; chain them to keep it alive ----
+  if (goldenUnlocked(gameLevel)){
+    let lastGold = -8;
+    for (let i = 8; i < tiles.length - 3; i++){
+      const t = tiles[i];
+      if (t.gap || t.weak || t.ob || t.coin || t.power || i - lastGold < 7) continue;
+      if (RND() < 0.78) continue;                                  // fairly rare — a chase, not a carpet
+      const lane = rndLane();
+      const grp = new THREE.Group();
+      const cube = new THREE.Mesh(new THREE.BoxGeometry(0.07,0.07,0.07),
+        new THREE.MeshStandardMaterial({ color:0xffcf3a, emissive:0xffae00, emissiveIntensity:0.9, metalness:0.85, roughness:0.22 }));
+      cube.castShadow = true; grp.add(cube);
+      const halo = new THREE.Mesh(new THREE.CylinderGeometry(0.075,0.075,0.006,20),
+        new THREE.MeshBasicMaterial({ color:0xffd86a, transparent:true, opacity:0.5, depthWrite:false, blending:THREE.AdditiveBlending }));
+      halo.rotation.x = Math.PI/2; grp.add(halo);
+      grp.position.set(t.pos.x + lane*LANE, t.pos.y + 0.13, t.pos.z); scene.add(grp);
+      t.gold = { mesh:grp, cube, got:false, lane };
+      lastGold = i;
+    }
+  }
   addLaneGuides(tiles);                                  // the three glowing paths you're restricted to
 }
 
@@ -1973,9 +2042,9 @@ function startRun(){
   sun.position.set(8, 15, 6); sun.intensity = 0.82; hemi.intensity = 0.46;
   // SOLID CORE: a stone pyramid filling the inside so the structure reads completely solid — any gap between the
   // built blocks (especially up top) shows solid stone behind it instead of a blank hole / the sky.
-  const coreH = BASE_BLOCKS_PER_WALL*LAYER_HEIGHT + 0.5, coreR = (BASE_BLOCKS_PER_WALL*BLOCK_SIZE/2)*1.75;
+  const coreH = baseBlocks*LAYER_HEIGHT + 0.5, coreR = (baseBlocks*BLOCK_SIZE/2)*1.75;
   const core = new THREE.Mesh(new THREE.ConeGeometry(coreR, coreH, 4),
-    new THREE.MeshStandardMaterial({ color: layerColor(Math.floor(BASE_BLOCKS_PER_WALL/2)), roughness:0.96, metalness:0.02 }));
+    new THREE.MeshStandardMaterial({ color: layerColor(Math.floor(baseBlocks/2)), roughness:0.96, metalness:0.02 }));
   core.rotation.y = Math.PI/4; core.position.y = -0.5 + coreH/2 - 0.05; core.receiveShadow = true;
   scene.add(core); S.coreMesh = core;
   // BUILD → CLIMB: the quality of the pyramid you built shapes the climb. A clean build means a
@@ -2007,6 +2076,7 @@ function startRun(){
             lane:0, laneX:0, sliding:false, slideT:0, slideDur:0.5,
             rolling:false, rollT:0, rollDur:0.5, rollDir:1, rollCD:0,
             magnet:0, shield:0, slow:0, bubble:null, hazardMul, dressed:false,
+            gMult:1, gMultT:0,                                  // golden-block score multiplier + its countdown
             storms, revives:0, usedAdRevive:false, invuln:0, dead:false, deathReason:'fell' };
   // NB: obstacles / coins / power-ups / lane guides are NOT created yet — only when the climb starts
   // (loadRunDressing in beginClimb), so the rating screen shows a clean pyramid with nothing moving on it.
@@ -2027,9 +2097,31 @@ function startRun(){
 // player tapped START CLIMB on the rating screen → drop into the climb
 function beginClimb(){
   const r = S.run; if (!r || !r.awaitStart) return;
+  // first time the player meets a freshly unlocked mechanic this level: freeze on the pyramid overview and explain
+  // it before the climb actually starts. Otherwise drop straight in.
+  const intros = pendingFeatureIntros(gameLevel);
+  if (intros.length){ $('ratingOverlay').classList.remove('show'); showFeatureIntros(intros, startClimbNow); return; }
+  startClimbNow();
+}
+// step through the new-mechanic cards one at a time (the climb stays frozen on the overview behind them), then begin
+function showFeatureIntros(list, done){
+  const card = $('featureIntro'); let i = 0;
+  function show(){
+    if (i >= list.length){ card.classList.remove('show'); done(); return; }
+    const f = list[i];
+    $('fiTitle').textContent = f.title; $('fiDesc').textContent = f.desc;
+    $('fiBtn').textContent = (i < list.length-1) ? 'NEXT ▸' : 'GOT IT';
+    card.classList.add('show');
+    Store.set('feat_'+f.key, 1);              // mark seen → explained only once, ever
+  }
+  $('fiBtn').onclick = () => { i++; show(); };
+  show();
+}
+function startClimbNow(){
+  const r = S.run; if (!r || !r.awaitStart) return;
   r.awaitStart = false;
   loadRunDressing();                                  // NOW spawn obstacles / coins / power-ups / lanes
-  $('ratingOverlay').classList.remove('show');
+  $('ratingOverlay').classList.remove('show'); $('featureIntro').classList.remove('show');
   // bring the run HUD back for the actual climb
   $('hud').style.display='flex'; $('coinHud').classList.remove('hidden');
   $('menuBtn').style.display='block'; $('restartBtn').style.display='block';
@@ -2133,8 +2225,9 @@ function updateRun(dt){
       // clear the hazards + leftover pickups off the conquered pyramid for a clean victory shot (keep the trail visible)
       r.tiles.forEach(tt => { if (tt.obMesh) tt.obMesh.visible = false;
         if (tt.coin && !tt.coin.got) tt.coin.mesh.visible = false;
-        if (tt.power && !tt.power.got) tt.power.mesh.visible = false; });
-      $('hud').style.display='none'; $('coinHud').classList.add('hidden'); $('combo').classList.remove('show');
+        if (tt.power && !tt.power.got) tt.power.mesh.visible = false;
+        if (tt.gold && !tt.gold.got) tt.gold.mesh.visible = false; });
+      $('hud').style.display='none'; $('coinHud').classList.add('hidden'); $('multHud').classList.add('hidden'); $('combo').classList.remove('show');
       $('meterWrap').style.opacity='0'; $('menuBtn').style.display='none'; $('restartBtn').style.display='none';
       return;
     }
@@ -2150,6 +2243,13 @@ function updateRun(dt){
     }
     collectCoin(r.tiles[r.idx], r);
     collectPower(r.tiles[r.idx], r);
+    collectGold(r.tiles[r.idx], r);
+  }
+  // golden-block multiplier ebbs away if you stop chaining (counted in real seconds, slow-mo can't stretch it)
+  if (r.gMult > 1){ r.gMultT -= (S.realDt || dt); if (r.gMultT <= 0){ r.gMult = 1; r.gMultT = 0; updateMultHud(); } }
+  for (let j = r.idx-1; j <= r.idx+5 && j < r.tiles.length; j++){          // idle spin on the nearby gold blocks
+    if (j < 0) continue; const tt = r.tiles[j];
+    if (tt && tt.gold && !tt.gold.got){ tt.gold.cube.rotation.y += dt*2.6; tt.gold.cube.rotation.x += dt*1.3; }
   }
 
   // active power-ups (timed off real seconds so slow-mo doesn't stretch itself)
@@ -2356,7 +2456,8 @@ function collectCoin(t, r, force){
   }
   t.coin.got = true;
   const bonus = Math.round((t.coin.air ? 2 : 1) * (S.climbCoinMul || 1));   // airborne grabs pay double; better builds pay more
-  S.coins += bonus; S.score += 50 * bonus;
+  const gm = (r && r.gMult) || 1;                                           // golden-block multiplier boosts coin SCORE
+  S.coins += bonus; S.score += 50 * bonus * gm;
   bank += bonus; Store.set('coins', bank);    // bank instantly so coins persist even if you quit mid-run
   missionEvent('runCoins', S.coins);          // goal: coins in one run
   Sound.coin(S.coins);
@@ -2367,6 +2468,25 @@ function collectCoin(t, r, force){
 function updateCoinHud(pulse){
   const h = $('coinHud'); $('coinVal').textContent = bank;   // show total coins you own (persists, grows live)
   if (pulse){ h.classList.add('pulse'); setTimeout(()=>h.classList.remove('pulse'), 130); }
+}
+// ---------- golden blocks: a chaseable score multiplier (level 2+) ----------
+function collectGold(t, r){
+  if (!t.gold || t.gold.got) return;
+  if (t.gold.lane !== undefined && r.lane !== t.gold.lane) return;          // steer into its lane to grab it
+  t.gold.got = true;
+  const pos = t.gold.mesh.position.clone();
+  scene.remove(t.gold.mesh); sparkle(pos); Sound.treasure();
+  r.gMult = Math.min(5, r.gMult + 1);                                       // each block bumps the multiplier, capped ×5
+  r.gMultT = 6.5;                                                           // refresh the chain window
+  S.score += 120 * r.gMult;
+  S.coins += r.gMult; bank += r.gMult; Store.set('coins', bank);
+  updateCoinHud(true); updateMultHud();
+  showPop('✦ GOLD ×' + r.gMult);
+}
+function updateMultHud(){
+  const r = S.run, h = $('multHud'); if (!h) return;
+  if (r && r.gMult > 1){ const v = $('multVal'); if (v) v.textContent = r.gMult; h.classList.remove('hidden'); }
+  else h.classList.add('hidden');
 }
 // ---------- run power-ups ----------
 function collectPower(t, r){
@@ -2445,7 +2565,7 @@ function applyShake(){
 function updateHUD(){
   $('score').textContent = S.score;
   $('level').textContent = gameLevel;
-  $('layer').textContent = (S.capstone ? (BASE_BLOCKS_PER_WALL+1) : (S.layer+1)) + '/' + (BASE_BLOCKS_PER_WALL+1);   // capstone counts as the final layer
+  $('layer').textContent = (S.capstone ? (baseBlocks+1) : (S.layer+1)) + '/' + (baseBlocks+1);   // capstone counts as the final layer
   const integ = Math.max(0, S.integrity);
   $('meterFill').style.width = (integ*100)+'%';
   $('meterFill').style.background = integ>0.4 ? 'linear-gradient(90deg,#6fe3a0,#e8d35f)' : 'linear-gradient(90deg,#e8a35f,#e85f5f)';
@@ -2459,7 +2579,7 @@ function startGame(){
   gameLevel = 1;
   applyBiome(gameLevel);                        // level-1 biome: sky / fog / light
   checkDailyStreak();                          // first game of the day → streak bump + bonus coins
-  $('ratingOverlay').classList.remove('show'); $('nextLevelWrap').classList.remove('show'); $('introOverlay').classList.remove('show');
+  $('ratingOverlay').classList.remove('show'); $('nextLevelWrap').classList.remove('show'); $('introOverlay').classList.remove('show'); $('featureIntro').classList.remove('show'); $('multHud').classList.add('hidden');
   resetState();
   [...scene.children].forEach(o => { if (o.__env || o===ground || o===sky) return; if (o.isMesh) scene.remove(o); if (o.isGroup) scene.remove(o); });
   S.phase='build';
@@ -2650,7 +2770,7 @@ function endGame(won, how){
   S.gameOver = true; S.won = won; S.phase = 'over';
   DDA.note(won ? 0.9 : (how==='collapsed' ? 0.15 : 0.3));   // run outcome feeds the adaptive skill estimate
   $('reviveScreen').classList.add('hidden'); $('menuBtn').style.display = 'none'; $('restartBtn').style.display='none';
-  $('hud').style.display = 'none'; $('coinHud').classList.add('hidden');
+  $('hud').style.display = 'none'; $('coinHud').classList.add('hidden'); $('multHud').classList.add('hidden'); $('featureIntro').classList.remove('show');
   // coins were already banked as they were collected; just save records here
   const newBest = S.score > bestScore;
   if (newBest){ bestScore = S.score; Store.set('best', bestScore); }
