@@ -371,7 +371,7 @@
   .bicon { width:15px; height:15px; }
 
   /* JOURNEY MAP — full-bleed 3D bird's-eye of the eras */
-  #mapPanel { padding:0; background:#06040c; }
+  #mapPanel { padding:0; background:#06040c; transition:none; }
   #mapCanvas { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
   #mapHud { position:fixed; top:max(58px,calc(env(safe-area-inset-top) + 44px)); left:0; right:0; z-index:2;
     pointer-events:none; text-align:center; color:#f6e9d2; }
@@ -400,14 +400,16 @@
 
   /* ---------- leaderboard / shop panels ---------- */
   .panel { justify-content:flex-start; padding-top:max(74px,calc(env(safe-area-inset-top) + 58px)); gap:16px;
-    background:radial-gradient(ellipse at 50% 28%, rgba(28,18,38,1), rgba(7,4,11,1)); }   /* fully opaque — no bleed-through */
+    background:radial-gradient(ellipse at 50% 28%, rgba(28,18,38,1), rgba(7,4,11,1));   /* fully opaque — no bleed-through */
+    transition:none; }   /* snap to opaque instantly so the menu/scene behind never shows through while opening */
   .panelTitle { font-family:'Cinzel',serif; font-weight:700; font-size:clamp(24px,7vw,38px); color:#f3d99a;
     letter-spacing:3px; text-shadow:0 0 22px rgba(243,200,120,.4); position:relative; }
   .panelTitle::after { content:''; display:block; width:58px; height:2px; margin:9px auto 0; border-radius:2px;
     background:linear-gradient(90deg, transparent, rgba(243,200,120,.85), transparent); }
-  /* subtle entrance for every overlay/panel when it's shown */
-  .overlay:not(.hidden) { animation:panelIn .3s ease-out; }
-  @keyframes panelIn { 0%{ opacity:0; transform:translateY(11px); } 100%{ opacity:1; transform:translateY(0); } }
+  /* subtle entrance for the solid menu panels — a transform-only rise (NO opacity fade, so the
+     menu/scene behind never bleeds through while the opaque panel is appearing) */
+  .panel:not(.hidden) { animation:panelRise .26s ease-out; }
+  @keyframes panelRise { 0%{ transform:translateY(11px); } 100%{ transform:translateY(0); } }
   .backBtn { pointer-events:auto; position:fixed; left:16px; top:max(16px,env(safe-area-inset-top));
     font-family:'Space Mono',monospace; font-size:12px; letter-spacing:2px; color:#f6e9d2;
     background:rgba(20,12,28,.6); border:1px solid rgba(243,200,120,.4); border-radius:18px; padding:9px 14px; cursor:pointer; }
@@ -641,6 +643,7 @@
     <div class="tagline">BUILD&nbsp;IT&nbsp;·&nbsp;CLIMB&nbsp;IT</div>
     <div class="chips">
       <div class="chip"><span class="chipLbl">BEST</span><span class="chipVal" id="bestScore">0</span></div>
+      <div class="chip"><span class="chipLbl">CLIMB</span><span class="chipVal" id="bestHeight">0m</span></div>
       <div class="chip chipTap" id="coinsChip"><span class="chipLbl coinLbl">COINS</span><span class="chipVal" id="bankCoins">0</span></div>
     </div>
     <div class="cta hero" id="homePlay">PLAY</div>
