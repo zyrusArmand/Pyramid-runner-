@@ -754,7 +754,7 @@
 
 const BASE_BLOCKS_PER_WALL  = 4;     // legacy default base ring (overall reference / cap baseline)
 // pyramids start small and grow: L1-2 base 3, then +1 every two levels, capped so phones stay smooth
-function baseForLevel(level){ return Math.min(7, 3 + Math.floor((Math.max(1,level)-1)/5)); }   // base grows 1 every 5 levels (3→7)
+function baseForLevel(level){ return Math.min(8, 3 + Math.floor((Math.max(1,level)-1)/5)); }   // 3 layers at L1, +1 layer every 5 levels, cap 8
 let baseBlocks = baseForLevel(1);    // the CURRENT pyramid's base ring (set per level in resetState)
 const BLOCK_SIZE            = 1;
 const LAYER_HEIGHT          = 0.55;  // flatter courses → clean, climbable pyramid steps
