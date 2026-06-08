@@ -1584,54 +1584,121 @@ function dStarfield(n){ for(let i=0;i<n;i++){ const a=Math.random()*6.28, d=30+M
   const s=new THREE.Mesh(new THREE.SphereGeometry(0.12+Math.random()*0.18,6,6), new THREE.MeshBasicMaterial({color:0xfdfdff,fog:false})); s.position.set(Math.sin(a)*d,yy,Math.cos(a)*d); addDecor(s); } }
 // EMPYREAN: a shaft of divine light
 function dLightBeam(x,z){ const m=new THREE.Mesh(new THREE.CylinderGeometry(0.9,1.6,42,16,1,true), new THREE.MeshBasicMaterial({color:0xfff2c0,transparent:true,opacity:0.12,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending,fog:false})); m.position.set(x,19,z); addDecor(m); }
+// ---- extra ICONIC landmarks (instantly read the era) ----
+function dPylon(x,z,s){ const g=new THREE.Group(), st=dMat(0xcaa86a), st2=dMat(0xd9b86a);   // EGYPT temple gateway
+  [-1,1].forEach(d=>{ for(let i=0;i<3;i++){ const w=s*(0.95-i*0.12); const b=new THREE.Mesh(new THREE.BoxGeometry(w,s*0.74,s*0.5*(1-i*0.07)), i===2?st2:st); b.position.set(d*s*0.9,s*0.37+i*s*0.71,0); b.castShadow=true; g.add(b);} });
+  const lintel=new THREE.Mesh(new THREE.BoxGeometry(s*1.1,s*0.55,s*0.55), st2); lintel.position.y=s*1.05; g.add(lintel);
+  g.position.set(x,-0.5,z); g.rotation.y=faceCentre(x,z); addDecor(g); }
+function dHieroWall(x,z,s){ const g=new THREE.Group(); const w=new THREE.Mesh(new THREE.BoxGeometry(s*2.4,s*1.2,s*0.35), dMat(0xc2a878)); w.position.y=s*0.6; w.castShadow=true; g.add(w);
+  for(let i=0;i<6;i++){ const gl=new THREE.Mesh(new THREE.BoxGeometry(s*0.11,s*0.11,s*0.03), dMat(0x8a6a44)); gl.position.set((i-2.5)*s*0.32,s*0.6,s*0.19); g.add(gl);} g.position.set(x,-0.5,z); g.rotation.y=faceCentre(x,z); addDecor(g); }
+function dHeroStep(x,z,s){ const g=new THREE.Group(), st=dMat(0x7a6248); const tiers=6;   // AZTEC Chichen-Itza
+  for(let i=0;i<tiers;i++){ const w=s*(1-i/(tiers+0.3)); const b=new THREE.Mesh(new THREE.BoxGeometry(w,s*0.28,w), st); b.position.y=i*s*0.28+s*0.14; b.castShadow=true; g.add(b);}
+  const stair=new THREE.Mesh(new THREE.BoxGeometry(s*0.24,s*1.75,s*0.16), dMat(0x6a5440)); stair.position.set(0,s*0.85,s*0.52); stair.rotation.x=-0.52; g.add(stair);
+  const temple=new THREE.Mesh(new THREE.BoxGeometry(s*0.46,s*0.42,s*0.46), dMat(0x8a3a30)); temple.position.y=tiers*s*0.28+s*0.21; g.add(temple);
+  g.position.set(x,-0.5,z); addDecor(g); }
+function dParthenon(x,z,s){ const g=new THREE.Group(), m=dMat(0xeee6d4);   // GREEK temple
+  const base=new THREE.Mesh(new THREE.BoxGeometry(s*4,s*0.4,s*2.2), m); base.position.y=s*0.2; g.add(base);
+  for(let ix=-3;ix<=3;ix++) [-1,1].forEach(d=>{ const c=new THREE.Mesh(new THREE.CylinderGeometry(s*0.13,s*0.15,s*1.6,10), dMat(0xf2ecde)); c.position.set(ix*s*0.6,s*1.0,d*s*0.85); c.castShadow=true; g.add(c); });
+  const roof=new THREE.Mesh(new THREE.BoxGeometry(s*4.2,s*0.3,s*2.4), dMat(0xe0d6c2)); roof.position.y=s*1.95; g.add(roof);
+  const ped=new THREE.Mesh(new THREE.ConeGeometry(s*1.3,s*0.7,3), m); ped.scale.set(1.7,1,0.9); ped.rotation.y=Math.PI/2; ped.position.y=s*2.4; g.add(ped);
+  g.position.set(x,-0.5,z); g.rotation.y=faceCentre(x,z); addDecor(g); }
+function dStatue(x,z,s){ const g=new THREE.Group(), m=dMat(0xeae2d2);   // GREEK marble figure
+  const ped=new THREE.Mesh(new THREE.BoxGeometry(s*0.7,s*0.7,s*0.7), dMat(0xd8d0c0)); ped.position.y=s*0.35; g.add(ped);
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(s*0.16,s*0.22,s*1.0,10), m); body.position.y=s*1.2; g.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(s*0.16,12,10), m); head.position.y=s*1.8; g.add(head);
+  g.position.set(x,-0.5,z); g.rotation.y=faceCentre(x,z); addDecor(g); }
+function dLonghouse(x,z,s){ const g=new THREE.Group();   // NORSE hall
+  const body=new THREE.Mesh(new THREE.BoxGeometry(s*2.6,s*0.9,s*1.2), dMat(0x5a4632)); body.position.y=s*0.45; body.castShadow=true; g.add(body);
+  const roof=new THREE.Mesh(new THREE.ConeGeometry(s*1.0,s*0.95,4), dMat(0x3a2e20)); roof.scale.set(2.4,1,1.4); roof.rotation.y=Math.PI/4; roof.position.y=s*1.2; g.add(roof);
+  g.position.set(x,-0.5,z); g.rotation.y=Math.random()*6.28; addDecor(g); }
+function dLantern(x,z,s){ const g=new THREE.Group(), st=dMat(0x8a8a82);   // NIPPON stone lantern
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(s*0.22,s*0.28,s*0.2,8), st); base.position.y=s*0.1; g.add(base);
+  const post=new THREE.Mesh(new THREE.CylinderGeometry(s*0.1,s*0.1,s*0.6,8), st); post.position.y=s*0.5; g.add(post);
+  const box=new THREE.Mesh(new THREE.BoxGeometry(s*0.34,s*0.3,s*0.34), dGlow(0xffcf6a,0.5)); box.position.y=s*0.95; g.add(box);
+  const cap=new THREE.Mesh(new THREE.ConeGeometry(s*0.3,s*0.22,4), st); cap.rotation.y=Math.PI/4; cap.position.y=s*1.2; g.add(cap);
+  g.position.set(x,-0.5,z); addDecor(g); }
+function dMothership(x,y,z,s){ const g=new THREE.Group();   // ALIEN mothership
+  const disc=new THREE.Mesh(new THREE.CylinderGeometry(s,s*0.4,s*0.3,24), dMat(0x2a2a3a,0.5)); g.add(disc);
+  const dome=new THREE.Mesh(new THREE.SphereGeometry(s*0.5,18,12,0,6.28,0,1.4), dGlow(0x8a6aff,0.4)); dome.position.y=s*0.15; g.add(dome);
+  for(let i=0;i<14;i++){ const a=i/14*6.28; const l=new THREE.Mesh(new THREE.SphereGeometry(s*0.05,6,6), dGlow([0x4af0e0,0xff5ad0][i%2],0.9)); l.position.set(Math.sin(a)*s*0.95,-s*0.05,Math.cos(a)*s*0.95); g.add(l);}
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(s*0.2,s*0.6,y,12,1,true), new THREE.MeshBasicMaterial({color:0x8affe0,transparent:true,opacity:0.1,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending,fog:false})); beam.position.y=-y/2; g.add(beam);
+  g.position.set(x,y,z); g.__ufo=true; addDecor(g); }
+function dShroom(x,z,s){ const g=new THREE.Group();   // ALIEN glowing flora
+  const st=new THREE.Mesh(new THREE.CylinderGeometry(s*0.1,s*0.14,s*1.2,8), dMat(0x3a2a4a)); st.position.y=s*0.6; g.add(st);
+  const cap=new THREE.Mesh(new THREE.SphereGeometry(s*0.4,12,8,0,6.28,0,1.6), dGlow([0x4af0e0,0xff5ad0,0xb46aff][Math.floor(Math.random()*3)],0.6)); cap.scale.set(1,0.6,1); cap.position.y=s*1.2; g.add(cap);
+  g.position.set(x,-0.5,z); addDecor(g); }
+function dStation(x,y,z,s){ const g=new THREE.Group();   // COSMOS space station
+  const core=new THREE.Mesh(new THREE.CylinderGeometry(s*0.3,s*0.3,s*1.4,12), dMat(0x9aa0b0,0.7)); core.rotation.z=Math.PI/2; g.add(core);
+  const ring=new THREE.Mesh(new THREE.RingGeometry(s*0.9,s*1.1,28), new THREE.MeshStandardMaterial({color:0x8a90a0,metalness:0.6,roughness:0.4,side:THREE.DoubleSide,fog:false})); ring.rotation.x=1.2; g.add(ring);
+  for(let i=0;i<10;i++){ const a=i/10*6.28; const l=new THREE.Mesh(new THREE.SphereGeometry(s*0.045,6,6), dGlow(0xffd24a,0.8)); l.position.set(0,Math.sin(a)*s,Math.cos(a)*s); g.add(l);}
+  g.position.set(x,y,z); g.__ufo=true; addDecor(g); }
+function dGoldenGate(x,z,s){ const g=new THREE.Group(), gld=new THREE.MeshStandardMaterial({color:0xffe9a8,emissive:0x6a5024,emissiveIntensity:0.3,metalness:0.7,roughness:0.3});   // EMPYREAN gates
+  [-1,1].forEach(d=>{ const p=new THREE.Mesh(new THREE.CylinderGeometry(s*0.3,s*0.34,s*3,16), gld); p.position.set(d*s*1.1,s*1.5,0); g.add(p);
+    const cap=new THREE.Mesh(new THREE.SphereGeometry(s*0.36,12,10), gld); cap.position.set(d*s*1.1,s*3.05,0); g.add(cap); });
+  const arch=new THREE.Mesh(new THREE.BoxGeometry(s*2.6,s*0.4,s*0.5), gld); arch.position.y=s*3.0; g.add(arch);
+  g.position.set(x,-0.5,z); g.rotation.y=faceCentre(x,z); addDecor(g); }
+function dFloatIsland(x,y,z,s){ const g=new THREE.Group();   // EMPYREAN floating isle
+  const rock=new THREE.Mesh(new THREE.ConeGeometry(s,s*1.2,7), dMat(0x9a8a76)); rock.position.y=-s*0.4; g.add(rock);
+  const top=new THREE.Mesh(new THREE.CylinderGeometry(s,s*0.9,s*0.3,12), dMat(0x7ab06a)); top.position.y=s*0.1; g.add(top);
+  g.position.set(x,y,z); addDecor(g); }
 function buildBackdrop(era){
   if (!era || era.key === _backdropEra) return;          // only rebuild when the era actually changes
   _backdropEra = era.key;
   try {
     clearEraDecor();
+    // NB: nothing is placed inside ~18 units so the props never block the camera's view of the pyramid.
     if (era.key === 'egypt'){
-      [[-45,-30,13],[43,-41,16],[-53,16,11],[51,28,12],[6,-55,15],[-22,-51,10],[35,47,9]].forEach(p=>dPyramid(p[0],p[1],p[2],0x6f4f31));
-      ringPlace(6,12,28,(x,z)=>dPalm(x,z,0.8+Math.random()*0.5));
-      ringPlace(12,9,30,(x,z)=>dRock(x,z,0.4+Math.random()*0.6,0x8a6a44));
-      ringPlace(4,14,26,(x,z)=>dObelisk(x,z,3+Math.random()*2));
-      dSphinx(15, 17, 3.4); dSphinx(-19, 13, 2.8);                      // the Great Sphinx guards the approach
+      [[-46,-32,15],[36,-44,18],[-56,18,13],[52,30,14],[10,-58,17],[-26,-52,12],[40,48,12],[58,-12,11]].forEach(p=>dPyramid(p[0],p[1],p[2],0x6f4f31));
+      dPylon(0,-40,5);                                                  // a great temple gateway dead ahead
+      dSphinx(24,26,3.6); dSphinx(-28,20,3.0);
+      ringPlace(5,26,44,(x,z)=>dHieroWall(x,z,2.6+Math.random()));
+      ringPlace(6,22,38,(x,z)=>dObelisk(x,z,3.5+Math.random()*2.5));
+      ringPlace(12,18,40,(x,z)=>dPalm(x,z,0.9+Math.random()*0.6));
+      ringPlace(14,18,42,(x,z)=>dRock(x,z,0.5+Math.random()*0.7,0x8a6a44));
     } else if (era.key === 'aztec'){
-      ringPlace(7,17,42,(x,z)=>dStepPyr(x,z,7+Math.random()*6,0x6a5440));
-      ringPlace(16,9,28,(x,z)=>dTree(x,z,1.1+Math.random()*0.7));
-      ringPlace(10,9,30,(x,z)=>dRock(x,z,0.5+Math.random()*0.7,0x4a5a3a));
-      ringPlace(4,13,24,(x,z)=>dStoneHead(x,z,1.3+Math.random()*0.7));   // colossal Olmec heads
+      dHeroStep(0,-42,8); dHeroStep(-34,26,6.5);                        // Chichen-Itza temples
+      ringPlace(6,26,50,(x,z)=>dStepPyr(x,z,7+Math.random()*6,0x6a5440));
+      ringPlace(6,22,38,(x,z)=>dStoneHead(x,z,1.4+Math.random()*0.8));
+      ringPlace(26,18,42,(x,z)=>dTree(x,z,1.1+Math.random()*0.9));      // dense jungle
+      ringPlace(14,18,40,(x,z)=>dRock(x,z,0.5+Math.random()*0.7,0x4a5a3a));
     } else if (era.key === 'greek'){
-      ringPlace(4,16,34,(x,z,a)=>{ const h=3+Math.random()*1.5; for(let k=-1;k<=1;k++) dColumn(x+Math.cos(a)*k*1.7, z-Math.sin(a)*k*1.7, h, 0xe8e2d4); });   // colonnades
-      ringPlace(8,10,28,(x,z)=>dColumn(x,z,2+Math.random()*2,0xdcd4c2));
-      ringPlace(6,12,30,(x,z)=>dTree(x,z,0.9+Math.random()*0.5));
-      dTemple(17, 16, 3); dTemple(-20, -14, 2.4);                       // marble temples on the hills
+      dParthenon(0,-40,4.5); dParthenon(38,30,3.4);                     // temples
+      ringPlace(5,24,42,(x,z,a)=>{ const h=3+Math.random()*1.6; for(let k=-1;k<=1;k++) dColumn(x+Math.cos(a)*k*1.7, z-Math.sin(a)*k*1.7, h, 0xe8e2d4); });
+      ringPlace(8,20,38,(x,z)=>dStatue(x,z,2+Math.random()));
+      ringPlace(12,18,38,(x,z)=>dColumn(x,z,2+Math.random()*2.5,0xdcd4c2));
+      ringPlace(10,18,40,(x,z)=>dTree(x,z,0.9+Math.random()*0.6));
     } else if (era.key === 'norse'){
-      ringPlace(7,18,44,(x,z)=>dMountain(x,z,12+Math.random()*8,0x586674));   // snowy peaks
-      ringPlace(16,9,30,(x,z)=>dPine(x,z,1.2+Math.random()*0.9));
-      ringPlace(5,12,26,(x,z)=>dRunestone(x,z,1.8+Math.random()*1.4));
-      ringPlace(3,16,30,(x,z)=>dLongship(x,z,2+Math.random()*0.8));
-      for(let i=0;i<5;i++){ const a=Math.random()*6.28,d=22+Math.random()*16; dAurora(Math.sin(a)*d, Math.cos(a)*d); }   // northern lights
+      ringPlace(9,34,62,(x,z)=>dMountain(x,z,14+Math.random()*9,0x586674));   // a wall of fjord peaks
+      dLonghouse(0,-36,5); dLonghouse(30,24,4);
+      ringPlace(24,18,44,(x,z)=>dPine(x,z,1.3+Math.random()*1.1));
+      ringPlace(7,18,34,(x,z)=>dRunestone(x,z,1.8+Math.random()*1.6));
+      ringPlace(4,24,42,(x,z)=>dLongship(x,z,2.2+Math.random()*0.9));
+      for(let i=0;i<7;i++){ const a=Math.random()*6.28,d=26+Math.random()*22; dAurora(Math.sin(a)*d, Math.cos(a)*d); }
     } else if (era.key === 'nippon'){
-      dMountain(0,-46,22,0x6a6a78);                                     // Mt Fuji on the horizon
-      ringPlace(5,16,40,(x,z)=>dPagoda(x,z,3+Math.random()*2));
-      ringPlace(12,9,28,(x,z)=>dBlossom(x,z,1.2+Math.random()*0.8));
-      ringPlace(4,12,26,(x,z)=>dTorii(x,z,2.4+Math.random()*1.2));      // vermilion torii gates
-      ringPlace(8,10,30,(x,z)=>dRock(x,z,0.4+Math.random()*0.6,0x5a5a4a));
+      dMountain(0,-54,26,0x6a6a78);                                     // Mt Fuji
+      ringPlace(5,26,46,(x,z)=>dPagoda(x,z,3.2+Math.random()*2.2));
+      ringPlace(6,20,36,(x,z)=>dTorii(x,z,2.6+Math.random()*1.4));
+      ringPlace(10,18,34,(x,z)=>dLantern(x,z,1.3+Math.random()*0.7));
+      ringPlace(18,18,42,(x,z)=>dBlossom(x,z,1.3+Math.random()*0.9));   // cherry blossoms everywhere
+      ringPlace(10,18,38,(x,z)=>dRock(x,z,0.4+Math.random()*0.6,0x5a5a4a));
     } else if (era.key === 'alien'){
-      ringPlace(18,9,36,(x,z)=>dCrystal(x,z,2+Math.random()*5, [0xb46aff,0x4af0e0,0xff5ad0][Math.floor(Math.random()*3)]));
-      ringPlace(6,17,42,(x,z)=>dMonolith(x,z,5+Math.random()*7,0x241a3a));
-      ringPlace(8,10,28,(x,z)=>dRock(x,z,0.5+Math.random()*0.8,0x3a2a55));
-      for(let i=0;i<4;i++){ const a=Math.random()*6.28,d=20+Math.random()*16; dUFO(Math.sin(a)*d, 9+Math.random()*8, Math.cos(a)*d, 1.6+Math.random()*1.2); }   // hovering saucers
+      dMothership(0,28,-42,9); dMothership(-30,22,30,6);
+      ringPlace(22,18,42,(x,z)=>dCrystal(x,z,2+Math.random()*6, [0xb46aff,0x4af0e0,0xff5ad0][Math.floor(Math.random()*3)]));
+      ringPlace(7,26,48,(x,z)=>dMonolith(x,z,5+Math.random()*8,0x241a3a));
+      ringPlace(12,18,38,(x,z)=>dShroom(x,z,1.4+Math.random()*1.2));
+      for(let i=0;i<6;i++){ const a=Math.random()*6.28,d=22+Math.random()*18; dUFO(Math.sin(a)*d, 10+Math.random()*9, Math.cos(a)*d, 1.6+Math.random()*1.2); }
     } else if (era.key === 'cosmos'){
-      dStarfield(70);
-      dPlanet(-34, 20, -40, 9, 0x6a5ad0); dPlanet(40, 26, -30, 6, 0xd06a9a); dPlanet(20, 30, 44, 5, 0x4ad0c0);
-      ringPlace(20,10,40,(x,z)=>dRock(x,z,0.4+Math.random()*0.9,0x2a2444));   // drifting asteroids
-      ringPlace(10,12,30,(x,z)=>dCrystal(x,z,1.5+Math.random()*3, [0x7a6aff,0x4ad0ff][Math.floor(Math.random()*2)]));
+      dStarfield(110);
+      dPlanet(-38,22,-46,11,0x6a5ad0); dPlanet(46,28,-34,7,0xd06a9a); dPlanet(24,34,50,6,0x4ad0c0); dPlanet(-50,12,28,5,0xe0b060);
+      dStation(0,24,-40,5); dStation(34,18,28,3.5);
+      ringPlace(28,18,46,(x,z)=>dRock(x,z,0.4+Math.random()*1.0,0x2a2444));   // asteroid field
+      ringPlace(12,18,36,(x,z)=>dCrystal(x,z,1.6+Math.random()*3.2, [0x7a6aff,0x4ad0ff][Math.floor(Math.random()*2)]));
     } else if (era.key === 'heaven'){
-      for(let i=0;i<16;i++){ const a=Math.random()*6.28,d=13+Math.random()*30; dCloud(Math.sin(a)*d,2+Math.random()*16,Math.cos(a)*d,2.5+Math.random()*3); }
-      ringPlace(8,14,32,(x,z)=>dPillar(x,z,5+Math.random()*5,0xfff0c0));
-      ringPlace(8,10,26,(x,z)=>dCloud(x,-1+Math.random()*2,z,1.6+Math.random()*1.4));
-      for(let i=0;i<7;i++){ const a=Math.random()*6.28,d=16+Math.random()*22; dLightBeam(Math.sin(a)*d, Math.cos(a)*d); }   // shafts of divine light
+      dGoldenGate(0,-40,5);                                             // the pearly gates dead ahead
+      ringPlace(6,26,46,(x,z)=>dFloatIsland(x,4+Math.random()*12,z,3+Math.random()*2));
+      ringPlace(12,18,38,(x,z)=>dPillar(x,z,5+Math.random()*5,0xfff0c0));
+      for(let i=0;i<22;i++){ const a=Math.random()*6.28,d=16+Math.random()*32; dCloud(Math.sin(a)*d,2+Math.random()*18,Math.cos(a)*d,2.5+Math.random()*3.2); }
+      for(let i=0;i<9;i++){ const a=Math.random()*6.28,d=20+Math.random()*24; dLightBeam(Math.sin(a)*d, Math.cos(a)*d); }
     }
   } catch(e){ /* backdrop is best-effort */ }
 }
