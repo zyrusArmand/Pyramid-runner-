@@ -1279,29 +1279,47 @@ sun.shadow.camera.near=1; sun.shadow.camera.far=60;
 sun.shadow.camera.left=-16; sun.shadow.camera.right=16; sun.shadow.camera.top=16; sun.shadow.camera.bottom=-16;
 scene.add(sun);
 
-// ---------- BIOMES: the sky, fog & light shift every level so the climb keeps feeling fresh ----------
-const BIOMES = [
-  { name:'DUSK DESERT',   skyTop:0x241a36, skyBot:0xc9714e, fog:0x2a1d33, sun:0xfff0d0, hSky:0xffd9a8, hGnd:0x33203a, storm:0.05 },
-  { name:'CRIMSON DUNES', skyTop:0x2a0e1a, skyBot:0xd1492f, fog:0x3a1320, sun:0xffd0b0, hSky:0xffc59a, hGnd:0x3a1020, storm:0.08 },
-  { name:'EMERALD NILE',  skyTop:0x10302e, skyBot:0x4fae8c, fog:0x16302b, sun:0xeafff0, hSky:0xcdf5d6, hGnd:0x1a3a30, storm:0.03 },
-  { name:'FROZEN PEAKS',  skyTop:0x1c2a44, skyBot:0x9fc7e0, fog:0x223349, sun:0xeaf4ff, hSky:0xdfeaff, hGnd:0x33405a, storm:0.10 },
-  { name:'OBSIDIAN NIGHT',skyTop:0x0a0814, skyBot:0x3a2a55, fog:0x140f22, sun:0xb9a8ff, hSky:0x8a7ad0, hGnd:0x140f22, storm:0.04 },
+// ---------- ERAS: the climb travels through civilizations & realms. Each era spans ~10 levels with two 5-level
+// sub-variants (same vibe, slightly shifted), and brings its own sky, ground, stone palette and backdrop props. ----------
+const ERAS = [
+  { key:'egypt',  name:'EGYPT',     ground:0x6b4a32, dune:0x946642, block:{hue:36,  sat:34, lig:62},
+    bands:[ { name:'DUSK SANDS',    skyTop:0x241a36, skyBot:0xc9714e, fog:0x2a1d33, sun:0xfff0d0, hSky:0xffd9a8, hGnd:0x33203a, storm:0.05 },
+            { name:'NILE DAWN',     skyTop:0x183a3a, skyBot:0xe0a85a, fog:0x243028, sun:0xfff2c8, hSky:0xffe8b0, hGnd:0x2a3a2a, storm:0.04 } ] },
+  { key:'aztec',  name:'AZTEC',     ground:0x3b5236, dune:0x4a6a40, block:{hue:16,  sat:30, lig:50},
+    bands:[ { name:'JUNGLE TEMPLE', skyTop:0x122a1e, skyBot:0x5fae6a, fog:0x163026, sun:0xeafff0, hSky:0xcdf5d6, hGnd:0x1a3a24, storm:0.06 },
+            { name:'BLOOD MOON',    skyTop:0x2a0e1a, skyBot:0xb0432f, fog:0x2a1320, sun:0xffd0b0, hSky:0xffb59a, hGnd:0x301018, storm:0.09 } ] },
+  { key:'greek',  name:'HELLAS',    ground:0x9a8f78, dune:0xb3a888, block:{hue:42,  sat:12, lig:80},
+    bands:[ { name:'MARBLE COAST',  skyTop:0x1c3a6a, skyBot:0x8fc7e0, fog:0x3a5670, sun:0xffffff, hSky:0xdfeaff, hGnd:0x6a7a70, storm:0.03 },
+            { name:'OLYMPIAN GOLD', skyTop:0x2a2350, skyBot:0xe0c060, fog:0x3a3450, sun:0xfff0c0, hSky:0xffe8b0, hGnd:0x5a5448, storm:0.05 } ] },
+  { key:'alien',  name:'XENON',     ground:0x2a2444, dune:0x3a2a5a, block:{hue:284, sat:42, lig:52},
+    bands:[ { name:'VOID REACH',    skyTop:0x05030f, skyBot:0x3a1a6a, fog:0x0a0820, sun:0x9f6aff, hSky:0x8a6ad0, hGnd:0x140f30, storm:0.07 },
+            { name:'NEON HIVE',     skyTop:0x031018, skyBot:0x0a8a9a, fog:0x041c24, sun:0x4af0e0, hSky:0x4ad0d0, hGnd:0x103040, storm:0.08 } ] },
+  { key:'heaven', name:'EMPYREAN',  ground:0xe6e0f2, dune:0xd6d0ec, block:{hue:46,  sat:30, lig:82},
+    bands:[ { name:'GOLDEN GATES',  skyTop:0x6a7ad0, skyBot:0xfff0c0, fog:0xc2cbe8, sun:0xffffff, hSky:0xffffff, hGnd:0xd0d0f0, storm:0.0 },
+            { name:'CELESTIAL',     skyTop:0x8a7ad0, skyBot:0xffe0f0, fog:0xd8d2f2, sun:0xfff8e0, hSky:0xfff0ff, hGnd:0xe0d8f4, storm:0.0 } ] },
 ];
-function biomeFor(level){ return BIOMES[((level-1) % BIOMES.length + BIOMES.length) % BIOMES.length]; }
+function eraFor(level){ return ERAS[Math.min(ERAS.length-1, Math.floor((Math.max(1,level)-1)/10))]; }
+function bandFor(level){ const e=eraFor(level); return e.bands[Math.floor((Math.max(1,level)-1)/5) % e.bands.length]; }
+function biomeFor(level){ const b=bandFor(level), e=eraFor(level); return { name: b.name, era: e.name, storm: b.storm }; }
+let curEra = null, curEraBlock = null;
 function applyBiome(level){
-  const b = biomeFor(level);
+  const b = bandFor(level), e = eraFor(level);
   skyMat.uniforms.top.value.setHex(b.skyTop);
   skyMat.uniforms.bot.value.setHex(b.skyBot);
   scene.fog.color.setHex(b.fog);
   sun.color.setHex(b.sun);
   hemi.color.setHex(b.hSky); hemi.groundColor.setHex(b.hGnd);
   if (sunCore){ sunCore.material.color.setHex(b.sun); sunHalo.material.color.setHex(b.skyBot); }
+  if (ground) ground.material.color.setHex(e.ground);
+  if (typeof duneMat !== 'undefined' && duneMat) duneMat.color.setHex(e.dune);
+  curEra = e; curEraBlock = e.block;
+  buildBackdrop(e);                       // swap the background props when the era changes
 }
 // the level/biome name banner at the top of the screen during a level
 function setLevelName(show){
   const el = $('levelName'); if (!el) return;
   el.style.display = show ? 'block' : 'none';
-  if (show){ $('lnLv').textContent = 'LEVEL ' + gameLevel; $('lnName').textContent = biomeFor(gameLevel).name; }
+  if (show){ const b=biomeFor(gameLevel); $('lnLv').textContent = 'LEVEL ' + gameLevel + ' · ' + b.era; $('lnName').textContent = b.name; }
 }
 
 // ---------- true bloom (post-processing) — best-effort, falls back to plain render ----------
@@ -1351,48 +1369,56 @@ for (let i=0;i<11;i++){
   d.__env = true; scene.add(d);                          // __env = keep across game restarts
 }
 
-// ---------- desert dressing: palm trees, boulders, ruined columns ----------
-const PALM_BARK = new THREE.MeshStandardMaterial({ color:0x6e4f2e, roughness:1 });
-const PALM_FROND = new THREE.MeshStandardMaterial({ color:0x4f7a37, roughness:0.85, side:THREE.DoubleSide });
-const ROCK_MAT = new THREE.MeshStandardMaterial({ color:0x8a6a44, roughness:1, bumpMap:STONE_BUMP||undefined, bumpScale:0.05 });
-const RUIN_MAT = new THREE.MeshStandardMaterial({ color:0xb59866, roughness:1, bumpMap:STONE_BUMP||undefined, bumpScale:0.04 });
-function makePalm(x,z,s){
-  const p = new THREE.Group();
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.1*s,0.17*s,2.3*s,7), PALM_BARK);
-  trunk.position.y = 1.15*s; trunk.castShadow = true; p.add(trunk);
-  for (let i=0;i<7;i++){
-    const piv = new THREE.Group(); piv.position.y = 2.3*s; piv.rotation.y = i/7*Math.PI*2;
-    const f = new THREE.Mesh(new THREE.ConeGeometry(0.13*s, 1.5*s, 5), PALM_FROND);
-    f.rotation.z = -Math.PI/2 + 0.35; f.position.set(0.72*s, -0.12*s, 0); f.castShadow = true;
-    piv.add(f); p.add(piv);
-  }
-  p.position.set(x,-0.5,z); p.__env = true; scene.add(p);
+// ---------- ERA BACKDROPS: themed background props (pyramids → temples → ruins → alien spires → heaven),
+// rebuilt only when the era changes. All tagged __env so they survive level resets. ----------
+let eraDecor = [], _backdropEra = null;
+function addDecor(o){ o.__env = true; eraDecor.push(o); scene.add(o); return o; }
+function clearEraDecor(){ eraDecor.forEach(o => scene.remove(o)); eraDecor = []; }
+function ringPlace(n, near, far, fn){ for (let i=0;i<n;i++){ const a=Math.random()*6.28, d=near+Math.random()*(far-near); fn(Math.sin(a)*d, Math.cos(a)*d, a); } }
+function dMat(c, r){ return new THREE.MeshStandardMaterial({ color:c, roughness:r==null?1:r }); }
+function dGlow(c, e){ return new THREE.MeshStandardMaterial({ color:c, emissive:c, emissiveIntensity:e==null?0.5:e, metalness:0.3, roughness:0.35, transparent:true, opacity:0.92 }); }
+// prop builders
+function dPyramid(x,z,s,col){ const m=new THREE.Mesh(new THREE.ConeGeometry(s,s*1.4,4), dMat(col)); m.rotation.y=Math.PI/4; m.position.set(x,-1.4+s*0.7,z); addDecor(m); }
+function dPalm(x,z,s){ const p=new THREE.Group(); const t=new THREE.Mesh(new THREE.CylinderGeometry(0.1*s,0.17*s,2.3*s,7), dMat(0x6e4f2e)); t.position.y=1.15*s; t.castShadow=true; p.add(t);
+  for(let i=0;i<7;i++){ const pv=new THREE.Group(); pv.position.y=2.3*s; pv.rotation.y=i/7*6.28; const f=new THREE.Mesh(new THREE.ConeGeometry(0.13*s,1.5*s,5), new THREE.MeshStandardMaterial({color:0x4f7a37,roughness:0.85,side:THREE.DoubleSide})); f.rotation.z=-Math.PI/2+0.35; f.position.set(0.72*s,-0.12*s,0); pv.add(f); p.add(pv);} p.position.set(x,-0.5,z); addDecor(p); }
+function dRock(x,z,s,col){ const r=new THREE.Mesh(new THREE.DodecahedronGeometry(s,0), dMat(col)); r.position.set(x,-0.5+s*0.35,z); r.scale.set(1+Math.random()*0.5,0.7+Math.random()*0.4,1+Math.random()*0.5); r.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3); r.castShadow=true; addDecor(r); }
+function dObelisk(x,z,h){ const g=new THREE.Group(); const sh=new THREE.Mesh(new THREE.BoxGeometry(0.5,h,0.5), dMat(0xb59866)); sh.position.y=h/2; sh.castShadow=true; g.add(sh); const tip=new THREE.Mesh(new THREE.ConeGeometry(0.36,0.7,4), dMat(0xd9b066)); tip.rotation.y=Math.PI/4; tip.position.y=h+0.3; g.add(tip); g.position.set(x,-0.5,z); addDecor(g); }
+function dColumn(x,z,h,col){ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.5,h,12), dMat(col)); c.position.set(x,-0.5+h/2,z); c.castShadow=true; addDecor(c); const cap=new THREE.Mesh(new THREE.BoxGeometry(1.1,0.25,1.1), dMat(col)); cap.position.set(x,-0.5+h+0.1,z); addDecor(cap); }
+function dStepPyr(x,z,s,col){ const g=new THREE.Group(); const tiers=5; for(let i=0;i<tiers;i++){ const w=s*(1-i/(tiers+0.5)); const b=new THREE.Mesh(new THREE.BoxGeometry(w,s*0.2,w), dMat(col)); b.position.y=i*s*0.2+s*0.1; b.castShadow=true; g.add(b);} const stair=new THREE.Mesh(new THREE.BoxGeometry(s*0.2,s,s*0.1), dMat(col)); stair.position.set(0,s*0.45,s*0.45); g.add(stair); g.position.set(x,-0.5,z); g.rotation.y=Math.random(); addDecor(g); }
+function dTree(x,z,s){ const g=new THREE.Group(); const t=new THREE.Mesh(new THREE.CylinderGeometry(0.12*s,0.18*s,1.6*s,7), dMat(0x5a4326)); t.position.y=0.8*s; g.add(t); for(let i=0;i<3;i++){ const f=new THREE.Mesh(new THREE.ConeGeometry(0.85*s-i*0.2*s,1.0*s,8), dMat(0x2f6a34)); f.position.y=1.3*s+i*0.5*s; f.castShadow=true; g.add(f);} g.position.set(x,-0.5,z); addDecor(g); }
+function dCrystal(x,z,h,col){ const m=new THREE.Mesh(new THREE.ConeGeometry(0.5+Math.random()*0.4,h,6), dGlow(col,0.55)); m.position.set(x,-0.5+h/2,z); m.rotation.set((Math.random()-0.5)*0.4,Math.random()*3,(Math.random()-0.5)*0.4); addDecor(m); }
+function dMonolith(x,z,h,col){ const m=new THREE.Mesh(new THREE.BoxGeometry(1+Math.random(),h,0.6), dMat(col,0.4)); m.position.set(x,-0.5+h/2,z); m.rotation.y=Math.random(); m.castShadow=true; addDecor(m); }
+function dCloud(x,y,z,s){ const g=new THREE.Group(); for(let i=0;i<4;i++){ const b=new THREE.Mesh(new THREE.SphereGeometry(s*(0.7+Math.random()*0.6),12,10), new THREE.MeshStandardMaterial({color:0xfdfbff,emissive:0xece8ff,emissiveIntensity:0.3,roughness:1})); b.position.set((Math.random()-0.5)*s*2.4,(Math.random()-0.5)*s*0.5,(Math.random()-0.5)*s*1.4); g.add(b);} g.position.set(x,y,z); addDecor(g); }
+function dPillar(x,z,h,col){ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.62,h,16), new THREE.MeshStandardMaterial({color:col,emissive:0x6a5024,emissiveIntensity:0.3,metalness:0.6,roughness:0.3})); c.position.set(x,-0.5+h/2,z); addDecor(c); const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.78,0.7,0.4,16), dMat(col)); cap.position.set(x,-0.5+h+0.2,z); addDecor(cap); }
+function buildBackdrop(era){
+  if (!era || era.key === _backdropEra) return;          // only rebuild when the era actually changes
+  _backdropEra = era.key;
+  try {
+    clearEraDecor();
+    if (era.key === 'egypt'){
+      [[-45,-30,13],[43,-41,16],[-53,16,11],[51,28,12],[6,-55,15],[-22,-51,10],[35,47,9]].forEach(p=>dPyramid(p[0],p[1],p[2],0x6f4f31));
+      ringPlace(6,12,28,(x,z)=>dPalm(x,z,0.8+Math.random()*0.5));
+      ringPlace(14,9,30,(x,z)=>dRock(x,z,0.4+Math.random()*0.6,0x8a6a44));
+      ringPlace(4,14,26,(x,z)=>dObelisk(x,z,3+Math.random()*2));
+    } else if (era.key === 'aztec'){
+      ringPlace(7,17,42,(x,z)=>dStepPyr(x,z,7+Math.random()*6,0x6a5440));
+      ringPlace(16,9,28,(x,z)=>dTree(x,z,1.1+Math.random()*0.7));
+      ringPlace(12,9,30,(x,z)=>dRock(x,z,0.5+Math.random()*0.7,0x4a5a3a));
+    } else if (era.key === 'greek'){
+      ringPlace(4,16,34,(x,z,a)=>{ const h=3+Math.random()*1.5; for(let k=-1;k<=1;k++) dColumn(x+Math.cos(a)*k*1.7, z-Math.sin(a)*k*1.7, h, 0xe8e2d4); });   // colonnades
+      ringPlace(8,10,28,(x,z)=>dColumn(x,z,2+Math.random()*2,0xdcd4c2));
+      ringPlace(7,12,30,(x,z)=>dTree(x,z,0.9+Math.random()*0.5));
+    } else if (era.key === 'alien'){
+      ringPlace(18,9,36,(x,z)=>dCrystal(x,z,2+Math.random()*5, [0xb46aff,0x4af0e0,0xff5ad0][Math.floor(Math.random()*3)]));
+      ringPlace(6,17,42,(x,z)=>dMonolith(x,z,5+Math.random()*7,0x241a3a));
+      ringPlace(10,10,28,(x,z)=>dRock(x,z,0.5+Math.random()*0.8,0x3a2a55));
+    } else if (era.key === 'heaven'){
+      for(let i=0;i<14;i++){ const a=Math.random()*6.28,d=13+Math.random()*30; dCloud(Math.sin(a)*d,2+Math.random()*16,Math.cos(a)*d,2.5+Math.random()*3); }
+      ringPlace(8,14,32,(x,z)=>dPillar(x,z,5+Math.random()*5,0xfff0c0));
+      ringPlace(8,10,26,(x,z)=>dCloud(x,-1+Math.random()*2,z,1.6+Math.random()*1.4));
+    }
+  } catch(e){ /* backdrop is best-effort */ }
 }
-function makeRock(x,z,s){
-  const r = new THREE.Mesh(new THREE.DodecahedronGeometry(s,0), ROCK_MAT);
-  r.position.set(x, -0.5+s*0.35, z);
-  r.scale.set(1+Math.random()*0.5, 0.7+Math.random()*0.4, 1+Math.random()*0.5);
-  r.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3);
-  r.castShadow = true; r.__env = true; scene.add(r);
-}
-function makeColumn(x,z,h){
-  const c = new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.5,h,12), RUIN_MAT);
-  c.position.set(x, -0.5+h/2, z); c.rotation.y = Math.random()*0.4; c.castShadow = true; c.__env = true; scene.add(c);
-  const cap = new THREE.Mesh(new THREE.BoxGeometry(1.1,0.25,1.1), RUIN_MAT);
-  cap.position.set(x, -0.5+h+0.1, z); cap.castShadow = true; cap.__env = true; scene.add(cap);
-}
-for (let i=0;i<6;i++){  const a=Math.random()*6.28, d=12+Math.random()*16; makePalm(Math.sin(a)*d, Math.cos(a)*d, 0.8+Math.random()*0.5); }
-for (let i=0;i<16;i++){ const a=Math.random()*6.28, d=9+Math.random()*24;  makeRock(Math.sin(a)*d, Math.cos(a)*d, 0.4+Math.random()*0.7); }
-for (let i=0;i<5;i++){  const a=Math.random()*6.28, d=15+Math.random()*15; makeColumn(Math.sin(a)*d, Math.cos(a)*d, 1.4+Math.random()*2.2); }
-
-// ---------- the Giza skyline: great pyramids on the horizon + a hazy sun/moon ----------
-function makeFarPyramid(x,z,s){                          // a 4-sided silhouette pyramid, hazed by fog for depth
-  const m = new THREE.Mesh(new THREE.ConeGeometry(s, s*1.4, 4),
-    new THREE.MeshStandardMaterial({ color:0x6f4f31, roughness:1, bumpMap:STONE_BUMP||undefined, bumpScale:0.03 }));
-  m.rotation.y = Math.PI/4; m.position.set(x, -1.4 + s*1.4/2, z); m.__env = true; scene.add(m);
-}
-[[-45,-30,13],[43,-41,16],[-53,16,11],[51,28,12],[6,-55,15],[-22,-51,10],[35,47,9],[18,-44,8]]
-  .forEach(p => makeFarPyramid(p[0],p[1],p[2]));
 
 let sunCore = new THREE.Mesh(new THREE.SphereGeometry(4.2, 28, 18),     // a sphere always reads as a round disk from any angle
   new THREE.MeshBasicMaterial({ color:0xffe7b0, fog:false }));
@@ -1405,7 +1431,9 @@ sunHalo.position.copy(sunCore.position); sunHalo.__env = true; scene.add(sunHalo
 const $ = id => document.getElementById(id);
 function rand3(s){ return new THREE.Vector3((Math.random()-0.5)*s,(Math.random()-0.5)*s,(Math.random()-0.5)*s); }
 function nForLayer(L){ return baseBlocks - L; }   // blocks per wall at layer L (half-block inset)
-function layerColor(L){ const s=stone(); const hue=(s.hue+L*6)%360; const lig=Math.max(36, s.lig - L*2); return new THREE.Color(`hsl(${hue},${s.sat}%,${lig}%)`); }
+// stones follow the ERA's palette by default; a purchased stone skin (anything but the default sand) overrides it
+function blockPalette(){ return (curStone === 'sand' && curEraBlock) ? curEraBlock : stone(); }
+function layerColor(L){ const s=blockPalette(); const hue=(s.hue+L*6)%360; const lig=Math.max(34, s.lig - L*2); return new THREE.Color(`hsl(${hue},${s.sat}%,${lig}%)`); }
 
 function gridPos(wall, index, n, layer){
   const H = (n*BLOCK_SIZE)/2, along = index*BLOCK_SIZE;
@@ -2959,7 +2987,7 @@ function nextLevel(){
   $('hud').style.display='flex';
   $('reviveScreen').classList.add('hidden'); $('hint').classList.remove('show');
   $('menuBtn').style.display='block'; $('restartBtn').style.display='block';
-  showPop('LEVEL ' + gameLevel + ' · ' + biomeFor(gameLevel).name);   // quick banner of the new level/biome
+  { const b=biomeFor(gameLevel); showPop('LEVEL ' + gameLevel + ' · ' + b.era + ' — ' + b.name); }   // quick banner of the new level/era
   updateHUD(); spawnBlock(); setLevelName(true);
 }
 
@@ -3548,6 +3576,7 @@ function animate(){
 }
 // initial idle camera
 camera.position.set(0,7,11); camera.lookAt(0,2,0);
+applyBiome(1);                            // paint the era-1 (Egypt) sky + backdrop behind the menu
 $('hud').style.display = 'none';          // hidden until a game starts, so the menu stays clean
 $('meterWrap').style.opacity = '0';
 renderHome();          // populate best scores & coin bank on the home screen
