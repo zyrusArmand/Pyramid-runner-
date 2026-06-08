@@ -3013,7 +3013,7 @@ function applyShake(){
 function updateHUD(){
   $('score').textContent = S.score;
   $('level').textContent = gameLevel;
-  $('layer').textContent = (S.capstone ? (baseBlocks+1) : (S.layer+1)) + '/' + (baseBlocks+1);   // capstone counts as the final layer
+  $('layer').textContent = (S.capstone ? baseBlocks : (S.layer+1)) + '/' + baseBlocks;   // N layers (the capstone caps the top layer, not a separate one)
   const integ = Math.max(0, S.integrity);
   $('meterFill').style.width = (integ*100)+'%';
   $('meterFill').style.background = integ>0.4 ? 'linear-gradient(90deg,#6fe3a0,#e8d35f)' : 'linear-gradient(90deg,#e8a35f,#e85f5f)';
