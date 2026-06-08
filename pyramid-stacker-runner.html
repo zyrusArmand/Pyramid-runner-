@@ -320,6 +320,8 @@
   .midBtn { pointer-events:auto; display:flex; align-items:center; gap:7px; font-size:12px; letter-spacing:2px;
     padding:12px 18px; border-radius:30px; border:1.5px solid rgba(243,200,120,.45); color:#f3d99a; cursor:pointer; transition:transform .12s; }
   .midBtn:active { transform:scale(.94); }
+  .midBtn.circBtn { width:44px; height:44px; padding:0; gap:0; border-radius:50%; justify-content:center; flex:0 0 auto; }
+  .midBtn.circBtn .bicon { width:20px; height:20px; }
   .bicon { width:15px; height:15px; }
   #homePlay { pointer-events:auto; cursor:pointer; margin-top:4px; }
   .cta.hero { border:none; color:#3a2410; font-weight:700; padding:12px 36px; font-size:15px; letter-spacing:3px; white-space:nowrap;
@@ -577,8 +579,8 @@
     <div class="homeRow">
       <div class="midBtn" id="homeLeader"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4a5 5 0 0 1-10 0V4z"/><path d="M7 6H4v1.5A3.5 3.5 0 0 0 7.5 11"/><path d="M17 6h3v1.5A3.5 3.5 0 0 1 16.5 11"/><path d="M9.5 18h5"/><path d="M12 14.5V18"/></svg>LEADERBOARD</div>
       <div class="midBtn" id="homeShop"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12l-1 11H7L6 8z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg>SHOP</div>
+      <div class="midBtn circBtn" id="homeGoalsBtn" title="Daily Goals"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/></svg></div>
     </div>
-    <div class="midBtn" id="homeGoalsBtn"><span id="homeGoalsLbl">DAILY GOALS</span></div>
   </div>
 </div>
 
@@ -2979,8 +2981,7 @@ function renderHome(){
   $('bestHeight').textContent = (bestHeight||0).toFixed(0)+'m';
   $('bankCoins').textContent  = bank;
   ensureMissions();
-  $('homeGoalsLbl').textContent = 'DAILY GOALS' + (dailyStreak>0 ? ' · DAY ' + dailyStreak : '');
-  $('homeGoalsBtn').classList.toggle('hasNew', goalsNew);
+  const gb = $('homeGoalsBtn'); if (gb){ gb.classList.toggle('hasNew', goalsNew); gb.title = 'Daily Goals' + (dailyStreak>0 ? ' · Day ' + dailyStreak : ''); }
   const pl = $('homePlay'); if (pl) pl.textContent = (!dailyMode && resumeLevel > 1) ? ('CONTINUE · LV ' + resumeLevel) : 'PLAY';
   const hp = $('homeProfile');
   if (hp){
