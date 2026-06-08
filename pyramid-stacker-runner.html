@@ -1951,6 +1951,13 @@ function startRun(){
   S.allBlocks.forEach(b => { if (b && b.material){ b.material.bumpMap = null; b.material.bumpScale = 0; b.material.roughness = 0.95; b.material.metalness = 0.0; b.material.needsUpdate = true; } });
   // CLIMB LIGHTING: a gentle side-key (brighter than the dark version) for a little step shadow without going murky
   sun.position.set(8, 15, 6); sun.intensity = 0.82; hemi.intensity = 0.46;
+  // SOLID CORE: a stone pyramid filling the inside so the structure reads completely solid — any gap between the
+  // built blocks (especially up top) shows solid stone behind it instead of a blank hole / the sky.
+  const coreH = BASE_BLOCKS_PER_WALL*LAYER_HEIGHT + 0.5, coreR = (BASE_BLOCKS_PER_WALL*BLOCK_SIZE/2)*1.75;
+  const core = new THREE.Mesh(new THREE.ConeGeometry(coreR, coreH, 4),
+    new THREE.MeshStandardMaterial({ color: layerColor(Math.floor(BASE_BLOCKS_PER_WALL/2)), roughness:0.96, metalness:0.02 }));
+  core.rotation.y = Math.PI/4; core.position.y = -0.5 + coreH/2 - 0.05; core.receiveShadow = true;
+  scene.add(core); S.coreMesh = core;
   // BUILD → CLIMB: the quality of the pyramid you built shapes the climb. A clean build means a
   // safer path and richer coins; a sloppy one means a treacherous climb.
   const stars = pyramidRating(); S.buildStars = stars;
