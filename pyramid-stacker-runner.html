@@ -995,6 +995,9 @@ function makeRunner(){
   const skinMat = new THREE.MeshStandardMaterial({ color:skinCol, emissive:(style==='explorer'||style==='pharaoh')?0x241806:0x060606, roughness:0.6 });
   const gold   = () => new THREE.MeshStandardMaterial({ color:0xe8c45a, emissive:0x3a2600, metalness:0.75, roughness:0.28 });
   const blue   = () => new THREE.MeshStandardMaterial({ color:0x2b5bd0, emissive:0x0a1638, metalness:0.3, roughness:0.5 });
+  const isEra  = style === 'era';                                  // era characters get bare skin limbs + boots (real-person read)
+  const limbMat = isEra ? skinMat : cMat;
+  const shoeMat = new THREE.MeshStandardMaterial({ color: isEra ? 0x4e3a26 : ch.color, roughness:0.8, metalness: ch.metal?0.5:0.05 });
 
   // smooth capsule (cylinder + rounded caps) for a modern limb silhouette
   function capsule(r, len, mat){
@@ -1006,23 +1009,35 @@ function makeRunner(){
   }
   function limb(px, py, r, len, foot){                  // pivot group at the shoulder/hip
     const piv = new THREE.Group(); piv.position.set(px, py, 0);
-    const cap = capsule(r, len, cMat); cap.position.y = -len/2; piv.add(cap);
-    if (foot){ const f = new THREE.Mesh(new THREE.SphereGeometry(r*1.15, 12, 10), cMat);
-      f.scale.set(1, 0.7, 1.6); f.position.set(0, -len, r*0.7); f.castShadow = true; piv.add(f); }
+    const cap = capsule(r, len, limbMat); cap.position.y = -len/2; piv.add(cap);
+    if (foot){                                          // a little boot: rounded heel + forward toe
+      const boot = new THREE.Mesh(new THREE.SphereGeometry(r*1.18, 12, 10), shoeMat);
+      boot.scale.set(1, 0.7, 1.7); boot.position.set(0, -len, r*0.8); boot.castShadow = true; piv.add(boot);
+      const toe = new THREE.Mesh(new THREE.SphereGeometry(r*0.74, 10, 8), shoeMat); toe.scale.set(1,0.8,1); toe.position.set(0, -len-r*0.1, r*1.75); piv.add(toe);
+    } else {                                            // a hand
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(r*1.3, 12, 10), limbMat);
+      hand.scale.set(1, 1.1, 0.82); hand.position.set(0, -len-r*0.2, 0); hand.castShadow = true; piv.add(hand);
+    }
     g.add(piv); return piv;
   }
 
-  // torso: smooth tapered ellipsoid + shoulders + hips
+  // torso: tapered chest → waist (less egg-like) + shoulders + hips
   const torso = new THREE.Mesh(new THREE.SphereGeometry(0.12, 24, 20), cMat);
-  torso.scale.set(0.92, 1.32, 0.78); torso.position.y = 0.37; torso.castShadow = true; g.add(torso);
+  torso.scale.set(0.86, 1.34, 0.72); torso.position.y = 0.38; torso.castShadow = true; g.add(torso);
+  const waist = new THREE.Mesh(new THREE.CylinderGeometry(0.082, 0.092, 0.1, 18), cMat);   // cinched midsection breaks up the blob
+  waist.position.y = 0.3; g.add(waist);
   const shoulders = new THREE.Mesh(new THREE.SphereGeometry(0.1, 20, 16), cMat);
-  shoulders.scale.set(1.3, 0.62, 0.82); shoulders.position.y = 0.47; shoulders.castShadow = true; g.add(shoulders);
+  shoulders.scale.set(1.36, 0.6, 0.82); shoulders.position.y = 0.475; shoulders.castShadow = true; g.add(shoulders);
   const pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.1, 20, 16), cMat);
-  pelvis.scale.set(1.05, 0.7, 0.88); pelvis.position.y = 0.27; g.add(pelvis);
-  // neck + head
+  pelvis.scale.set(1.06, 0.66, 0.88); pelvis.position.y = 0.27; g.add(pelvis);
+  // neck + head + face
   const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.04, 0.06, 14), skinMat); neck.position.y = 0.52; g.add(neck);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.1, 28, 24), skinMat);
-  head.position.y = 0.585; head.castShadow = true; g.add(head);
+  head.scale.set(1, 1.04, 0.96); head.position.y = 0.585; head.castShadow = true; g.add(head);
+  const eyeMat = new THREE.MeshStandardMaterial({ color:0x16161e, roughness:0.25 });
+  [-1,1].forEach(s => { const eye = new THREE.Mesh(new THREE.SphereGeometry(0.016, 10, 8), eyeMat);
+    eye.scale.set(1, 1.25, 0.55); eye.position.set(s*0.036, 0.6, 0.09); g.add(eye); });
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.014, 8, 7), skinMat); nose.position.set(0, 0.578, 0.1); g.add(nose);
 
   g.legL = limb(-0.05, 0.27, 0.042, 0.21, true);
   g.legR = limb( 0.05, 0.27, 0.042, 0.21, true);
@@ -1203,6 +1218,27 @@ function buildEraOutfit(g, ch){
   const GLOW = (c,e) => new THREE.MeshStandardMaterial({ color:c, emissive:c, emissiveIntensity:e==null?0.7:e, metalness:0.3, roughness:0.35 });
   const tier = ch.tier|0, body = ch.color, boss = tier===3, head = ch.head, add = m => { g.add(m); return m; };
   const headHalf = (r,col,th) => { const h=new THREE.Mesh(new THREE.SphereGeometry(r,18,14,0,6.28,0,th||1.55), col); h.position.set(0,0.6,0); h.castShadow=true; return add(h); };
+  const cloth = c => M(c, 0.04, 0.9);
+  // ---- garments every era character wears (tunic hem, collar, belt) so nobody is a bare blob ----
+  const hem = new THREE.Mesh(new THREE.CylinderGeometry(0.092, 0.132, 0.17, 18, 1, true), cloth(body)); hem.position.y=0.225; hem.castShadow=true; add(hem);   // tunic skirt over the hips
+  const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.088, 0.032, 16), cloth(body)); collar.position.y=0.47; add(collar);                            // neckline
+  const beltGold = tier>=2;
+  const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.097, 0.097, 0.03, 18), M(beltGold?0xe8c45a:0x4a3320, beltGold?0.6:0.1, beltGold?0.3:0.7)); belt.position.y=0.3; add(belt);
+  const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.042,0.036,0.02), GOLD()); buckle.position.set(0,0.3,0.095); add(buckle);
+  // ---- detail that rises with social rank ----
+  if (tier===0){               // PEASANT — rope belt, shoulder strap, satchel
+    const strap=new THREE.Mesh(new THREE.BoxGeometry(0.028,0.26,0.014), cloth(0x7a5a3a)); strap.position.set(-0.045,0.39,0.072); strap.rotation.z=0.5; add(strap);
+    const bag=new THREE.Mesh(new THREE.SphereGeometry(0.05,12,10), M(0x6a4a2a,0,0.95)); bag.scale.set(1,1.1,0.6); bag.position.set(0.1,0.27,-0.02); bag.castShadow=true; add(bag);
+    const patch=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.05,0.012), cloth(0x8a6a44)); patch.position.set(0.04,0.36,0.092); add(patch);   // a patched tunic
+  } else if (tier===1){        // WARRIOR — crossed leather straps, studded belt, a shoulder guard
+    [-1,1].forEach(d=>{ const st=new THREE.Mesh(new THREE.BoxGeometry(0.03,0.3,0.014), M(0x4a3320,0,0.8)); st.position.set(0,0.4,0.075); st.rotation.z=d*0.5; add(st);} );
+    const guard=new THREE.Mesh(new THREE.SphereGeometry(0.058,12,10,0,6.28,0,1.6), M(body,0.3,0.5)); guard.scale.set(1.25,0.95,1.05); guard.position.set(-0.135,0.49,0); guard.castShadow=true; add(guard);
+    for(let i=0;i<3;i++){ const stud=new THREE.Mesh(new THREE.SphereGeometry(0.01,6,6), GOLD()); stud.position.set((i-1)*0.042,0.3,0.097); add(stud);}
+  } else if (tier===2){        // NOBLE — diagonal sash, shoulder mantle, a gem at the belt
+    const sash=new THREE.Mesh(new THREE.BoxGeometry(0.052,0.34,0.018), cloth(0xb83a4a)); sash.position.set(0,0.39,0.072); sash.rotation.z=0.55; add(sash);
+    const mantle=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.145,0.11,18,1,true), cloth(body)); mantle.position.y=0.475; mantle.castShadow=true; add(mantle);
+    const gem=new THREE.Mesh(new THREE.DodecahedronGeometry(0.022), GLOW(0x4ad0ff,0.5)); gem.position.set(0,0.3,0.1); add(gem);
+  }
   if (head==='hood'){ headHalf(0.108, M(body,0.05,0.85)); }
   else if (head==='furhood'){ headHalf(0.115, M(0x6a5a44,0,0.95), 1.75);
     const ruff=new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.15,0.06,16), M(0x4a3a2a,0,1)); ruff.position.y=0.49; add(ruff); }
