@@ -1953,8 +1953,19 @@ function loadRunDressing(){
 function startRun(){
   S.phase = 'run';
   Sound.cap();
-  // polish the built stones for the close-up climb: drop the grainy bump map but keep them matte
-  S.allBlocks.forEach(b => { if (b && b.material){ b.material.bumpMap = null; b.material.bumpScale = 0; b.material.roughness = 0.95; b.material.metalness = 0.0; b.material.needsUpdate = true; } });
+  // Prep the built stones for the close-up climb: drop the grainy bump map, keep them matte, and BAND alternate
+  // courses light/dark so the staircase reads in 3D from the low chase-cam (each band reads as a step shadow).
+  // Done per-plate at climb time (the build phase keeps its single shared material so the active-piece glow still works).
+  S.allBlocks.forEach(b => {
+    if (!b || !b.children) return;
+    b.children.forEach((plate, idx) => {
+      if (!plate.material) return;
+      let m = plate.material;
+      if (m.clone){ m = m.clone(); plate.material = m;
+        if (idx % 2 === 1 && m.color && m.color.multiplyScalar) m.color.multiplyScalar(0.8); }   // shadow band on every other course
+      m.bumpMap = null; m.bumpScale = 0; m.roughness = 0.95; m.metalness = 0.0; m.needsUpdate = true;
+    });
+  });
   // CLIMB LIGHTING: a gentle side-key (brighter than the dark version) for a little step shadow without going murky
   sun.position.set(8, 15, 6); sun.intensity = 0.82; hemi.intensity = 0.46;
   // SOLID CORE: a stone pyramid filling the inside so the structure reads completely solid — any gap between the
@@ -2195,7 +2206,7 @@ function updateRun(dt){
 
   g.position.set(base.x + perp.x*r.laneX, base.y + r.yOff, base.z + perp.z*r.laneX);
   g.scale.set(sx*RUN_SCALE, sy*RUN_SCALE, sx*RUN_SCALE);
-  if (r.bubble){ r.bubble.position.set(g.position.x, g.position.y + 0.12, g.position.z);
+  if (r.bubble){ r.bubble.position.set(g.position.x, g.position.y + 0.07, g.position.z);
     const bs = 1 + 0.06*Math.sin(performance.now()*0.008); r.bubble.scale.set(bs, bs, bs); }
   placeShadow(g, r);
 
@@ -2367,7 +2378,7 @@ function collectPower(t, r){
 }
 function addShieldBubble(r){
   if (r.bubble) return;
-  const b = new THREE.Mesh(new THREE.SphereGeometry(0.34,20,16),
+  const b = new THREE.Mesh(new THREE.SphereGeometry(0.12,20,16),
     new THREE.MeshStandardMaterial({ color:0x8fffd0, emissive:0x2a8a5a, transparent:true, opacity:0.26, depthWrite:false }));
   scene.add(b); r.bubble = b;
 }
