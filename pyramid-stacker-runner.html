@@ -234,6 +234,25 @@
   .goalRew { color:#ffd24a; font-weight:700; }
   .goalBar { margin-top:5px; height:5px; border-radius:5px; background:rgba(255,255,255,.1); overflow:hidden; }
   .goalBar > div { height:100%; background:linear-gradient(90deg,#6fe3a0,#e8d35f); border-radius:5px; transition:width .3s; }
+  #goalsPanel { overflow-y:auto; padding-bottom:32px; gap:10px; }
+  .goalsHd { width:min(360px,88vw); font-size:11px; letter-spacing:3px; color:#cdb083; opacity:.85; margin:6px 0 -2px; text-align:left; }
+  .goalsHd span { color:#ffd24a; opacity:.9; }
+  #dailyLadder { width:min(360px,88vw); display:flex; gap:5px; }
+  .dayCell { flex:1; text-align:center; padding:6px 2px; border-radius:8px; background:rgba(255,255,255,.05);
+    border:1px solid rgba(243,200,120,.16); font-size:9px; letter-spacing:.5px; color:#cdbfa6; }
+  .dayCell .dn { font-size:8px; opacity:.7; }
+  .dayCell .dr { font-size:10px; color:#ffd24a; font-weight:700; margin-top:2px; }
+  .dayCell.done { background:rgba(111,227,160,.16); border-color:rgba(111,227,160,.4); color:#bfeccd; }
+  .dayCell.today { background:rgba(255,210,74,.18); border-color:#ffd24a; color:#fff0c4; box-shadow:0 0 12px rgba(255,210,74,.35); }
+  #achList { width:min(360px,88vw); display:flex; flex-direction:column; gap:7px; }
+  .ach { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:7px 11px; border-radius:10px;
+    background:rgba(255,255,255,.04); border:1px solid rgba(243,200,120,.15); }
+  .ach.got { background:rgba(255,210,74,.1); border-color:rgba(255,210,74,.34); }
+  .ach .anm { font-size:11.5px; letter-spacing:.6px; color:#f0e3c8; font-weight:700; }
+  .ach.got .anm { color:#ffe9a8; }
+  .ach .ad { font-size:9.5px; letter-spacing:.3px; color:#b6a98a; }
+  .ach .av { font-size:13px; }
+  .ach .arw { font-size:10px; color:#ffd24a; font-weight:700; white-space:nowrap; }
 
   /* tappable COINS chip → shop */
   .chip.chipTap { pointer-events:auto; cursor:pointer; transition:transform .12s, border-color .18s; }
@@ -668,9 +687,14 @@
 </div>
 
 <div class="overlay hidden panel" id="goalsPanel">
-  <div class="panelTitle">DAILY GOALS</div>
+  <div class="panelTitle">GOALS &amp; REWARDS</div>
   <div id="goalsStreak"></div>
+  <div class="goalsHd">LOGIN REWARDS</div>
+  <div id="dailyLadder"></div>
+  <div class="goalsHd">DAILY GOALS</div>
   <div id="goalsList"></div>
+  <div class="goalsHd">ACHIEVEMENTS <span id="achCount"></span></div>
+  <div id="achList"></div>
   <div class="backBtn" id="goalsBack">◀ BACK</div>
 </div>
 
@@ -902,8 +926,10 @@ function checkDailyStreak(){
   if (last===today) return;
   dailyStreak = (last===dayKey(1)) ? dailyStreak+1 : 1;
   Store.set('dstreak', dailyStreak); Store.set('dday', today);
-  const reward = Math.min(20 + dailyStreak*10, 120); bank += reward; Store.set('coins', bank); goalsNew = true;
-  setTimeout(()=> showHint('🔥 DAY '+dailyStreak+' · DAILY BONUS +'+reward+' DEBEN', 3600), 700);
+  const reward = dailyLadderReward(dailyStreak); bank += reward; Store.set('coins', bank); goalsNew = true;
+  const dayInWeek = ((dailyStreak-1)%7)+1;
+  setTimeout(()=> showHint('🔥 DAY '+dailyStreak+' · LOGIN REWARD +'+reward+' DEBEN'+(dayInWeek===7?'  (JACKPOT!)':''), 3600), 700);
+  if (typeof checkAchievements==='function') checkAchievements();
 }
 
 // ---------- cosmetics: STONE themes (block palette) + CHARACTER costumes (runner), bought with coins ----------
@@ -1035,6 +1061,42 @@ grantEraChars();                                  // give the player every peasa
 let selChar     = curChar, selStone = curStone;   // shop PREVIEW selection (what you're viewing, not necessarily worn)
 const COIN_NAME = 'DEBEN';                          // what the in-game currency is called (change this one word to rename the labels)
 try { document.querySelectorAll('.coinLbl, .chipLbl').forEach(e => e.textContent = COIN_NAME); } catch(e){}
+
+// ---------- ACHIEVEMENTS: one-time lifetime milestones (paid out in DEBEN, never affect score) ----------
+let records    = Store.get('records', {});         // lifetime bests: bestStars, bestStreak, bestGold, guardians
+let achUnlocked= Store.get('ach', []);
+const ACHIEVEMENTS = [
+  { id:'firstclimb', name:'FIRST ASCENT',  desc:'Clear level 1',                 reward:50,   test:()=> maxLevel>=2 },
+  { id:'build10',    name:'STONEMASON',    desc:'Build 10 pyramids',             reward:100,  test:()=> totalBuilds>=10 },
+  { id:'flawless',   name:'FLAWLESS',      desc:'Build a 5★ pyramid',            reward:120,  test:()=> (records.bestStars||0)>=5 },
+  { id:'streak10',   name:'IN THE ZONE',   desc:'Land a 10× PERFECT streak',     reward:120,  test:()=> (records.bestStreak||0)>=10 },
+  { id:'lvl10',      name:'PATHFINDER',    desc:'Reach level 10',                reward:150,  test:()=> maxLevel>=10 },
+  { id:'guardian',   name:'GIANT-SLAYER',  desc:'Topple an era guardian',        reward:200,  test:()=> (records.guardians||0)>=1 },
+  { id:'gold5',      name:'MIDAS TOUCH',   desc:'Reach a ×5 gold chain',         reward:120,  test:()=> (records.bestGold||0)>=5 },
+  { id:'collector',  name:'COLLECTOR',     desc:'Own 8 characters',              reward:200,  test:()=> ownedChars.length>=8 },
+  { id:'build50',    name:'GRAND ARCHITECT',desc:'Build 50 pyramids',            reward:300,  test:()=> totalBuilds>=50 },
+  { id:'lvl30',      name:'WORLD-WALKER',  desc:'Reach level 30',                reward:300,  test:()=> maxLevel>=30 },
+  { id:'devoted',    name:'DEVOTED',       desc:'Play 7 days in a row',          reward:250,  test:()=> dailyStreak>=7 },
+  { id:'lvl50',      name:'LIVING LEGEND', desc:'Reach level 50',                reward:500,  test:()=> maxLevel>=50 },
+  { id:'lvl80',      name:'ASCENDANT',     desc:'Reach the Empyrean (level 80)', reward:1000, test:()=> maxLevel>=80 },
+];
+function checkAchievements(){
+  const newly = [];
+  ACHIEVEMENTS.forEach(a => { if (achUnlocked.includes(a.id)) return;
+    let ok=false; try { ok = a.test(); } catch(e){}
+    if (ok){ achUnlocked.push(a.id); bank += a.reward; newly.push(a); } });
+  if (newly.length){ Store.set('ach', achUnlocked); Store.set('coins', bank); goalsNew = true;
+    if (typeof updateCoinHud==='function') updateCoinHud(true);
+    newly.forEach((a,i)=> setTimeout(()=> showHint('🏆 '+a.name+' UNLOCKED  +'+a.reward+' '+COIN_NAME, 3400), 600 + i*1500)); }
+  return newly.length;
+}
+function bumpRecord(key, val){ if ((records[key]||0) < val){ records[key]=val; Store.set('records', records); } checkAchievements(); }
+function incRecord(key){ records[key]=(records[key]||0)+1; Store.set('records', records); checkAchievements(); }
+
+// ---------- DAILY REWARD LADDER: escalating login bonus that loops every 7 days ----------
+const DAILY_LADDER = [40, 60, 80, 120, 160, 220, 400];   // day 1 → day 7, then repeats (streak keeps counting)
+function dailyLadderReward(streak){ return DAILY_LADDER[(Math.max(1,streak)-1) % 7]; }
+checkAchievements();   // retroactively credit anything an existing player already qualifies for
 function stone(){ return STONES[curStone] || STONES.sand; }
 function character(){ return CHARACTERS[curChar] || CHARACTERS.explorer; }
 
@@ -2361,6 +2423,7 @@ function blockPlaced(mesh, instability, capstone, len, consumed, bonus){
   if (tier === 'PERFECT'){
     // exact hit ONLY — the full reaction: emoji pop + phone buzz + chime + sparkle
     S.streak++; S.bestPerfect = Math.max(S.bestPerfect, S.streak); missionEvent('streak', S.streak);   // goal: perfect streak
+    bumpRecord('bestStreak', S.streak);                                  // achievement: lifetime best perfect streak
     if (S.streak > bestStreak){ bestStreak = S.streak; Store.set('bestStreak', bestStreak); }          // lifetime best streak
     const mult = Math.min(1 + Math.floor((S.streak-1)/3), 5);    // x1 (1–3), x2 (4–6), … up to x5 — the chain reward
     S.score += Math.round((baseScore + S.streak*25) * len * mult);
@@ -2791,6 +2854,7 @@ function defeatGuardian(){
   bank += reward; S.coins += reward; Store.set('coins', bank); updateCoinHud(true);
   try { sparkle(gd.mesh.position.clone()); } catch(e){}
   flash(); shake(0.5); Sound.glory();
+  incRecord('guardians');                                  // achievement: giant-slayer
   showPop('⚔ ' + guardianName(gameLevel) + ' VANQUISHED  +' + reward + ' ' + COIN_NAME);
 }
 
@@ -2820,6 +2884,7 @@ function startRun(){
   totalBuilds++; Store.set('builds', totalBuilds);                                   // lifetime pyramids built
   if (gameLevel > maxLevel){ maxLevel = gameLevel; Store.set('maxLevel', maxLevel); grantEraChars(); } // highest level reached → free peasant for any new era
   missionEvent('stars', stars); missionEvent('builds', 1);   // goals: build quality + pyramids built
+  bumpRecord('bestStars', stars);                            // achievements: flawless build, build counts, levels reached
   const hazardMul = stars>=5 ? 0.4 : stars>=4 ? 0.65 : stars>=3 ? 1.0 : stars>=2 ? 1.35 : 1.7;   // fewer hazards on a clean build
   S.climbCoinMul = stars>=5 ? 2 : stars>=4 ? 1.6 : stars>=3 ? 1.2 : stars>=2 ? 1.0 : 0.7;        // richer coins on a clean build
   const tiles = climbPath();   // steep, direct step-by-step climb up the front face
@@ -3308,6 +3373,7 @@ function collectGold(t, r){
   scene.remove(t.gold.mesh); sparkle(pos); Sound.treasure();
   r.gMult = Math.min(5, r.gMult + 1);                                       // each block bumps the multiplier, capped ×5
   r.gMultMax = Math.max(r.gMultMax||1, r.gMult);                            // remember the run's best chain for the summary
+  bumpRecord('bestGold', r.gMult);                                         // achievement: ×5 gold chain
   r.gMultT = 6.5;                                                           // refresh the chain window
   S.score += 120 * r.gMult;
   const goldGain = Math.max(1, Math.round(r.gMult * ((r.coinMul) || 1)));   // perk boosts DEBEN only
@@ -3621,14 +3687,36 @@ function handleAvatarFile(file){
 function renderGoals(){
   ensureMissions();
   $('goalsStreak').textContent = dailyStreak>0 ? ('DAY ' + dailyStreak + ' PLAY STREAK 🔥') : '';
+  // login-reward ladder — 7-day loop, today highlighted, earlier days marked claimed
+  const dayInWeek = dailyStreak>0 ? ((dailyStreak-1)%7)+1 : 1;
+  const claimedToday = Store.get('dday','') === todayKey();
+  let lad = '';
+  for (let d=1; d<=7; d++){
+    const cls = (d < dayInWeek || (d===dayInWeek && claimedToday)) ? 'done'
+              : (d===dayInWeek ? 'today' : '');
+    lad += '<div class="dayCell ' + cls + '"><div class="dn">DAY ' + d + '</div><div class="dr">+' + DAILY_LADDER[d-1] + '</div></div>';
+  }
+  const dl = $('dailyLadder'); if (dl) dl.innerHTML = lad;
+  // rotating goals
   let html = '';
   missions.forEach(m => {
-    const d = missionDef(m.id); if (!d) return;
-    const pct = Math.min(100, Math.round(m.prog / d.goal * 100));
-    html += '<div class="goal"><div class="goalRow"><span>' + d.desc + '</span><span class="goalRew">+' + d.reward + '</span></div>'
+    const def = missionDef(m.id); if (!def) return;
+    const pct = Math.min(100, Math.round(m.prog / def.goal * 100));
+    html += '<div class="goal"><div class="goalRow"><span>' + def.desc + '</span><span class="goalRew">+' + def.reward + '</span></div>'
           + '<div class="goalBar"><div style="width:' + pct + '%"></div></div></div>';
   });
   $('goalsList').innerHTML = html;
+  // achievements — unlocked first, then locked
+  const ac = $('achCount'); if (ac) ac.textContent = '(' + achUnlocked.length + '/' + ACHIEVEMENTS.length + ')';
+  const sorted = ACHIEVEMENTS.slice().sort((a,b)=> (achUnlocked.includes(b.id)?1:0) - (achUnlocked.includes(a.id)?1:0));
+  let ah = '';
+  sorted.forEach(a => {
+    const got = achUnlocked.includes(a.id);
+    ah += '<div class="ach' + (got?' got':'') + '"><div class="av">' + (got?'🏆':'🔒') + '</div>'
+        + '<div style="flex:1;text-align:left"><div class="anm">' + a.name + '</div><div class="ad">' + a.desc + '</div></div>'
+        + '<div class="arw">' + (got ? 'EARNED' : '+' + a.reward) + '</div></div>';
+  });
+  const al = $('achList'); if (al) al.innerHTML = ah;
 }
 function showLeader(){ $('howtoPanel').classList.add('hidden'); $('startScreen').classList.add('hidden'); $('leaderPanel').classList.remove('hidden'); renderLeader(); }
 function showShop(tab){ if (tab) shopTab = tab; $('howtoPanel').classList.add('hidden'); selChar = curChar; selStone = curStone; $('startScreen').classList.add('hidden'); $('shopPanel').classList.remove('hidden'); renderShop(); }
@@ -3731,7 +3819,7 @@ function purchaseSel(){
     if (st==='lock-era'){ showPop('REACH LEVEL ' + eraEnterLevel(it.era) + ' FIRST'); return; }
     if (st==='lock-boss'){ showPop('REACH LEVEL ' + it.unlock + ' FIRST'); return; }
   }
-  if (bank >= it.cost){ bank -= it.cost; Store.set('coins', bank); own.push(key); Store.set(ownedKey, own); Sound.buy(); showPop('UNLOCKED — TAP EQUIP'); }
+  if (bank >= it.cost){ bank -= it.cost; Store.set('coins', bank); own.push(key); Store.set(ownedKey, own); Sound.buy(); showPop('UNLOCKED — TAP EQUIP'); if (isChar) checkAchievements(); }
   else { Sound.blip(150,0.16,'sawtooth',0.14); showPop('NEED MORE DEBEN'); }
   renderShop();
 }
