@@ -3597,10 +3597,11 @@ function updateHUD(){
 function showPop(t){ const p=$('pop'); p.textContent=t; p.classList.remove('show'); void p.offsetWidth; p.classList.add('show'); }
 function buzz(pattern){ try { if (navigator.vibrate) navigator.vibrate(pattern); } catch(e){} }   // phone haptics (perfect only)
 
-function startGame(){
+function startGame(atLevel){
   charPrevOn = false;
   _runPostedScore = -1;                          // fresh run → allow posting its scores again
-  gameLevel = dailyMode ? 1 : Math.max(1, resumeLevel);   // CONTINUE from your saved progress (Daily always starts at 1)
+  // atLevel set → restart that exact level (retry / in-game restart); otherwise CONTINUE from saved progress
+  gameLevel = dailyMode ? 1 : Math.max(1, atLevel || resumeLevel);
   applyBiome(gameLevel);                        // biome for the level you're resuming at
   checkDailyStreak();                          // first game of the day → streak bump + bonus coins
   $('ratingOverlay').classList.remove('show'); $('nextLevelWrap').classList.remove('show'); $('introOverlay').classList.remove('show'); $('featureIntro').classList.remove('show'); $('multHud').classList.add('hidden');
@@ -4196,9 +4197,9 @@ btn('menuFromOver',  goMenu);
   sn.addEventListener('blur', () => { save(); sn.value = playerName; });
   sn.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); save(); sn.value = playerName; if (sn.blur) sn.blur(); showPop('NAME SAVED'); } });
 })();
-btn('retryBtn',      ()=>startGame());
+btn('retryBtn',      ()=>startGame(gameLevel));   // retry the level you just died on
 btn('restartBtn',    showRestartConfirm);   // in-game restart → ask first
-btn('restartYes',    ()=>{ hideRestartConfirm(); startGame(); });
+btn('restartYes',    ()=>{ hideRestartConfirm(); startGame(gameLevel); });   // restart the current level
 btn('restartNo',     hideRestartConfirm);
 btn('climbBtn',      beginClimb);        // start the climb from the rating screen
 btn('introBtn',      beginBuild);        // start building from the between-level intro card
@@ -4235,7 +4236,7 @@ window.addEventListener('keydown', e => {
   e.preventDefault(); primeAudio();
   if (S.paused) return;
   if (atMenu){ startGame(); return; }
-  if (S.gameOver){ if (!$('overScreen').classList.contains('hidden')) startGame(); return; }
+  if (S.gameOver){ if (!$('overScreen').classList.contains('hidden')) startGame(gameLevel); return; }
   if (S.phase==='intro'){ beginBuild(); return; }     // any key starts building the next pyramid
   if (S.phase==='build'){ if (k==='Space'||k==='ArrowUp'||k==='ArrowDown') drop(); return; }
   if (S.phase==='run'){
