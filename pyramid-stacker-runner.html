@@ -374,6 +374,13 @@
     display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; opacity:.9; }
   #lb .lbrow b { margin-left:auto; font-size:15px; color:#f3d99a; letter-spacing:1px; }
   #lb .lbtag { color:#9fd0ff; font-size:11px; opacity:.8; }
+  #lb .lbname { font-size:13px; letter-spacing:1px; color:#f6e9d2; opacity:.9; max-width:46%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #lb .lbrow.me { outline:1px solid rgba(120,210,160,.5); }
+  #lbName { display:none; align-items:center; gap:8px; width:min(360px,90vw); margin:0 auto 4px; font-family:'Space Mono',monospace;
+    font-size:11px; letter-spacing:2px; color:#cdbb95; }
+  #lbName input { flex:1; background:rgba(255,255,255,.06); border:1px solid rgba(243,200,120,.3); border-radius:8px;
+    color:#ffe9b8; font-family:'Space Mono',monospace; font-size:13px; letter-spacing:2px; padding:7px 10px; text-transform:uppercase; outline:none; }
+  #lbName input:focus { border-color:#f3c878; }
 
   /* over-screen action buttons (share / double coins) */
   .obtnRow { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-top:18px; }
@@ -524,6 +531,7 @@
     <div class="lbStat"><div class="lbStatV" id="lbStreak">0</div><div class="lbStatL">BEST STREAK</div></div>
     <div class="lbStat"><div class="lbStatV" id="lbMaxLvl">1</div><div class="lbStatL">MAX LEVEL</div></div>
   </div>
+  <div id="lbName">YOUR NAME <input id="nameInput" maxlength="12" placeholder="SET HANDLE" autocomplete="off" spellcheck="false" /></div>
   <div id="lb"></div>
   <div class="backBtn" id="leaderBack">◀ BACK</div>
 </div>
@@ -669,7 +677,41 @@ let totalBuilds = Store.get('builds', 0);         // lifetime pyramids built
 let bestStreak  = Store.get('bestStreak', 0);     // lifetime best PERFECT streak
 let maxLevel    = Store.get('maxLevel', 1);       // highest level reached
 let resumeLevel = Store.get('resumeLevel', 1);    // level a new game CONTINUES from (progress is saved, not reset to 1)
+let playerName  = Store.get('name', '');          // handle shown on the global leaderboard
 let firstTime = !Store.get('tut', 0);             // show the onboarding hints once
+
+// ---------- GLOBAL LEADERBOARD (Supabase) ----------
+// To turn the leaderboard from local-only into a shared global board, paste your project's values below.
+// Find them in Supabase → Project Settings → API:  "Project URL"  and the public "anon" key (safe in a static page).
+// One-time table setup (run in Supabase → SQL editor):
+//   create table public.scores (id bigint generated always as identity primary key,
+//     name text not null, score integer not null, level integer, height real, created_at timestamptz default now());
+//   alter table public.scores enable row level security;
+//   create policy "read"   on public.scores for select using (true);
+//   create policy "insert" on public.scores for insert with check (char_length(name) between 1 and 12 and score >= 0 and score < 100000000);
+const SUPABASE_URL  = '';   // e.g. 'https://abcdwxyz.supabase.co'
+const SUPABASE_ANON = '';   // the long public anon key
+const RemoteBoard = {
+  enabled(){ return !!(SUPABASE_URL && SUPABASE_ANON); },
+  _h(extra){ return Object.assign({ apikey:SUPABASE_ANON, Authorization:'Bearer '+SUPABASE_ANON }, extra||{}); },
+  async submit(entry){
+    if (!this.enabled()) return false;
+    try {
+      const r = await fetch(SUPABASE_URL+'/rest/v1/scores', { method:'POST',
+        headers:this._h({ 'Content-Type':'application/json', Prefer:'return=minimal' }), body:JSON.stringify(entry) });
+      return r.ok;
+    } catch(e){ return false; }
+  },
+  async top(n){
+    if (!this.enabled()) return null;
+    try {
+      const r = await fetch(SUPABASE_URL+'/rest/v1/scores?select=name,score,level&order=score.desc&limit='+(n||20), { headers:this._h() });
+      return r.ok ? await r.json() : null;
+    } catch(e){ return null; }
+  }
+};
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function sanitizeName(s){ return String(s||'').replace(/[^\w \-]/g,'').trim().slice(0,12).toUpperCase(); }
 let dailyMode = false;
 let goalsNew  = false;                            // a goal completed / streak bonus is waiting to be seen
 
@@ -2428,12 +2470,32 @@ function runAd(done){
 
 // ---------- share + leaderboard + 2× coins ----------
 function recordScore(entry){ scores.push(entry); scores.sort((a,b)=>b.score-a.score); scores = scores.slice(0,10); Store.set('scores', scores); }
+const MEDAL = ['#ffd86a','#d6d6d6','#cd8b54'];
 function renderLeaderboard(){
   const lb = $('lb'); if (!lb) return;
+  if (RemoteBoard.enabled()){
+    lb.innerHTML = '<div class="lbttl">GLOBAL TOP RUNS</div><div class="lbrow"><span class="lbrank">·</span><b>loading…</b></div>';
+    const token = (renderLeaderboard._t = (renderLeaderboard._t||0) + 1);   // ignore a stale fetch if reopened fast
+    RemoteBoard.top(12).then(rows => {
+      if (token !== renderLeaderboard._t) return;
+      if (!rows){ renderLocalBoard(lb, 'TOP RUNS · OFFLINE'); return; }
+      if (!rows.length){ lb.innerHTML = '<div class="lbttl">GLOBAL TOP RUNS</div><div class="lbttl">BE THE FIRST — PLAY A RUN!</div>'; return; }
+      lb.innerHTML = '<div class="lbttl">GLOBAL TOP RUNS</div>' + rows.map((s,i)=>{
+        const rankStyle = i<3 ? `color:${MEDAL[i]};border-color:${MEDAL[i]}` : '';
+        const nm = escapeHtml((s.name||'ANON').toString().toUpperCase().slice(0,12));
+        const mine = playerName && nm === playerName.toUpperCase();
+        return `<div class="lbrow${i===0?' top':''}${mine?' me':''}"><span class="lbrank" style="${rankStyle}">${i+1}</span>`+
+          `<span class="lbname">${nm}</span><b>${(s.score||0).toLocaleString()}</b></div>`;
+      }).join('');
+    });
+    return;
+  }
+  renderLocalBoard(lb, 'TOP RUNS');
+}
+function renderLocalBoard(lb, title){
   if (!scores.length){ lb.innerHTML = '<div class="lbttl">NO RUNS YET — BUILD ONE!</div>'; return; }
-  const medal = ['#ffd86a','#d6d6d6','#cd8b54'];
-  lb.innerHTML = '<div class="lbttl">TOP RUNS</div>' + scores.slice(0,8).map((s,i)=>{
-    const rankStyle = i<3 ? `color:${medal[i]};border-color:${medal[i]}` : '';
+  lb.innerHTML = `<div class="lbttl">${title}</div>` + scores.slice(0,8).map((s,i)=>{
+    const rankStyle = i<3 ? `color:${MEDAL[i]};border-color:${MEDAL[i]}` : '';
     return `<div class="lbrow${i===0?' top':''}"><span class="lbrank" style="${rankStyle}">${i+1}</span>`+
       `<b>${(s.score||0).toLocaleString()}</b>${s.daily?'<span class="lbtag">◈</span>':''}</div>`;
   }).join('');
@@ -2719,6 +2781,8 @@ function renderLeader(){
   $('lbBuilds').textContent = totalBuilds;
   $('lbStreak').textContent = bestStreak;
   $('lbMaxLvl').textContent = maxLevel;
+  const nameWrap = $('lbName'), nameInput = $('nameInput');
+  if (nameWrap){ nameWrap.style.display = RemoteBoard.enabled() ? 'flex' : 'none'; if (nameInput) nameInput.value = playerName || ''; }
   renderLeaderboard();
 }
 function renderShop(){
@@ -2801,6 +2865,14 @@ function endGame(won, how){
   if (peak > (bestHeight||0)){ bestHeight = peak; Store.set('height', bestHeight); }
   if (dailyMode){ const k='daily_'+todayKey(); if (S.score > Store.get(k,0)) Store.set(k, S.score); }
   recordScore({ score:S.score, daily:dailyMode, date:Date.now() });
+  // push the run to the shared global board (no-op until Supabase is configured). Ask for a name once, the first time.
+  if (RemoteBoard.enabled() && !dailyMode && S.score > 0){
+    if (!playerName){
+      let nm = ''; try { nm = sanitizeName(window.prompt && window.prompt('Enter a name for the GLOBAL leaderboard (max 12):','')); } catch(e){}
+      if (nm){ playerName = nm; Store.set('name', playerName); }
+    }
+    RemoteBoard.submit({ name: playerName || 'ANON', score: S.score, level: gameLevel, height: Math.round((S.peakY||0)*10)/10 });
+  }
   if (firstTime){ firstTime = false; Store.set('tut', 1); }   // onboarding only on the first game
   setTimeout(()=>{
     $('overTitle').textContent = won ? 'YOU REACHED THE TOP' : (how==='fell' ? 'YOU FELL' : how==='hit' ? 'YOU CRASHED' : how==='collapsed' ? 'IT ALL CAME DOWN' : 'GAME OVER');
@@ -2855,6 +2927,11 @@ btn('reviveAd',      reviveWithAd);
 btn('reviveGiveup',  giveUp);
 btn('menuBtn',       goMenu);
 btn('menuFromOver',  goMenu);
+// leaderboard handle: persist whatever the player types as their global name
+(function(){ const ni = $('nameInput'); if (ni && ni.addEventListener){
+  const save = () => { playerName = sanitizeName(ni.value); Store.set('name', playerName); ni.value = playerName; };
+  ni.addEventListener('change', save); ni.addEventListener('blur', save);
+}})();
 btn('retryBtn',      ()=>startGame());
 btn('restartBtn',    showRestartConfirm);   // in-game restart → ask first
 btn('restartYes',    ()=>{ hideRestartConfirm(); startGame(); });
