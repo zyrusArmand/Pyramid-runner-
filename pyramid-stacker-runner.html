@@ -202,8 +202,9 @@
   #dailyBtn { pointer-events:auto; font-size:11px; letter-spacing:2px; padding:9px 20px; border-radius:30px;
     border:1.5px solid rgba(111,227,160,.5); color:#9fe9c0; cursor:pointer; transition:all .18s; }
   #dailyBtn.on { background:rgba(111,227,160,.18); border-color:#9fe9c0; color:#d6ffe9; }
-  #ddaBtn, #musicBtn { pointer-events:auto; min-width:54px; text-align:center; font-size:12px; letter-spacing:2px; padding:8px 16px; border-radius:24px;
+  #ddaBtn, #musicBtn, #resetProgBtn, #eraJumpBtn { pointer-events:auto; min-width:54px; text-align:center; font-size:12px; letter-spacing:2px; padding:8px 16px; border-radius:24px;
     border:1.5px solid rgba(243,200,120,.4); color:#caa86a; cursor:pointer; transition:all .18s; }
+  #eraJumpBtn { color:#ffe6b0; border-color:rgba(243,200,120,.55); white-space:nowrap; }
   #ddaBtn.on, #musicBtn.on { background:rgba(243,200,120,.16); border-color:#f3c878; color:#ffe6b0; }
   /* gear / settings icon (top-right of home) */
   #homeSettings { position:fixed; right:14px; top:calc(max(16px,env(safe-area-inset-top)) + 2px); z-index:6;
@@ -668,6 +669,7 @@
     <div class="setRow"><div class="setName">MUSIC<span class="setHint">generative desert score</span></div><div id="musicBtn">ON</div></div>
     <div class="setRow"><div class="setName">DAILY CHALLENGE<span class="setHint" id="dailyHint">same seeded pyramid for everyone today</span></div><div id="dailyBtn">OFF</div></div>
     <div class="setRow"><div class="setName">PROGRESS<span class="setHint" id="progHint">continue from your highest level</span></div><div id="resetProgBtn">RESET</div></div>
+    <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
 </div>
@@ -3132,6 +3134,17 @@ function renderSettings(){
   const pb = $('resetProgBtn'), ph = $('progHint');
   if (pb && ph){ ph.textContent = resumeLevel > 1 ? ('continuing from Level ' + resumeLevel) : 'start from Level 1'; pb.textContent = resumeLevel > 1 ? 'RESET' : 'LV 1'; }
   const sn = $('setNameInput'); if (sn) sn.value = playerName || '';
+  const ej = $('eraJumpBtn'), eh = $('eraJumpHint');
+  if (ej){ const e = eraFor(resumeLevel); ej.textContent = e.name; if (eh) eh.textContent = 'next run begins at Level ' + resumeLevel + ' (' + e.name + ')'; }
+}
+// cycle the next run's starting ERA (each era begins every 10 levels). Sets the continue point.
+function cycleEra(){
+  const cur = Math.min(ERAS.length-1, Math.floor((Math.max(1,resumeLevel)-1)/10));
+  const next = (cur + 1) % ERAS.length;
+  resumeLevel = next*10 + 1; Store.set('resumeLevel', resumeLevel);
+  if (resumeLevel > maxLevel){ maxLevel = resumeLevel; Store.set('maxLevel', maxLevel); }
+  Sound.blip && Sound.blip(620,0.07,'sine',0.1);
+  renderSettings(); renderHome();
 }
 // wipe saved level progress so the next game starts from Level 1 again (mini-tutorials replay too)
 function resetProgress(){
@@ -3420,6 +3433,7 @@ btn('shopBuyBtn',    purchaseSel);
 btn('shopEquipBtn',  equipSel);
 btn('dailyBtn',      ()=>{ dailyMode = !dailyMode; renderSettings(); });
 btn('resetProgBtn',  resetProgress);   // wipe saved level progress → back to Level 1
+btn('eraJumpBtn',    cycleEra);        // preview: jump the next run to another era
 btn('homeProfile',   showProfile);
 btn('profileBack',   backHome);
 btn('acctCreate',    createAccount);
