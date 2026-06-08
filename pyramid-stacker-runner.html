@@ -405,6 +405,7 @@
   .profName { font-family:'Cinzel',serif; font-weight:700; font-size:22px; color:#ffe9b8; letter-spacing:1px; line-height:1;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .profSub { font-family:'Space Mono',monospace; font-size:11px; letter-spacing:1px; color:#cdbb95; opacity:.85; }
+  .profCoin { vertical-align:-0.14em; }
   .lbStat { background:rgba(243,200,120,.07); border:1px solid rgba(243,200,120,.18); border-radius:12px; padding:11px 4px; text-align:center; }
   .lbStatV { font-family:'Cinzel',serif; font-weight:700; font-size:20px; color:#f3d99a; line-height:1; }
   .lbStatL { font-size:8.5px; letter-spacing:1.2px; opacity:.6; margin-top:5px; }
@@ -1170,9 +1171,13 @@ function characterThumb(charKey){
     if (cp.runner){ cp.sc.remove(cp.runner); cp.runner = null; }
     const save = curChar; curChar = (charKey && CHARACTERS[charKey]) ? charKey : curChar;
     const g = makeRunner(); curChar = save;
-    g.rotation.y = 0.5; cp.sc.add(g);
-    cp.rend.setSize(200, 200, false); cp.cam.aspect = 1; cp.cam.updateProjectionMatrix();
-    cp.rend.render(cp.sc, cp.cam);
+    g.rotation.y = 0.42; cp.sc.add(g);                              // static 3/4 portrait pose (never spinning)
+    // dedicated CLOSE-UP camera framing the face + shoulders (separate from the shop's full-body cam)
+    let pcam = cp.portraitCam;
+    if (!pcam){ pcam = new THREE.PerspectiveCamera(30, 1, 0.05, 12); cp.portraitCam = pcam; }
+    pcam.position.set(0.17, 0.605, 0.6); pcam.lookAt(0, 0.565, 0); pcam.aspect = 1; pcam.updateProjectionMatrix();
+    cp.rend.setSize(220, 220, false);
+    cp.rend.render(cp.sc, pcam);
     const url = cp.rend.domElement.toDataURL('image/png');
     cp.sc.remove(g);
     if (url) _charThumbCache[ckey] = url;
@@ -3022,7 +3027,7 @@ function renderProfile(){
     if (rs) rs.style.display = custom ? 'block' : 'none';      // offer to revert to the character render
   }
   $('profName').textContent = nm;
-  $('profSub').textContent  = (ch ? ch.name : 'EXPLORER') + ' · ◎ ' + (bank||0).toLocaleString() + ' deben' + (account ? '  ·  ' + account.email : '');
+  $('profSub').innerHTML    = escapeHtml(ch ? ch.name : 'EXPLORER') + ' · <span class="coinIcon profCoin"></span> ' + (bank||0).toLocaleString() + ' deben' + (account ? '  ·  ' + escapeHtml(account.email) : '');
   $('pfBest').textContent   = (bestScore||0).toLocaleString();
   $('pfHeight').textContent = (bestHeight||0).toFixed(0)+'m';
   $('pfDeben').textContent  = (bank||0).toLocaleString();
@@ -3316,6 +3321,8 @@ function showRestartConfirm(){ if (atMenu || S.gameOver) return; S.paused = true
 function hideRestartConfirm(){ S.paused = false; $('restartConfirm').classList.add('hidden'); }
 
 window.addEventListener('pointerdown', e => {
+  const tn = (e.target && e.target.tagName) || '';
+  if (tn==='INPUT' || tn==='TEXTAREA' || tn==='SELECT' || (e.target && e.target.isContentEditable)){ primeAudio(); return; }   // let text fields focus & type
   e.preventDefault(); primeAudio();
   if (atMenu){ return; }                                                   // menu uses its own buttons
   if (S.gameOver || S.paused) return;                                      // over/confirm screens use their own buttons
@@ -3332,6 +3339,8 @@ window.addEventListener('pointerup', e => {
   else downAction();                                                   // swipe down (double = roll back)
 }, { passive:false });
 window.addEventListener('keydown', e => {
+  const tn = (e.target && e.target.tagName) || '';
+  if (tn==='INPUT' || tn==='TEXTAREA' || (e.target && e.target.isContentEditable)) return;   // don't hijack keys while typing
   const k = e.code;
   if (k!=='Space' && k!=='ArrowUp' && k!=='ArrowDown' && k!=='ArrowLeft' && k!=='ArrowRight') return;
   e.preventDefault(); primeAudio();
