@@ -18,13 +18,16 @@
   .stat { font-size:10px; letter-spacing:2px; opacity:.7; }
   .val  { font-size:18px; font-weight:700; line-height:1; }
   /* three stacked readouts (SCORE / LEVEL / LAYER) top-right */
-  .right { display:flex; flex-direction:column; align-items:flex-end; gap:5px; }
-  .statBox { display:flex; align-items:baseline; justify-content:flex-end; gap:7px; }
+  .right { display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+  .statBox { display:flex; align-items:baseline; justify-content:flex-end; gap:7px;
+    background:rgba(18,11,26,.34); -webkit-backdrop-filter:blur(7px); backdrop-filter:blur(7px);
+    border:1px solid rgba(243,200,120,.15); border-radius:13px; padding:4px 12px; }
   /* current level / biome name, centred at the very top — width-capped & ellipsised so a long biome name never
      overlaps the corner buttons/stats and the layout is identical on every level */
-  #levelName { position:fixed; top:max(14px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
+  #levelName { position:fixed; top:max(12px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
     z-index:5; pointer-events:none; text-align:center; color:#ffe9b8; text-shadow:0 2px 10px rgba(0,0,0,.7); display:none;
-    max-width:54vw; }
+    max-width:54vw; background:rgba(18,11,26,.32); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
+    border:1px solid rgba(243,200,120,.13); border-radius:13px; padding:4px 16px; }
   #levelName .lnLv { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:3px; opacity:.7; }
   #levelName .lnName { font-family:'Cinzel',serif; font-weight:700; font-size:12px; letter-spacing:1.5px; line-height:1.25;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -74,9 +77,11 @@
   #finalStats .fstatL { font-size:8px; letter-spacing:1px; opacity:.6; margin-top:4px; }
 
   /* coin counter (top-centre) */
-  #coinHud { position:fixed; top:calc(max(16px,env(safe-area-inset-top)) + 46px); left:50%; transform:translateX(-50%);
+  #coinHud { position:fixed; top:calc(max(16px,env(safe-area-inset-top)) + 50px); left:50%; transform:translateX(-50%);
     z-index:5; pointer-events:none; font-family:'Space Mono',monospace; color:#ffe08a; font-weight:700;
-    font-size:16px; text-shadow:0 2px 6px rgba(0,0,0,.6); display:flex; align-items:center; gap:6px; transition:transform .12s; }
+    font-size:16px; text-shadow:0 2px 6px rgba(0,0,0,.6); display:flex; align-items:center; gap:6px; transition:transform .12s;
+    background:rgba(18,11,26,.34); -webkit-backdrop-filter:blur(7px); backdrop-filter:blur(7px);
+    border:1px solid rgba(243,200,120,.18); border-radius:20px; padding:4px 13px; }
   #coinHud.pulse { transform:translateX(-50%) scale(1.25); }
   /* stamped gold DEBEN coin — a struck disc with a raised rim and an ankh engraving */
   .coinIcon { position:relative; width:1em; height:1em; border-radius:50%; display:inline-block; flex:0 0 auto;
@@ -88,7 +93,7 @@
   #coinHud .coinIcon { font-size:16px; }
   #coinHud.hidden { display:none; }
   /* golden-block score multiplier badge — sits just under the coin counter, only while a chain is live */
-  #multHud { position:fixed; top:calc(max(16px,env(safe-area-inset-top)) + 70px); left:50%; transform:translateX(-50%);
+  #multHud { position:fixed; top:calc(max(16px,env(safe-area-inset-top)) + 86px); left:50%; transform:translateX(-50%);
     z-index:5; pointer-events:none; font-family:'Cinzel',serif; font-weight:700; font-size:18px; letter-spacing:1px;
     color:#ffd98a; text-shadow:0 2px 10px rgba(255,170,40,.75); animation:multPulse .7s ease-in-out infinite; }
   #multHud.hidden { display:none; }
@@ -121,6 +126,17 @@
   /* perfect / collect flash */
   #flash { position:fixed; inset:0; z-index:9; pointer-events:none; opacity:0; background:#fff; }
   #flash.show { animation:flashfx .32s ease-out; }
+  /* golden level-transition wipe */
+  #wipe { position:fixed; inset:0; z-index:8; pointer-events:none; opacity:0; transform:translateX(-70%);
+    background:linear-gradient(105deg, transparent 38%, rgba(255,228,158,0) 46%, rgba(255,234,176,.92) 50%,
+      rgba(255,228,158,0) 54%, transparent 62%); }
+  #wipe.show { animation:wipefx .72s ease-in-out; }
+  @keyframes wipefx { 0%{opacity:1; transform:translateX(-70%);} 100%{opacity:1; transform:translateX(70%);} }
+  /* speed-focus streaks at the screen edges during a fast climb */
+  #speed { position:fixed; inset:0; z-index:4; pointer-events:none; opacity:0; transition:opacity .25s; mix-blend-mode:screen;
+    background:repeating-linear-gradient(90deg, rgba(255,255,255,.06) 0 2px, transparent 2px 9px);
+    -webkit-mask:radial-gradient(ellipse 58% 72% at 50% 50%, transparent 42%, #000 100%);
+    mask:radial-gradient(ellipse 58% 72% at 50% 50%, transparent 42%, #000 100%); }
   @keyframes flashfx { 0%{opacity:.5;} 100%{opacity:0;} }
   #ratingOverlay { position:fixed; inset:0; z-index:8; display:none; flex-direction:column; align-items:center;
     justify-content:flex-start; padding-top:9vh; gap:8px; pointer-events:none; opacity:0; transition:opacity .4s; text-align:center; }
@@ -375,7 +391,12 @@
   .panel { justify-content:flex-start; padding-top:max(74px,calc(env(safe-area-inset-top) + 58px)); gap:16px;
     background:radial-gradient(ellipse at 50% 28%, rgba(28,18,38,1), rgba(7,4,11,1)); }   /* fully opaque — no bleed-through */
   .panelTitle { font-family:'Cinzel',serif; font-weight:700; font-size:clamp(24px,7vw,38px); color:#f3d99a;
-    letter-spacing:3px; text-shadow:0 0 22px rgba(243,200,120,.4); }
+    letter-spacing:3px; text-shadow:0 0 22px rgba(243,200,120,.4); position:relative; }
+  .panelTitle::after { content:''; display:block; width:58px; height:2px; margin:9px auto 0; border-radius:2px;
+    background:linear-gradient(90deg, transparent, rgba(243,200,120,.85), transparent); }
+  /* subtle entrance for every overlay/panel when it's shown */
+  .overlay:not(.hidden) { animation:panelIn .3s ease-out; }
+  @keyframes panelIn { 0%{ opacity:0; transform:translateY(11px); } 100%{ opacity:1; transform:translateY(0); } }
   .backBtn { pointer-events:auto; position:fixed; left:16px; top:max(16px,env(safe-area-inset-top));
     font-family:'Space Mono',monospace; font-size:12px; letter-spacing:2px; color:#f6e9d2;
     background:rgba(20,12,28,.6); border:1px solid rgba(243,200,120,.4); border-radius:18px; padding:9px 14px; cursor:pointer; }
@@ -526,6 +547,8 @@
 
 <div id="vignette"></div>
 <div id="storm"></div>
+<div id="speed"></div>
+<div id="wipe"></div>
 <div id="flash"></div>
 <div id="ratingOverlay">
   <div id="ratingTint"></div>
@@ -1557,6 +1580,9 @@ sun.shadow.mapSize.set(1024,1024);
 sun.shadow.camera.near=1; sun.shadow.camera.far=60;
 sun.shadow.camera.left=-16; sun.shadow.camera.right=16; sun.shadow.camera.top=16; sun.shadow.camera.bottom=-16;
 scene.add(sun);
+// a cool back/rim light from the opposite side — catches block & climber edges so they pop off the backdrop.
+// no shadows (cheap); colour + intensity are re-tinted per era in applyBiome.
+const rim = new THREE.DirectionalLight(0xffe8c4, 0.0); rim.position.set(-8, 5, -10); scene.add(rim);
 
 // ---------- ERAS: the climb travels through civilizations & realms. Each era spans ~10 levels with two 5-level
 // sub-variants (same vibe, slightly shifted), and brings its own sky, ground, stone palette and backdrop props. ----------
@@ -1595,6 +1621,28 @@ function eraBossKey(eraKey){ const s = CHAR_SPEC.find(x => x[0]===eraKey && x[1]
 function guardianName(level){ const k = eraBossKey(eraFor(level).key); return (k && CHARACTERS[k]) ? CHARACTERS[k].name : 'GUARDIAN'; }
 function guardianReward(level){ return 300 + Math.floor((level-1)/10)*150; }   // bigger payout deeper in
 let curEra = null, curEraBlock = null;
+// per-era screen colour grade: [glow R,G,B, glowAlpha, vignetteAlpha, rimColourHex, rimIntensity]
+const GRADE = {
+  egypt:  [255,176, 86, .10, .52, 0xffd9a0, .30],
+  aztec:  [196,170, 78, .10, .55, 0xd2e0a0, .30],
+  greek:  [255,232,186, .09, .46, 0xfff0d8, .34],   // HELLAS — bright marble
+  norse:  [150,188,236, .11, .55, 0xcfe2ff, .40],   // MIDGARD — cold blue
+  nippon: [236,150,140, .10, .52, 0xffd0c4, .30],
+  alien:  [176, 96,228, .13, .60, 0xc89cff, .42],   // XENON — violet
+  cosmos: [120,128,232, .12, .60, 0xbcc4ff, .44],
+  heaven: [255,240,214, .12, .42, 0xfff4e0, .46],   // EMPYREAN — soft bloom
+};
+function applyGrade(e){
+  const G = GRADE[e.key] || GRADE.egypt;
+  try {
+    const gr = $('grade');
+    if (gr){
+      gr.style.background = 'radial-gradient(ellipse at 50% 38%, rgba('+G[0]+','+G[1]+','+G[2]+','+G[3]+'), transparent 60%)';
+      gr.style.boxShadow   = 'inset 0 0 175px 46px rgba(6,3,12,'+G[4]+')';
+    }
+  } catch(err){}
+  if (rim){ rim.color.setHex(G[5]); rim.intensity = G[6]; }
+}
 function applyBiome(level){
   const b = bandFor(level), e = eraFor(level);
   skyMat.uniforms.top.value.setHex(b.skyTop);
@@ -1606,6 +1654,7 @@ function applyBiome(level){
   if (ground) ground.material.color.setHex(e.ground);
   if (typeof duneMat !== 'undefined' && duneMat) duneMat.color.setHex(e.dune);
   curEra = e; curEraBlock = e.block;
+  applyGrade(e);                          // tint the screen colour-grade + rim light to the era
   buildBackdrop(e);                       // swap the background props when the era changes
 }
 // the level/biome name banner at the top of the screen during a level
@@ -2472,6 +2521,8 @@ function coinPop(n){
   } catch(e){}
 }
 function flash(){ const f=$('flash'); f.classList.remove('show'); void f.offsetWidth; f.classList.add('show'); }
+function wipe(){ try { const w=$('wipe'); if(!w) return; w.classList.remove('show'); void w.offsetWidth; w.classList.add('show'); } catch(e){} }
+function setSpeedFx(v){ try { const se=$('speed'); if(se) se.style.opacity = v ? Math.min(0.42, v).toFixed(2) : '0'; } catch(e){} }
 
 // ---------- end-of-pyramid STAR RATING (1–5) based on how well you placed your stones ----------
 const RATINGS = [ null,
@@ -2861,6 +2912,7 @@ function defeatGuardian(){
 function startRun(){
   S.phase = 'run';
   Sound.cap();
+  wipe();                                   // golden sweep on the build → climb transition
   // Prep the built stones for the close-up climb: drop the grainy bump map, keep them matte, and BAND alternate
   // courses light/dark so the staircase reads in 3D from the low chase-cam (each band reads as a step shadow).
   // Done per-plate at climb time (the build phase keeps its single shared material so the active-piece glow still works).
@@ -2870,7 +2922,7 @@ function startRun(){
       if (!plate.material) return;
       let m = plate.material;
       if (m.clone){ m = m.clone(); plate.material = m;
-        if (idx % 2 === 1 && m.color && m.color.multiplyScalar) m.color.multiplyScalar(0.8); }   // shadow band on every other course
+        if (m.color && m.color.multiplyScalar) m.color.multiplyScalar(idx % 2 === 1 ? 0.72 : 1.05); }   // deeper shadow band + lifted lit band → crisper staircase
       m.bumpMap = null; m.bumpScale = 0; m.roughness = 0.95; m.metalness = 0.0; m.needsUpdate = true;
     });
   });
@@ -2999,6 +3051,8 @@ function downAction(){ const now = performance.now(); if (now-_lastDown < 320){ 
 function updateRun(dt){
   const r = S.run, g = S.runner; if (!r) return;
 
+  setSpeedFx(0);                                    // off by default; the active-climb branch dials it up with speed
+
   if (r.awaitStart){ overviewCam(dt); placeShadow(g, r); return; }   // holding on the rating screen; show the whole pyramid
 
   if (r.falling){
@@ -3056,6 +3110,7 @@ function updateRun(dt){
 
   // advance along the path — the climb steadily quickens to keep the pressure on
   r.speed = (3.1 + Math.min(r.idx * 0.028, 2.3)) * DDA.runSpeed() * levelSpeed();   // adaptive + faster each level
+  setSpeedFx(Math.max(0, (r.speed - 4.3) / 4) * 0.42);   // edge speed-streaks fade in as the climb accelerates
   r.t += r.speed * dt / 1;
   while (r.t >= 1){
     r.t -= 1; r.idx++;
@@ -3851,6 +3906,7 @@ function postScore(force){
 }
 function endGame(won, how){
   if (S.gameOver) return;
+  setSpeedFx(0);
   S.gameOver = true; S.won = won; S.phase = 'over';
   DDA.note(won ? 0.9 : (how==='collapsed' ? 0.15 : 0.3));   // run outcome feeds the adaptive skill estimate
   $('reviveScreen').classList.add('hidden'); $('menuBtn').style.display = 'none'; $('restartBtn').style.display='none';
