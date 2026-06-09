@@ -78,14 +78,15 @@
     z-index:5; pointer-events:none; font-family:'Space Mono',monospace; color:#ffe08a; font-weight:700;
     font-size:16px; text-shadow:0 2px 6px rgba(0,0,0,.6); display:flex; align-items:center; gap:6px; transition:transform .12s; }
   #coinHud.pulse { transform:translateX(-50%) scale(1.25); }
-  /* stamped gold DEBEN coin — a struck disc with a raised rim and an ankh engraving */
+  /* stamped gold DEBEN coin — a struck disc with a raised rim and an embossed pyramid */
   .coinIcon { position:relative; width:1em; height:1em; border-radius:50%; display:inline-block; flex:0 0 auto;
     background:radial-gradient(circle at 36% 30%, #fff6c4, #f0c54a 46%, #b9822a 92%);
     box-shadow:0 0 6px rgba(232,200,90,.55), inset 0 0 0 1.5px rgba(120,75,15,.5),
       inset 0 -2px 3px rgba(110,68,12,.45), inset 0 2px 2px rgba(255,250,210,.55); }
-  .coinIcon::after { content:'\2625'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-    font-size:.66em; line-height:1; color:rgba(108,66,12,.82); text-shadow:0 1px 0 rgba(255,247,205,.5); }
-  #coinHud .coinIcon { font-size:16px; }
+  .coinIcon::after { content:''; position:absolute; left:50%; top:56%; transform:translate(-50%,-50%);
+    width:0; height:0; border-left:0.27em solid transparent; border-right:0.27em solid transparent;
+    border-bottom:0.40em solid rgba(108,66,12,.85); filter:drop-shadow(0 1px 0 rgba(255,247,205,.45)); }
+  #coinHud .coinIcon { font-size:18px; }
   #coinHud.hidden { display:none; }
   /* golden-block score multiplier badge — sits just under the coin counter, only while a chain is live */
   #multHud { position:fixed; top:calc(max(16px,env(safe-area-inset-top)) + 70px); left:50%; transform:translateX(-50%);
@@ -766,7 +767,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.164 · 2026.06.09</div>
+  <div id="appVersion">v1.165 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -818,7 +819,7 @@
 
 <div class="overlay hidden" id="restartConfirm">
   <div class="title" style="font-size:clamp(24px,7vw,40px)">RESTART?</div>
-  <div class="sub" style="margin-top:8px;opacity:.85;max-width:300px">This abandons your current run and starts over from Level&nbsp;1.</div>
+  <div class="sub" id="restartSub" style="margin-top:8px;opacity:.85;max-width:300px">Restart this level from the beginning?</div>
   <div class="obtnRow" style="margin-top:24px">
     <div class="obtn gold" id="restartYes">RESTART</div>
     <div class="obtn" id="restartNo">CANCEL</div>
@@ -1747,7 +1748,7 @@ scene.add(ground);
 // top sits at ~-0.2 (just under the lowest course at -0.26); recoloured to the era ground in applyBiome.
 const baseMoundMat = new THREE.MeshStandardMaterial({ color:0xc9a96a, roughness:1, bumpMap:SAND_BUMP||undefined, bumpScale:0.05 });
 const baseMound = new THREE.Mesh(new THREE.SphereGeometry(12, 30, 18), baseMoundMat);
-baseMound.scale.set(1, 0.07, 1); baseMound.position.y = -1.04;   // top = -1.04 + 12*0.07 ≈ -0.2
+baseMound.scale.set(1, 0.07, 1); baseMound.position.y = -1.11;   // top ≈ -0.27 → sand sits just below the first course / placement outline
 baseMound.receiveShadow = true; baseMound.__env = true; scene.add(baseMound);
 // a smooth, pointed pyramid used ONLY as the home-menu centrepiece (so the menu never shows the
 // stepped, just-built pyramid). Hidden while a game is running; recoloured to the era's stone in applyBiome.
@@ -4268,7 +4269,9 @@ btn('introOverlay',  beginBuild);        // …or tap anywhere on the card
 btn('nextLevelBtn',  nextLevel);         // advance after the victory celebration
 function goMenu(){ if (!atMenu) postScore(true); endRevivePrompt(); $('adModal').classList.add('hidden'); showStart(); }   // quit to main menu mid-game → still post your score
 // restart confirmation — pause the game while the player decides
-function showRestartConfirm(){ if (atMenu || S.gameOver) return; S.paused = true; $('restartConfirm').classList.remove('hidden'); }
+function showRestartConfirm(){ if (atMenu || S.gameOver) return; S.paused = true;
+  { const e=$('restartSub'); if (e) e.textContent = 'Restart Level ' + (gameLevel||1) + ' from the beginning? Your progress is kept.'; }
+  $('restartConfirm').classList.remove('hidden'); }
 function hideRestartConfirm(){ S.paused = false; $('restartConfirm').classList.add('hidden'); }
 
 window.addEventListener('pointerdown', e => {
