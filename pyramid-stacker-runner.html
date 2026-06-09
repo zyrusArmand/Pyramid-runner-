@@ -767,7 +767,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.172 · 2026.06.09</div>
+  <div id="appVersion">v1.173 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1814,7 +1814,12 @@ function dStepPyr(x,z,s,col){ const g=new THREE.Group(); const tiers=5; for(let 
 function dTree(x,z,s){ const g=new THREE.Group(); const t=new THREE.Mesh(new THREE.CylinderGeometry(0.12*s,0.18*s,1.6*s,7), dMat(0x5a4326)); t.position.y=0.8*s; g.add(t); for(let i=0;i<3;i++){ const f=new THREE.Mesh(new THREE.ConeGeometry(0.85*s-i*0.2*s,1.0*s,8), dMat(0x2f6a34)); f.position.y=1.3*s+i*0.5*s; f.castShadow=true; g.add(f);} g.position.set(x,-0.5,z); addDecor(g); }
 function dCrystal(x,z,h,col){ const m=new THREE.Mesh(new THREE.ConeGeometry(0.5+Math.random()*0.4,h,6), dGlow(col,0.55)); m.position.set(x,-0.5+h/2,z); m.rotation.set((Math.random()-0.5)*0.4,Math.random()*3,(Math.random()-0.5)*0.4); addDecor(m); }
 function dMonolith(x,z,h,col){ const m=new THREE.Mesh(new THREE.BoxGeometry(1+Math.random(),h,0.6), dMat(col,0.4)); m.position.set(x,-0.5+h/2,z); m.rotation.y=Math.random(); m.castShadow=true; addDecor(m); }
-function dCloud(x,y,z,s){ const g=new THREE.Group(); for(let i=0;i<4;i++){ const b=new THREE.Mesh(new THREE.SphereGeometry(s*(0.7+Math.random()*0.6),12,10), new THREE.MeshStandardMaterial({color:0xfdfbff,emissive:0xece8ff,emissiveIntensity:0.3,roughness:1})); b.position.set((Math.random()-0.5)*s*2.4,(Math.random()-0.5)*s*0.5,(Math.random()-0.5)*s*1.4); g.add(b);} g.position.set(x,y,z); g.__anim={t:'drift',d:Math.hypot(x,z),a:Math.atan2(x,z),y,ph:Math.random()*6.28}; addDecor(g); }
+function dCloud(x,y,z,s){ const g=new THREE.Group();
+  const cm=new THREE.MeshStandardMaterial({ color:0xf4f0fa, emissive:0xdcd6ec, emissiveIntensity:0.18, roughness:1, transparent:true, opacity:0.8 });
+  const n=3+Math.floor(Math.random()*2);
+  for(let i=0;i<n;i++){ const b=new THREE.Mesh(new THREE.SphereGeometry(s*(0.4+Math.random()*0.32),12,8), cm);
+    b.scale.set(1.5,0.36,0.85); b.position.set((i-(n-1)/2)*s*0.82+(Math.random()-0.5)*s*0.3,(Math.random()-0.5)*s*0.12,(Math.random()-0.5)*s*0.45); g.add(b); }
+  g.position.set(x,y,z); g.__anim={t:'drift',d:Math.hypot(x,z),a:Math.atan2(x,z),y,ph:Math.random()*6.28}; addDecor(g); }
 function dPillar(x,z,h,col){ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.62,h,16), new THREE.MeshStandardMaterial({color:col,emissive:0x6a5024,emissiveIntensity:0.3,metalness:0.6,roughness:0.3})); c.position.set(x,-0.5+h/2,z); addDecor(c); const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.78,0.7,0.4,16), dMat(col)); cap.position.set(x,-0.5+h+0.2,z); addDecor(cap); }
 const faceCentre = (x,z)=>Math.atan2(-x,-z);   // yaw so a prop faces the pyramid at the origin
 // EGYPT: a reclining Great Sphinx
@@ -1868,12 +1873,12 @@ function dOasis(x,z,s){
 // overlapping so they merge into one rolling ridge-line). Stack several bands for receding dunes. ----
 function duneBand(z, h, segW, n){
   for (let i=0;i<n;i++){
-    const x=(i-(n-1)/2)*segW*1.25 + (Math.random()-0.5)*segW*0.3;
-    const hh=h*(0.72+Math.random()*0.55);
-    const d=new THREE.Mesh(new THREE.SphereGeometry(1,20,12), duneMat);
-    d.scale.set(segW*(1.0+Math.random()*0.3), hh, segW*0.5);   // very wide, low → a broad smooth dune, never a circle
-    d.position.set(x, -0.5, z + (Math.random()-0.5)*segW*0.45);
-    d.rotation.y=(Math.random()-0.5)*0.3; d.receiveShadow=true;
+    const x=(i-(n-1)/2)*segW*1.04 + (Math.random()-0.5)*segW*0.28;   // tight spacing → distinct peaks
+    const hh=h*(0.45+Math.random()*1.35);                            // strong height variation → mountainy ups & downs
+    const d=new THREE.Mesh(new THREE.SphereGeometry(1,22,14), duneMat);
+    d.scale.set(segW*(0.8+Math.random()*0.5), hh, segW*0.62);
+    d.position.set(x, -0.5, z + (Math.random()-0.5)*segW*0.5);
+    d.rotation.y=(Math.random()-0.5)*0.4; d.receiveShadow=true;
     d.__env=true; scene.add(d);
   }
 }
@@ -2023,6 +2028,9 @@ function dGiza(cx,cz){
 // a pyramid with custom base/height so the skyline can mix steep and broad Egyptian types
 function dPyramidH(x,z,base,height,col){ const m=new THREE.Mesh(new THREE.ConeGeometry(base,height,4), dMat(col));
   m.rotation.y=Math.PI/4; m.position.set(x,-1.4+height/2,z); addDecor(m); }
+// a crisp dark pyramid SILHOUETTE on the far horizon (fog-independent so it reads as a clean silhouette)
+function dPyrSil(x,z,base,height){ const m=new THREE.Mesh(new THREE.ConeGeometry(base,height,4), new THREE.MeshBasicMaterial({ color:0x2a2240, fog:false }));
+  m.rotation.y=Math.PI/4; m.position.set(x,-1.4+height/2,z); addDecor(m); }
 function buildBackdrop(era){
   if (!era || era.key === _backdropEra) return;          // only rebuild when the era actually changes
   _backdropEra = era.key;
@@ -2030,23 +2038,22 @@ function buildBackdrop(era){
     clearEraDecor();
     // NB: nothing is placed inside ~18 units so the props never block the camera's view of the pyramid.
     if (era.key === 'egypt'){
-      dGiza(-6,-50);                                                    // the three Pyramids of Giza on the skyline
-      // a mix of smaller, varied Egyptian pyramids — steep ones and broad (Red-pyramid style) ones
-      dPyramidH(-44,-30, 5, 9, 0x6f4f31); dPyramidH(46,-40, 8.5, 7, 0x6a4a2e);
-      dPyramidH(-60,16, 4.2, 7.5, 0x6f4f31); dPyramidH(56,28, 4.2, 5.5, 0x6a4a2e);
-      dPyramidH(38,46, 3.8, 6, 0x6f4f31); dPyramidH(64,-8, 5, 5, 0x6a4a2e);
-      dPyramidH(-30,-58, 6, 8.5, 0x6a4a2e);
-      dSphinx(20,-26,3.0);                                             // a proper Sphinx, off to one side facing in
-      dSphinx(-30,20,1.9);
-      // rolling dune ridges receding into the haze (layered bands → continuous dunescape, not circles)
-      duneBand(-30, 2.6, 9, 8); duneBand(-46, 4.2, 11, 7); duneBand(-62, 6.0, 13, 6); duneBand(-80, 7.5, 16, 5);
-      dOasis(-24,-12,4.0);                                             // an oasis pool with palms, in clear view
-      dCaravan(-12,-44,5,1.7);                                         // a static camel caravan, far back in the haze
-      ringPlace(14,10,24,(x,z)=>dDune(x,z,1.0+Math.random()*1.4));      // a few subtle drifts on the near sand
+      // FAR crisp pyramid silhouettes on the horizon
+      dPyrSil(-34,-74, 11, 20); dPyrSil(2,-82, 13, 24); dPyrSil(40,-76, 10, 18); dPyrSil(-66,-66, 9, 16);
+      // CLOSE 3D pyramids you read clearly in three dimensions (lit sandstone)
+      dPyramidH(-24,-30, 6, 9, 0x8a6a44); dPyramidH(26,-34, 7, 10, 0x7e6038); dPyramidH(-40,-40, 5, 7.5, 0x8a6a44);
+      dGiza(-4,-52);                                                    // the three Pyramids of Giza, mid-distance
+      dSphinx(18,-26,2.8);                                             // a proper Sphinx, off to one side facing in
+      dSphinx(-30,20,1.7);
+      // tall, mountainy rolling dune ridges receding into the haze (layered bands, strong ups & downs)
+      duneBand(-26, 3.6, 8, 9); duneBand(-42, 5.6, 10, 8); duneBand(-58, 7.5, 12, 7); duneBand(-74, 9.5, 14, 6);
+      dOasis(-22,-12,3.6);                                             // an oasis pool with palms, in clear view
+      dCaravan(-10,-46,5,1.6);                                         // a static camel caravan, far back in the haze
+      ringPlace(12,10,24,(x,z)=>dDune(x,z,1.0+Math.random()*1.4));      // a few subtle drifts on the near sand
       ringPlace(6,22,38,(x,z)=>dObelisk(x,z,3+Math.random()*2));
       ringPlace(10,18,40,(x,z)=>dPalm(x,z,0.9+Math.random()*0.6));
       ringPlace(14,18,42,(x,z)=>dRock(x,z,0.5+Math.random()*0.7,0x8a6a44));
-      for(let i=0;i<7;i++){ const a=Math.random()*6.28,d=26+Math.random()*22; dCloud(Math.sin(a)*d,8+Math.random()*6,Math.cos(a)*d,2.4+Math.random()*2.6); }
+      for(let i=0;i<6;i++){ const a=Math.random()*6.28,d=28+Math.random()*22; dCloud(Math.sin(a)*d,9+Math.random()*5,Math.cos(a)*d,1.3+Math.random()*1.4); }
       dBirds(10,0x3a2a22,28); dBirds(8,0x2a2018,36); dBirds(6,0x4a3a2a,44);   // more flocks wheeling over the desert
       dSnake(10,-12,1.3); dSnake(-15,7,-0.7); dSnake(6,16,2.4);          // snakes slithering across the sand
     } else if (era.key === 'aztec'){
