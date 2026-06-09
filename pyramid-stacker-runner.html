@@ -768,7 +768,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.176 · 2026.06.09</div>
+  <div id="appVersion">v1.177 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1761,12 +1761,36 @@ function sandstoneTex(){
   } catch(e){}
   return _sandstone;
 }
+// real Poly Haven sandstone PBR maps (diffuse + GL normal + roughness), loaded once
+let _texLoader=null, _egyptPBR=0;
+function loadEgyptPBR(){
+  if (_egyptPBR!==0) return _egyptPBR; _egyptPBR=null;
+  try {
+    if (!_texLoader) _texLoader = new THREE.TextureLoader();
+    const B='assets/';
+    const map=_texLoader.load(B+'sandstone_cracks_diff_1k.jpg');
+    const nor=_texLoader.load(B+'sandstone_cracks_nor_gl_1k.png');
+    const rgh=_texLoader.load(B+'sandstone_cracks_rough_1k.jpg');
+    [map,nor,rgh].forEach(t=>{ if(t){ t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(2,2); } });
+    if (map && THREE.sRGBEncoding!==undefined) map.encoding=THREE.sRGBEncoding;   // diffuse is colour data (sRGB)
+    _egyptPBR={ map, normalMap:nor, roughnessMap:rgh };
+  } catch(e){ _egyptPBR=null; }
+  return _egyptPBR;
+}
 // apply the era-specific block surface to a stone material (Egypt sandstone for now — the realism preview)
 function applyEraBlockTex(mat){
   try {
     if (curStone==='sand' && curEra && curEra.key==='egypt'){
-      const t=sandstoneTex();
-      if (t.map){ mat.map=t.map; mat.bumpMap=t.bump||null; mat.bumpScale=0.14; mat.roughness=0.97; mat.metalness=0.0; mat.needsUpdate=true; }
+      const t=loadEgyptPBR();
+      if (t && t.map){            // real Poly Haven sandstone
+        mat.map=t.map; if(t.normalMap) mat.normalMap=t.normalMap; if(t.roughnessMap) mat.roughnessMap=t.roughnessMap;
+        mat.bumpMap=null; mat.roughness=1.0; mat.metalness=0.0;
+        if (mat.color && mat.color.lerp) mat.color.lerp(new THREE.Color(1,1,1), 0.55);   // brighten so the diffuse reads true (keep a little per-layer tint)
+        if (mat.normalScale && mat.normalScale.set) mat.normalScale.set(0.8,0.8);
+        mat.needsUpdate=true; return;
+      }
+      const s=sandstoneTex();     // procedural fallback
+      if (s.map){ mat.map=s.map; mat.bumpMap=s.bump||null; mat.bumpScale=0.14; mat.roughness=0.97; mat.metalness=0.0; mat.needsUpdate=true; }
     }
   } catch(e){}
 }
@@ -3176,8 +3200,7 @@ function startRun(){
       if (m.clone){ m = m.clone(); plate.material = m;
         if (m.color && m.color.multiplyScalar) m.color.multiplyScalar(idx % 2 === 1 ? 0.72 : 1.05); }   // deeper shadow band + lifted lit band → crisper staircase
       m.roughness = 0.95; m.metalness = 0.0;
-      if (curStone==='sand' && curEra && curEra.key==='egypt'){ const t=sandstoneTex(); if (t.map){ m.map=t.map; m.bumpMap=t.bump||null; m.bumpScale=0.12; } }
-      else { m.bumpMap = null; m.bumpScale = 0; }                  // other eras keep the clean matte climb look
+      if (!(curStone==='sand' && curEra && curEra.key==='egypt')){ m.bumpMap = null; m.bumpScale = 0; }   // Egypt keeps its sandstone PBR maps; others go clean matte
       m.needsUpdate = true;
     });
   });
