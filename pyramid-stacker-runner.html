@@ -342,7 +342,7 @@
   .mote { animation:drift 9s ease-in-out infinite; opacity:.5; } .mote.m2{animation-delay:3s;} .mote.m3{animation-delay:6s;}
   @keyframes drift { 0%{transform:translate(0,0);opacity:0;} 20%{opacity:.6;} 80%{opacity:.4;} 100%{transform:translate(-26px,-30px);opacity:0;} }
   #homeInner { position:relative; z-index:1; width:100%; display:flex; flex-direction:column; align-items:center;
-    padding:24px 24px max(40px,env(safe-area-inset-bottom)); gap:12px;
+    padding:24px 22px max(20px,calc(env(safe-area-inset-bottom) + 6px)); gap:12px;
     background:linear-gradient(to top, rgba(10,7,14,.94) 42%, rgba(10,7,14,0));
     animation:rise .65s cubic-bezier(.2,.85,.25,1) both; }
   @keyframes rise { from{opacity:0; transform:translateY(26px);} to{opacity:1; transform:none;} }
@@ -364,7 +364,7 @@
   .midBtn.circBtn .bicon { width:20px; height:20px; }
   .bicon { width:15px; height:15px; }
   /* home menu: a row of circular icon buttons each with a tiny caption underneath */
-  .iconRow { gap:18px; margin-top:8px; }
+  .iconRow { width:100%; gap:0; margin-top:18px; justify-content:space-evenly; flex-wrap:nowrap; }
   .iconCol { pointer-events:auto; display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer; }
   .iconCol .iconCircle { position:relative; width:48px; height:48px; border-radius:50%; display:flex; align-items:center; justify-content:center;
     border:1.5px solid rgba(243,200,120,.45); color:#f3d99a; transition:transform .12s; }
@@ -469,7 +469,9 @@
     display:flex; align-items:center; justify-content:center; color:#f3d99a; background:rgba(243,200,120,.1);
     border:1.5px solid rgba(243,200,120,.4); transition:transform .12s; }
   .profEdit:active { transform:scale(.9); }
+  .profEdit.on { background:rgba(243,200,120,.9); color:#1a1018; border-color:#f3d99a; }
   .profEdit svg { width:16px; height:16px; }
+  #profilePanel { overflow-y:auto; padding-bottom:28px; }
   .profHead { display:flex; flex-direction:column; align-items:center; gap:8px; margin-bottom:2px; }
   .profAvatar { position:relative; width:84px; height:84px; flex:0 0 auto; border-radius:50%; display:flex; align-items:center; justify-content:center;
     border:2px solid rgba(255,255,255,.5); box-shadow:0 2px 12px rgba(0,0,0,.4); cursor:pointer; pointer-events:auto;
@@ -678,7 +680,7 @@
     <div class="lbStat"><div class="lbStatV" id="pfStreak">0</div><div class="lbStatL">BEST STREAK</div></div>
     <div class="lbStat"><div class="lbStatV" id="pfLvl">1</div><div class="lbStatL">MAX LEVEL</div></div>
   </div>
-  <div class="acctForm">
+  <div class="acctForm" id="acctForm" style="display:none">
     <div class="tabRow" id="acctTabs">
       <div class="tab sel" id="acctTabName">USERNAME</div>
       <div class="tab" id="acctTabEmail">EMAIL</div>
@@ -3776,6 +3778,7 @@ function renderProfile(){
     if (btn) btn.textContent = 'CREATE ACCOUNT';
   }
   acctTab('name');             // default to the USERNAME tab each time the profile opens
+  { const f=$('acctForm'); if (f) f.style.display='none'; const pe=$('profEditBtn'); if (pe) pe.classList.remove('on'); }   // edit form hidden until the pencil is tapped
   showAcctMsg('');
 }
 // swap the account form between the USERNAME and EMAIL fields
@@ -4190,7 +4193,12 @@ btn('profileBack',   backHome);
 btn('acctCreate',    createAccount);
 btn('acctTabName',   ()=>acctTab('name'));
 btn('acctTabEmail',  ()=>acctTab('email'));
-btn('profEditBtn',   ()=>{ acctTab('name'); const ni=$('acctName'); if (ni && ni.focus) ni.focus(); });
+btn('profEditBtn',   ()=>{ const f=$('acctForm'); if (!f) return;   // pencil reveals/hides the name + email editor
+  const show = (f.style.display==='none' || !f.style.display);
+  f.style.display = show ? 'flex' : 'none';
+  $('profEditBtn').classList.toggle('on', show);
+  if (show){ acctTab('name'); const ni=$('acctName'); if (ni && ni.focus) ni.focus(); }
+});
 btn('howTabPlay',    ()=>howTab('play'));
 btn('howTabAbout',   ()=>howTab('about'));
 btn('ddaBtn',        ()=>{ DDA.on = !DDA.on; Store.set('dda', DDA.on?1:0); renderSettings(); });
