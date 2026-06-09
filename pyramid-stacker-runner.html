@@ -767,7 +767,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.166 · 2026.06.09</div>
+  <div id="appVersion">v1.167 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1781,6 +1781,14 @@ function animateBackdrop(T){
     else if (a.t==='aurora'){ o.rotation.z = a.rz + Math.sin(T*0.5+a.ph)*0.22; if (o.material) o.material.opacity = a.op*(0.55+0.45*Math.abs(Math.sin(T*0.35+a.ph))); }
     else if (a.t==='star'){ const s=0.6+0.6*Math.abs(Math.sin(T*1.8+a.ph)); o.scale.set(s,s,s); }
     else if (a.t==='sway'){ o.rotation.z = Math.sin(T*0.7+a.ph)*0.05; }
+    else if (a.t==='snake'){                                 // a desert snake slithering across the sand
+      a.head += a.spd; if (a.head > a.len) a.head = -8;       // crawl forward, then loop back
+      const segs=o.__snakeSegs; if (segs){ for (let k=0;k<segs.length;k++){
+        const along = a.head - k*a.gap;
+        const lat = Math.sin(along*a.freq + a.ph) * a.amp;
+        segs[k].position.set(a.x0 + along*a.dx + lat*a.px, a.y, a.z0 + along*a.dz + lat*a.pz);
+      } }
+    }
     else if (a.t==='bird'){                                  // a flock wheeling across the sky, wings flapping
       const ang = a.ph + T*a.spd;
       o.position.set(a.d*Math.sin(ang), a.y + Math.sin(T*0.4+a.ph)*1.1, a.d*Math.cos(ang));
@@ -1808,12 +1816,30 @@ function dPillar(x,z,h,col){ const c=new THREE.Mesh(new THREE.CylinderGeometry(0
 const faceCentre = (x,z)=>Math.atan2(-x,-z);   // yaw so a prop faces the pyramid at the origin
 // EGYPT: a reclining Great Sphinx
 function dSphinx(x,z,s){ const g=new THREE.Group(), sand=dMat(0xc6ac80), gold=dMat(0xd6b24c);
-  const body=new THREE.Mesh(new THREE.BoxGeometry(s*2.6,s*0.85,s*0.95), sand); body.position.y=s*0.55; body.castShadow=true; g.add(body);
-  const chest=new THREE.Mesh(new THREE.BoxGeometry(s*0.8,s*1.1,s*0.95), sand); chest.position.set(s*1.05,s*0.8,0); g.add(chest);
-  const head=new THREE.Mesh(new THREE.BoxGeometry(s*0.62,s*0.6,s*0.58), sand); head.position.set(s*1.3,s*1.5,0); g.add(head);
-  const nemes=new THREE.Mesh(new THREE.BoxGeometry(s*0.78,s*0.4,s*0.74), gold); nemes.position.set(s*1.27,s*1.78,0); g.add(nemes);
-  [-1,1].forEach(d=>{ const paw=new THREE.Mesh(new THREE.BoxGeometry(s*1.3,s*0.32,s*0.26), sand); paw.position.set(s*1.25,s*0.16,d*s*0.3); g.add(paw); });
+  // smooth, rounded reclining-lion forms instead of stacked boxes
+  const body=new THREE.Mesh(new THREE.SphereGeometry(s*0.78,18,14), sand); body.scale.set(2.0,0.82,0.92); body.position.set(-s*0.25,s*0.62,0); body.castShadow=true; g.add(body);
+  const haunch=new THREE.Mesh(new THREE.SphereGeometry(s*0.66,16,12), sand); haunch.scale.set(1,1,1.05); haunch.position.set(-s*1.55,s*0.6,0); g.add(haunch);
+  const chest=new THREE.Mesh(new THREE.SphereGeometry(s*0.58,16,12), sand); chest.scale.set(1.05,1.45,1); chest.position.set(s*1.0,s*0.82,0); g.add(chest);
+  [-1,1].forEach(d=>{                                    // outstretched front legs + rounded paws
+    const leg=new THREE.Mesh(new THREE.CylinderGeometry(s*0.15,s*0.19,s*1.7,12), sand); leg.rotation.z=Math.PI/2; leg.position.set(s*1.15,s*0.17,d*s*0.34); g.add(leg);
+    const paw=new THREE.Mesh(new THREE.SphereGeometry(s*0.21,12,10), sand); paw.scale.set(1.2,1,1); paw.position.set(s*2.0,s*0.17,d*s*0.34); g.add(paw); });
+  const head=new THREE.Mesh(new THREE.SphereGeometry(s*0.4,18,14), sand); head.scale.set(0.95,1.08,1.0); head.position.set(s*1.4,s*1.55,0); head.castShadow=true; g.add(head);
+  const snout=new THREE.Mesh(new THREE.SphereGeometry(s*0.2,12,10), sand); snout.scale.set(1.3,0.85,0.9); snout.position.set(s*1.68,s*1.48,0); g.add(snout);
+  // nemes headdress — a domed cap over the head, with side lappets, gold-striped
+  const nemes=new THREE.Mesh(new THREE.SphereGeometry(s*0.5,18,12,0,Math.PI*2,0,1.75), gold); nemes.scale.set(1.18,1.05,1.25); nemes.position.set(s*1.34,s*1.6,0); g.add(nemes);
+  [-1,1].forEach(d=>{ const lap=new THREE.Mesh(new THREE.BoxGeometry(s*0.17,s*0.55,s*0.16), gold); lap.position.set(s*1.34,s*1.3,d*s*0.46); g.add(lap); });
   g.position.set(x,-0.5,z); g.rotation.y=faceCentre(x,z); addDecor(g); }
+// a low desert snake that slithers across the sand (animated via the 'snake' type)
+function dSnake(x0, z0, dir){
+  const g=new THREE.Group(), col=[0x7a6238,0x5a4a30,0x8a7048][Math.floor(Math.random()*3)], skin=dMat(col), segs=[];
+  const N=10;
+  for (let i=0;i<N;i++){ const r=(0.22-i*0.013)*(1+0.0); const m=new THREE.Mesh(new THREE.SphereGeometry(Math.max(0.06,r),8,7), skin); m.castShadow=true; segs.push(m); g.add(m); }
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.26,10,8), skin); head.scale.set(1.2,0.8,1); segs.unshift(head); g.add(head);
+  g.__snakeSegs=segs;
+  const dx=Math.sin(dir), dz=Math.cos(dir);
+  g.__anim={ t:'snake', x0, z0, dx, dz, px:dz, pz:-dx, head:-8+Math.random()*30, gap:0.5, len:24, amp:1.1, freq:0.7, ph:Math.random()*6.28, spd:0.05+Math.random()*0.04, y:-0.4 };
+  addDecor(g);
+}
 // AZTEC: a colossal Olmec stone head
 function dStoneHead(x,z,s){ const g=new THREE.Group(), st=dMat(0x55564a);
   const head=new THREE.Mesh(new THREE.SphereGeometry(s,16,14), st); head.scale.set(1,1.16,0.92); head.position.y=s; head.castShadow=true; g.add(head);
@@ -1941,12 +1967,14 @@ function dBirds(count, col, radius){
 // a small, low sand hill — wide and flat so it reads as a gentle dune, never a blobby dome
 function dDune(x,z,s,col){ const m=new THREE.Mesh(new THREE.SphereGeometry(s,16,10), dMat(col==null?0xc9a96a:col));
   m.position.set(x,-0.5,z); m.scale.set(1.2+Math.random()*0.6, 0.15+Math.random()*0.12, 1.2+Math.random()*0.6); m.rotation.y=Math.random()*6.28; addDecor(m); }
-// the three Pyramids of Giza in their classic stagger, fronted by queen's pyramids — a big iconic skyline
+// the three Pyramids of Giza in a clean skyline (smooth, matching) — kept modestly sized so they don't loom
 function dGiza(cx,cz){
   const col=0x9a7048;
-  // three matching regular pyramids (same size/style) in a clean skyline — no stepped queen's pyramids
-  dPyramid(cx-17, cz-3, 18, col); dPyramid(cx, cz, 18, col); dPyramid(cx+16, cz+2, 18, col);
+  dPyramid(cx-13, cz-3, 13, col); dPyramid(cx, cz, 13, col); dPyramid(cx+12, cz+2, 13, col);
 }
+// a pyramid with custom base/height so the skyline can mix steep and broad Egyptian types
+function dPyramidH(x,z,base,height,col){ const m=new THREE.Mesh(new THREE.ConeGeometry(base,height,4), dMat(col));
+  m.rotation.y=Math.PI/4; m.position.set(x,-1.4+height/2,z); addDecor(m); }
 function buildBackdrop(era){
   if (!era || era.key === _backdropEra) return;          // only rebuild when the era actually changes
   _backdropEra = era.key;
@@ -1954,17 +1982,22 @@ function buildBackdrop(era){
     clearEraDecor();
     // NB: nothing is placed inside ~18 units so the props never block the camera's view of the pyramid.
     if (era.key === 'egypt'){
-      dGiza(-6,-52);                                                    // the three Pyramids of Giza on the skyline dead ahead
-      [[-50,-30,15],[44,-42,17],[-58,18,13],[54,30,14],[40,50,12],[60,-12,11]].forEach(p=>dPyramid(p[0],p[1],p[2],0x6f4f31));
-      dSphinx(0,-26,5.5);                                              // a giant Sphinx fronting the pyramids, facing the player
-      dSphinx(26,26,3.4); dSphinx(-30,20,3.0);
+      dGiza(-6,-50);                                                    // the three Pyramids of Giza on the skyline
+      // a mix of smaller, varied Egyptian pyramids — steep ones and broad (Red-pyramid style) ones
+      dPyramidH(-44,-30, 6, 11, 0x6f4f31); dPyramidH(46,-40, 10, 8.5, 0x6a4a2e);
+      dPyramidH(-60,16, 5, 9, 0x6f4f31);   dPyramidH(56,28, 5, 6.5, 0x6a4a2e);
+      dPyramidH(38,46, 4.5, 7.5, 0x6f4f31); dPyramidH(64,-8, 6, 6, 0x6a4a2e);
+      dPyramidH(-30,-58, 7, 10, 0x6a4a2e);
+      dSphinx(0,-24,3.3);                                              // smaller, smoother Sphinx fronting the pyramids
+      dSphinx(24,24,2.1); dSphinx(-28,18,1.9);
       ringPlace(30,22,56,(x,z)=>dDune(x,z,2.5+Math.random()*4));        // lots of small rolling sand dunes
       ringPlace(16,9,18,(x,z)=>dDune(x,z,1.2+Math.random()*1.8));        // tiny low drifts hugging the pyramid base
-      ringPlace(6,22,38,(x,z)=>dObelisk(x,z,3.5+Math.random()*2.5));
+      ringPlace(6,22,38,(x,z)=>dObelisk(x,z,3+Math.random()*2));
       ringPlace(12,18,40,(x,z)=>dPalm(x,z,0.9+Math.random()*0.6));
       ringPlace(14,18,42,(x,z)=>dRock(x,z,0.5+Math.random()*0.7,0x8a6a44));
       for(let i=0;i<7;i++){ const a=Math.random()*6.28,d=26+Math.random()*22; dCloud(Math.sin(a)*d,15+Math.random()*9,Math.cos(a)*d,2.4+Math.random()*2.6); }
-      dBirds(9,0x3a2a22,30); dBirds(7,0x2a2018,38);                     // flocks wheeling over the desert
+      dBirds(10,0x3a2a22,28); dBirds(8,0x2a2018,36); dBirds(6,0x4a3a2a,44);   // more flocks wheeling over the desert
+      dSnake(10,-12,1.3); dSnake(-15,7,-0.7); dSnake(6,16,2.4);          // snakes slithering across the sand
     } else if (era.key === 'aztec'){
       dHeroStep(0,-42,8); dHeroStep(-34,26,6.5);                        // Chichen-Itza temples
       ringPlace(6,26,50,(x,z)=>dStepPyr(x,z,7+Math.random()*6,0x6a5440));
@@ -2255,7 +2288,7 @@ function resetState(){
 function addPlaceGuide(a){
   removeKeystoneGuide();
   const grp = new THREE.Group();
-  const mat = new THREE.MeshBasicMaterial({ color:0xffd86a, transparent:true, opacity:0.7 });
+  const mat = new THREE.MeshBasicMaterial({ color:0x2ddbff, transparent:true, opacity:0.92 });   // high-contrast cyan vs the gold sand
   const sx = (a.axis==='x' ? a.len : 1) * BLOCK_SIZE*0.99;     // footprint matches this stone's size
   const sz = (a.axis==='z' ? a.len : 1) * BLOCK_SIZE*0.99;
   const t = 0.04, hx = sx/2, hz = sz/2, fy = -LAYER_HEIGHT*0.94/2;   // flat on the base of where the stone sits
@@ -4344,8 +4377,9 @@ function animate(){
       // light the perfect-seat outline (and the stone) GREEN the instant it reaches the flush seat for a PERFECT
       const near = Math.abs(a.mesh.position[ax] - (a.seat !== undefined ? a.seat : a.center[ax])) / 1.3 < perfectThreshold();
       if (S.keyGuide){
-        if (near) S.keyGuide.material.color.setRGB(0.4,1.0,0.5); else S.keyGuide.material.color.setRGB(1.0,0.85,0.42);
-        S.keyGuide.material.opacity = near ? 0.95 : 0.6;
+        // high-contrast against the warm gold scene: bright cyan normally, vivid green at the perfect seat
+        if (near) S.keyGuide.material.color.setRGB(0.3,1.0,0.45); else S.keyGuide.material.color.setRGB(0.18,0.86,1.0);
+        S.keyGuide.material.opacity = near ? 1.0 : 0.92;
       }
       if (a.mesh.material && a.mesh.material.emissive){
         if (near) a.mesh.material.emissive.setRGB(0, 0.28, 0.08);                 // green the instant it lines up
