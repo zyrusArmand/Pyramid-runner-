@@ -78,14 +78,14 @@
     z-index:5; pointer-events:none; font-family:'Space Mono',monospace; color:#ffe08a; font-weight:700;
     font-size:16px; text-shadow:0 2px 6px rgba(0,0,0,.6); display:flex; align-items:center; gap:6px; transition:transform .12s; }
   #coinHud.pulse { transform:translateX(-50%) scale(1.25); }
-  /* stamped gold DEBEN coin — a struck disc with a raised rim and an embossed pyramid */
+  /* stamped gold DEBEN coin — a struck disc with a raised rim and an embossed ankh (drawn as SVG so it always renders) */
   .coinIcon { position:relative; width:1em; height:1em; border-radius:50%; display:inline-block; flex:0 0 auto;
     background:radial-gradient(circle at 36% 30%, #fff6c4, #f0c54a 46%, #b9822a 92%);
     box-shadow:0 0 6px rgba(232,200,90,.55), inset 0 0 0 1.5px rgba(120,75,15,.5),
       inset 0 -2px 3px rgba(110,68,12,.45), inset 0 2px 2px rgba(255,250,210,.55); }
-  .coinIcon::after { content:''; position:absolute; left:50%; top:56%; transform:translate(-50%,-50%);
-    width:0; height:0; border-left:0.27em solid transparent; border-right:0.27em solid transparent;
-    border-bottom:0.40em solid rgba(108,66,12,.85); filter:drop-shadow(0 1px 0 rgba(255,247,205,.45)); }
+  .coinIcon::after { content:''; position:absolute; inset:0; background:center/0.66em 0.66em no-repeat;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236c420c' stroke-width='2.6' stroke-linecap='round'%3E%3Cellipse cx='12' cy='7' rx='3.8' ry='4.8'/%3E%3Cpath d='M12 11.6V21'/%3E%3Cpath d='M7 15.4h10'/%3E%3C/svg%3E");
+    filter:drop-shadow(0 1px 0 rgba(255,247,205,.45)); }
   #coinHud .coinIcon { font-size:18px; }
   #coinHud.hidden { display:none; }
   /* golden-block score multiplier badge — sits just under the coin counter, only while a chain is live */
@@ -767,7 +767,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.165 · 2026.06.09</div>
+  <div id="appVersion">v1.166 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
