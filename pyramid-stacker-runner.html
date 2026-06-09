@@ -768,7 +768,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.175 · 2026.06.09</div>
+  <div id="appVersion">v1.176 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1739,6 +1739,37 @@ function noiseTex(size, grain, blotch){
 }
 const STONE_BUMP = noiseTex(128, 52, 16);
 const SAND_BUMP  = noiseTex(128, 30, 10); if (SAND_BUMP) SAND_BUMP.repeat.set(20,20);
+// ---- richer sandstone for Egypt blocks: a near-neutral detail map (tinted by each block's colour)
+// plus a strong relief/bump heightmap (sediment bands + pitting + erosion). Harness-safe (guarded). ----
+let _sandstone;
+function sandstoneTex(){
+  if (_sandstone) return _sandstone;
+  _sandstone = { map:null, bump:null };
+  try {
+    const sz=256;
+    const c=document.createElement('canvas'); c.width=c.height=sz; const x=c.getContext&&c.getContext('2d'); if(!x) return _sandstone;
+    x.fillStyle='#cabfa6'; x.fillRect(0,0,sz,sz);                                              // light neutral base (block colour tints this)
+    for(let i=0;i<sz;i+=3){ const v=202+Math.sin(i/sz*Math.PI*6)*10+(Math.random()-0.5)*8; x.fillStyle='rgba('+(v|0)+','+((v*0.96)|0)+','+((v*0.86)|0)+',0.12)'; x.fillRect(0,i,sz,3); }   // faint sediment bands
+    for(let i=0;i<70;i++){ const r=8+Math.random()*40, gx=Math.random()*sz, gy=Math.random()*sz, dark=Math.random()<0.5, a=(0.06+Math.random()*0.1).toFixed(3); const g=x.createRadialGradient(gx,gy,0,gx,gy,r); g.addColorStop(0, dark?'rgba(120,96,58,'+a+')':'rgba(240,232,210,'+a+')'); g.addColorStop(1,'rgba(0,0,0,0)'); x.fillStyle=g; x.fillRect(0,0,sz,sz); }   // weather mottle
+    let img=x.getImageData(0,0,sz,sz),d=img.data; for(let i=0;i<d.length;i+=4){ const n=(Math.random()-0.5)*16; d[i]+=n; d[i+1]+=n; d[i+2]+=n; } x.putImageData(img,0,0);   // fine grain
+    _sandstone.map=new THREE.CanvasTexture(c); _sandstone.map.wrapS=_sandstone.map.wrapT=THREE.RepeatWrapping;
+    const cb=document.createElement('canvas'); cb.width=cb.height=sz; const xb=cb.getContext('2d'); xb.fillStyle='#7f7f7f'; xb.fillRect(0,0,sz,sz);
+    for(let i=0;i<sz;i+=3){ const v=128+Math.sin(i/sz*Math.PI*6)*18; xb.fillStyle='rgba('+(v|0)+','+(v|0)+','+(v|0)+',0.4)'; xb.fillRect(0,i,sz,3); }   // sediment relief
+    for(let i=0;i<160;i++){ const r=1.2+Math.random()*4.5, gx=Math.random()*sz, gy=Math.random()*sz, dark=Math.random()<0.62; const g=xb.createRadialGradient(gx,gy,0,gx,gy,r); g.addColorStop(0, dark?'rgba(36,36,36,0.65)':'rgba(225,225,225,0.5)'); g.addColorStop(1,'rgba(128,128,128,0)'); xb.fillStyle=g; xb.fillRect(0,0,sz,sz); }   // pitting/erosion
+    let ib=xb.getImageData(0,0,sz,sz),db=ib.data; for(let i=0;i<db.length;i+=4){ const n=(Math.random()-0.5)*44; db[i]+=n; db[i+1]+=n; db[i+2]+=n; } xb.putImageData(ib,0,0);
+    _sandstone.bump=new THREE.CanvasTexture(cb); _sandstone.bump.wrapS=_sandstone.bump.wrapT=THREE.RepeatWrapping;
+  } catch(e){}
+  return _sandstone;
+}
+// apply the era-specific block surface to a stone material (Egypt sandstone for now — the realism preview)
+function applyEraBlockTex(mat){
+  try {
+    if (curStone==='sand' && curEra && curEra.key==='egypt'){
+      const t=sandstoneTex();
+      if (t.map){ mat.map=t.map; mat.bumpMap=t.bump||null; mat.bumpScale=0.14; mat.roughness=0.97; mat.metalness=0.0; mat.needsUpdate=true; }
+    }
+  } catch(e){}
+}
 
 // ---------- richer desert ground + rolling horizon dunes ----------
 const ground = new THREE.Mesh(new THREE.CircleGeometry(64,56),
@@ -2191,6 +2222,7 @@ function makePiece(len, axis, color, corner){
 function makeSteppedPiece(len, axis, color, center, n){
   const mat = new THREE.MeshStandardMaterial({ color, roughness:0.92, metalness:0.04 });
   if (STONE_BUMP){ mat.bumpMap = STONE_BUMP; mat.bumpScale = 0.04; }    // carved stone surface relief
+  applyEraBlockTex(mat);                                                // richer sandstone in Egypt
   const h = LAYER_HEIGHT*1.04, GAP = 0.999;           // slightly over-tall so stacked courses overlap → NO visible gap between layers; a PERFECT (flush) seat shows NO gap at all,
                                                       // while a drifted stone still leaves a real visible gap
   const xHalf = (axis==='x' ? len*BLOCK_SIZE*GAP : BLOCK_SIZE*GAP)/2;
@@ -2219,6 +2251,7 @@ function makeSteppedPiece(len, axis, color, center, n){
 function makeCapstonePeak(color){
   const mat = new THREE.MeshStandardMaterial({ color, roughness:0.92, metalness:0.04 });  // exactly the other stones' look
   if (STONE_BUMP){ mat.bumpMap = STONE_BUMP; mat.bumpScale = 0.04; }
+  applyEraBlockTex(mat);
   const g = new THREE.Group();
   // same stepping cadence as every other stone (STEP_N courses, 0.04 inset/course) but receding on ALL FOUR
   // sides, topping out in a small FLAT platform the climber can stand on at the summit — no pointed peak.
@@ -3142,7 +3175,10 @@ function startRun(){
       let m = plate.material;
       if (m.clone){ m = m.clone(); plate.material = m;
         if (m.color && m.color.multiplyScalar) m.color.multiplyScalar(idx % 2 === 1 ? 0.72 : 1.05); }   // deeper shadow band + lifted lit band → crisper staircase
-      m.bumpMap = null; m.bumpScale = 0; m.roughness = 0.95; m.metalness = 0.0; m.needsUpdate = true;
+      m.roughness = 0.95; m.metalness = 0.0;
+      if (curStone==='sand' && curEra && curEra.key==='egypt'){ const t=sandstoneTex(); if (t.map){ m.map=t.map; m.bumpMap=t.bump||null; m.bumpScale=0.12; } }
+      else { m.bumpMap = null; m.bumpScale = 0; }                  // other eras keep the clean matte climb look
+      m.needsUpdate = true;
     });
   });
   // CLIMB LIGHTING: a gentle side-key (brighter than the dark version) for a little step shadow without going murky
