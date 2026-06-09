@@ -364,7 +364,7 @@
   .midBtn.circBtn .bicon { width:20px; height:20px; }
   .bicon { width:15px; height:15px; }
   /* home menu: a row of circular icon buttons each with a tiny caption underneath */
-  .iconRow { width:100%; gap:0; margin-top:18px; justify-content:space-evenly; flex-wrap:nowrap; }
+  .iconRow { align-self:stretch; gap:0; margin:20px -8px 0; justify-content:space-between; flex-wrap:nowrap; }
   .iconCol { pointer-events:auto; display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer; }
   .iconCol .iconCircle { position:relative; width:48px; height:48px; border-radius:50%; display:flex; align-items:center; justify-content:center;
     border:1.5px solid rgba(243,200,120,.45); color:#f3d99a; transition:transform .12s; }
@@ -383,7 +383,7 @@
     color:#ffe9b8; text-shadow:0 2px 10px rgba(0,0,0,.7); }
   #mapEraSub { font-family:'Space Mono',monospace; font-size:10px; letter-spacing:3px; opacity:.7; margin-top:3px; }
   #homePlay { pointer-events:auto; cursor:pointer; margin-top:4px; }
-  .cta.hero { border:none; color:#3a2410; font-weight:700; padding:12px 36px; font-size:15px; letter-spacing:3px; white-space:nowrap;
+  .cta.hero { border:none; color:#3a2410; font-weight:700; padding:9px 34px; font-size:15px; letter-spacing:3px; white-space:nowrap;
     background:linear-gradient(180deg,#ffe79a,#e2a93f); border-radius:30px; animation:heroGlow 2.2s ease-in-out infinite; }
   @keyframes heroGlow { 0%,100%{box-shadow:0 6px 20px rgba(224,168,63,.4), inset 0 1px 0 rgba(255,255,255,.55);}
     50%{box-shadow:0 8px 34px rgba(255,212,120,.7), inset 0 1px 0 rgba(255,255,255,.65);} }
