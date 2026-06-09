@@ -282,9 +282,9 @@
     border:1px solid rgba(243,200,120,.35); border-radius:50%; transition:transform .15s; }
   #homeHelp:active { transform:scale(.92); }
   #homeProfile { position:fixed; left:14px; top:calc(max(16px,env(safe-area-inset-top)) + 2px); z-index:6;
-    width:42px; height:42px; display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer;
+    width:56px; height:56px; display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer;
     color:#f3d99a; background:rgba(20,12,28,.55); border:1px solid rgba(243,200,120,.35); border-radius:50%; transition:transform .2s; }
-  #homeProfile svg { width:22px; height:22px; }
+  #homeProfile svg { width:28px; height:28px; }
   #homeProfile { background-size:cover; background-position:center 30%; overflow:hidden; }
   #homeProfile.hasImg svg { display:none; }
   #homeProfile.hasDot::after { content:''; position:absolute; top:2px; right:2px; width:9px; height:9px; border-radius:50%;
@@ -463,22 +463,26 @@
   /* local leaderboard on the start screen */
   /* leaderboard lifetime-stats grid */
   #lbStats, #profStats { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; width:min(360px,90vw); margin:4px 0 8px; }
-  /* profile header: avatar + name + sub */
-  .profHead { display:flex; align-items:center; gap:14px; width:min(360px,90vw); margin-bottom:2px; }
-  .profAvatar { position:relative; width:60px; height:60px; flex:0 0 auto; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  /* profile: username + edit pencil at the top, big centred avatar below */
+  .profTitleRow { display:flex; align-items:center; justify-content:center; gap:10px; max-width:min(360px,90vw); }
+  .profEdit { pointer-events:auto; cursor:pointer; width:34px; height:34px; flex:0 0 auto; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; color:#f3d99a; background:rgba(243,200,120,.1);
+    border:1.5px solid rgba(243,200,120,.4); transition:transform .12s; }
+  .profEdit:active { transform:scale(.9); }
+  .profEdit svg { width:16px; height:16px; }
+  .profHead { display:flex; flex-direction:column; align-items:center; gap:8px; margin-bottom:2px; }
+  .profAvatar { position:relative; width:84px; height:84px; flex:0 0 auto; border-radius:50%; display:flex; align-items:center; justify-content:center;
     border:2px solid rgba(255,255,255,.5); box-shadow:0 2px 12px rgba(0,0,0,.4); cursor:pointer; pointer-events:auto;
     background-size:cover; background-position:center 30%; overflow:hidden; }
-  .profAvLetter { font-family:'Cinzel',serif; font-weight:700; font-size:26px; color:#1a1018; }
+  .profAvLetter { font-family:'Cinzel',serif; font-weight:700; font-size:36px; color:#1a1018; }
   .profAvatar.hasImg .profAvLetter { display:none; }
-  .profAvCam { position:absolute; right:-2px; bottom:-2px; width:20px; height:20px; border-radius:50%; font-size:10px;
+  .profAvCam { position:absolute; right:-1px; bottom:-1px; width:24px; height:24px; border-radius:50%; font-size:11px;
     display:flex; align-items:center; justify-content:center; background:#2a1d33; border:1px solid rgba(243,200,120,.5); }
   .profAvatar input[type=file] { display:none; }
   .profAvReset { font-family:'Space Mono',monospace; font-size:10px; letter-spacing:1px; color:#9fc7e8; opacity:.85;
-    cursor:pointer; pointer-events:auto; margin-top:2px; display:none; }
-  .profMeta { display:flex; flex-direction:column; gap:3px; min-width:0; }
-  .profName { font-family:'Cinzel',serif; font-weight:700; font-size:22px; color:#ffe9b8; letter-spacing:1px; line-height:1;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .profSub { font-family:'Space Mono',monospace; font-size:11px; letter-spacing:1px; color:#cdbb95; opacity:.85; }
+    cursor:pointer; pointer-events:auto; display:none; }
+  .profName { font-family:'Cinzel',serif; font-weight:700; font-size:26px; color:#ffe9b8; letter-spacing:1px; line-height:1;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-shadow:0 0 18px rgba(243,200,120,.35); }
   .profCoin { vertical-align:-0.14em; }
   .lbStat { background:rgba(243,200,120,.07); border:1px solid rgba(243,200,120,.18); border-radius:12px; padding:11px 4px; text-align:center; }
   .lbStatV { font-family:'Cinzel',serif; font-weight:700; font-size:20px; color:#f3d99a; line-height:1; }
@@ -654,18 +658,17 @@
 </div>
 
 <div class="overlay hidden panel" id="profilePanel">
-  <div class="panelTitle">PROFILE</div>
+  <div class="profTitleRow">
+    <div class="profName" id="profName">PLAYER</div>
+    <button class="profEdit" id="profEditBtn" title="Edit username"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
+  </div>
   <div class="profHead">
     <div class="profAvatar" id="profAvatar" title="Tap to upload a photo">
       <span class="profAvLetter" id="profAvLetter">A</span>
       <span class="profAvCam">📷</span>
       <input type="file" id="avatarUpload" accept="image/*" />
     </div>
-    <div class="profMeta">
-      <div class="profName" id="profName">PLAYER</div>
-      <div class="profSub" id="profSub"></div>
-      <div class="profAvReset" id="profAvReset">↺ use my character</div>
-    </div>
+    <div class="profAvReset" id="profAvReset">↺ use my character</div>
   </div>
   <div id="profStats">
     <div class="lbStat"><div class="lbStatV" id="pfBest">0</div><div class="lbStatL">BEST SCORE</div></div>
@@ -675,10 +678,13 @@
     <div class="lbStat"><div class="lbStatV" id="pfStreak">0</div><div class="lbStatL">BEST STREAK</div></div>
     <div class="lbStat"><div class="lbStatV" id="pfLvl">1</div><div class="lbStatL">MAX LEVEL</div></div>
   </div>
-  <div class="acctIntro" id="profSignupNote">Sign up with your email and we’ll unlock the <b>FERRO</b> metal character — <b>free</b>.</div>
   <div class="acctForm">
-    <label class="acctField">NAME<input id="acctName" maxlength="12" placeholder="HANDLE" autocomplete="off" spellcheck="false" /></label>
-    <label class="acctField" id="acctEmailField">EMAIL<input id="acctEmail" type="email" placeholder="you@email.com" autocomplete="email" inputmode="email" /></label>
+    <div class="tabRow" id="acctTabs">
+      <div class="tab sel" id="acctTabName">USERNAME</div>
+      <div class="tab" id="acctTabEmail">EMAIL</div>
+    </div>
+    <label class="acctField" id="acctNameField"><input id="acctName" maxlength="12" placeholder="HANDLE" autocomplete="off" spellcheck="false" /></label>
+    <label class="acctField" id="acctEmailField" style="display:none"><input id="acctEmail" type="email" placeholder="you@email.com" autocomplete="email" inputmode="email" /></label>
     <div class="cta hero" id="acctCreate" style="pointer-events:auto">CREATE ACCOUNT</div>
     <div id="acctMsg"></div>
   </div>
@@ -3754,25 +3760,33 @@ function renderProfile(){
     if (rs) rs.style.display = custom ? 'block' : 'none';      // offer to revert to the character render
   }
   $('profName').textContent = nm;
-  $('profSub').innerHTML    = escapeHtml(ch ? ch.name : 'EXPLORER') + ' · <span class="coinIcon profCoin"></span> ' + (bank||0).toLocaleString() + ' deben' + (account ? '  ·  ' + escapeHtml(account.email) : '');
   $('pfBest').textContent   = (bestScore||0).toLocaleString();
   $('pfHeight').textContent = (bestHeight||0).toFixed(0)+'m';
   $('pfDeben').textContent  = (bank||0).toLocaleString();
   $('pfPyr').textContent    = totalBuilds;
   $('pfStreak').textContent = bestStreak;
   $('pfLvl').textContent    = maxLevel;
-  const ni = $('acctName'), ei = $('acctEmail'), btn = $('acctCreate'), note = $('profSignupNote');
+  const ni = $('acctName'), ei = $('acctEmail'), btn = $('acctCreate');
   if (account){
     if (ni) ni.value = account.name || playerName || '';
     if (ei) ei.value = account.email || '';
     if (btn) btn.textContent = 'UPDATE ACCOUNT';
-    if (note) note.textContent = '✓ Signed up — FERRO skin unlocked. Update your name or email any time.';
   } else {
     if (ni && !ni.value) ni.value = playerName || '';
     if (btn) btn.textContent = 'CREATE ACCOUNT';
-    if (note) note.innerHTML = 'Sign up with your email and we’ll unlock the <b>FERRO</b> metal character — <b>free</b>.';
   }
+  acctTab('name');             // default to the USERNAME tab each time the profile opens
   showAcctMsg('');
+}
+// swap the account form between the USERNAME and EMAIL fields
+function acctTab(which){
+  const nameOn = which !== 'email';
+  const nf = $('acctNameField'), ef = $('acctEmailField');
+  if (nf) nf.style.display = nameOn ? 'flex' : 'none';
+  if (ef) ef.style.display = nameOn ? 'none' : 'flex';
+  const tn = $('acctTabName'), te = $('acctTabEmail');
+  if (tn) tn.classList.toggle('sel', nameOn);
+  if (te) te.classList.toggle('sel', !nameOn);
 }
 function createAccount(){
   const name = sanitizeName($('acctName').value);
@@ -4174,6 +4188,9 @@ btn('eraJumpBtn',    cycleEra);        // preview: jump the next run to another 
 btn('homeProfile',   showProfile);
 btn('profileBack',   backHome);
 btn('acctCreate',    createAccount);
+btn('acctTabName',   ()=>acctTab('name'));
+btn('acctTabEmail',  ()=>acctTab('email'));
+btn('profEditBtn',   ()=>{ acctTab('name'); const ni=$('acctName'); if (ni && ni.focus) ni.focus(); });
 btn('howTabPlay',    ()=>howTab('play'));
 btn('howTabAbout',   ()=>howTab('about'));
 btn('ddaBtn',        ()=>{ DDA.on = !DDA.on; Store.set('dda', DDA.on?1:0); renderSettings(); });
