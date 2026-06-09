@@ -767,7 +767,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.173 · 2026.06.09</div>
+  <div id="appVersion">v1.174 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1777,6 +1777,7 @@ function clearEraDecor(){ eraDecor.forEach(o => scene.remove(o)); eraDecor = [];
 function animateBackdrop(T){
   for (let i=0;i<animProps.length;i++){ const o=animProps[i], a=o.__anim; if (!a) continue;
     if (a.t==='drift'){ const ang=a.a + T*0.012; o.position.set(a.d*Math.sin(ang), a.y + Math.sin(T*0.5+a.ph)*0.5, a.d*Math.cos(ang)); }
+    else if (a.t==='cloud2d'){ const ang=a.a + T*0.009; o.position.set(a.d*Math.sin(ang), a.y + Math.sin(T*0.35+a.ph)*0.25, a.d*Math.cos(ang)); if (o.lookAt && typeof camera!=='undefined') o.lookAt(camera.position.x, o.position.y, camera.position.z); }
     else if (a.t==='ufo'){ o.rotation.y += a.spd; o.position.y = a.y + Math.sin(T*0.8+a.ph)*0.3; }
     else if (a.t==='aurora'){ o.rotation.z = a.rz + Math.sin(T*0.5+a.ph)*0.22; if (o.material) o.material.opacity = a.op*(0.55+0.45*Math.abs(Math.sin(T*0.35+a.ph))); }
     else if (a.t==='star'){ const s=0.6+0.6*Math.abs(Math.sin(T*1.8+a.ph)); o.scale.set(s,s,s); }
@@ -1814,12 +1815,39 @@ function dStepPyr(x,z,s,col){ const g=new THREE.Group(); const tiers=5; for(let 
 function dTree(x,z,s){ const g=new THREE.Group(); const t=new THREE.Mesh(new THREE.CylinderGeometry(0.12*s,0.18*s,1.6*s,7), dMat(0x5a4326)); t.position.y=0.8*s; g.add(t); for(let i=0;i<3;i++){ const f=new THREE.Mesh(new THREE.ConeGeometry(0.85*s-i*0.2*s,1.0*s,8), dMat(0x2f6a34)); f.position.y=1.3*s+i*0.5*s; f.castShadow=true; g.add(f);} g.position.set(x,-0.5,z); addDecor(g); }
 function dCrystal(x,z,h,col){ const m=new THREE.Mesh(new THREE.ConeGeometry(0.5+Math.random()*0.4,h,6), dGlow(col,0.55)); m.position.set(x,-0.5+h/2,z); m.rotation.set((Math.random()-0.5)*0.4,Math.random()*3,(Math.random()-0.5)*0.4); addDecor(m); }
 function dMonolith(x,z,h,col){ const m=new THREE.Mesh(new THREE.BoxGeometry(1+Math.random(),h,0.6), dMat(col,0.4)); m.position.set(x,-0.5+h/2,z); m.rotation.y=Math.random(); m.castShadow=true; addDecor(m); }
-function dCloud(x,y,z,s){ const g=new THREE.Group();
-  const cm=new THREE.MeshStandardMaterial({ color:0xf4f0fa, emissive:0xdcd6ec, emissiveIntensity:0.18, roughness:1, transparent:true, opacity:0.8 });
-  const n=3+Math.floor(Math.random()*2);
-  for(let i=0;i<n;i++){ const b=new THREE.Mesh(new THREE.SphereGeometry(s*(0.4+Math.random()*0.32),12,8), cm);
-    b.scale.set(1.5,0.36,0.85); b.position.set((i-(n-1)/2)*s*0.82+(Math.random()-0.5)*s*0.3,(Math.random()-0.5)*s*0.12,(Math.random()-0.5)*s*0.45); g.add(b); }
-  g.position.set(x,y,z); g.__anim={t:'drift',d:Math.hypot(x,z),a:Math.atan2(x,z),y,ph:Math.random()*6.28}; addDecor(g); }
+// ---- 2D billboard clouds + 2D layered dune-ridge horizon (canvas textures; harness-safe) ----
+let _cloudTex=0, _ridgeTex={};
+function cloudTex(){ if (_cloudTex!==0) return _cloudTex; _cloudTex=null;
+  try { const w=256,h=140,c=document.createElement('canvas'); c.width=w; c.height=h; const x=c.getContext&&c.getContext('2d'); if(!x) return _cloudTex;
+    const puffs=[[70,92,40],[118,72,54],[168,88,46],[206,98,30],[98,100,36],[150,102,34],[44,100,26]];
+    puffs.forEach(p=>{ const g=x.createRadialGradient(p[0],p[1],0,p[0],p[1],p[2]); g.addColorStop(0,'rgba(255,255,255,0.97)'); g.addColorStop(0.6,'rgba(248,248,255,0.5)'); g.addColorStop(1,'rgba(255,255,255,0)'); x.fillStyle=g; x.beginPath(); x.arc(p[0],p[1],p[2],0,6.28); x.fill(); });
+    _cloudTex=new THREE.CanvasTexture(c);
+  } catch(e){ _cloudTex=null; } return _cloudTex; }
+function ridgeTex(rgb){ if (_ridgeTex[rgb]!==undefined) return _ridgeTex[rgb]; _ridgeTex[rgb]=null;
+  try { const w=512,h=170,c=document.createElement('canvas'); c.width=w; c.height=h; const x=c.getContext&&c.getContext('2d'); if(!x) return _ridgeTex[rgb];
+    x.fillStyle=rgb; x.beginPath(); x.moveTo(0,h);
+    for(let i=0;i<=w;i+=5){ const t=i/w; const y=h*0.46 + Math.sin(t*6.28*1.4+0.6)*h*0.20 + Math.sin(t*6.28*3.1+2)*h*0.10 + Math.sin(t*6.28*6.5)*h*0.04; x.lineTo(i,y); }
+    x.lineTo(w,h); x.closePath(); x.fill();
+    const tex=new THREE.CanvasTexture(c); _ridgeTex[rgb]=tex;
+  } catch(e){ _ridgeTex[rgb]=null; } return _ridgeTex[rgb]; }
+function dCloud(x,y,z,s){
+  const mat=new THREE.MeshBasicMaterial({ map:cloudTex()||null, color:0xffffff, transparent:true, opacity:0.8, depthWrite:false });
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(s*3.4, s*1.7), mat);
+  m.position.set(x,y,z);
+  m.__anim={ t:'cloud2d', d:Math.hypot(x,z), a:Math.atan2(x,z), y, ph:Math.random()*6.28 };
+  addDecor(m);
+}
+// a ring of vertical 2D dune-ridge billboards facing the centre → a continuous dune horizon from any angle
+function duneRing(radius, H, rgb, n, op){
+  const tex=ridgeTex(rgb), baseY=-0.5+H/2;
+  for(let i=0;i<n;i++){ const ang=(i/n)*6.28;
+    const mat=new THREE.MeshBasicMaterial({ map:tex||null, color: tex?0xffffff:rgb, transparent:true, opacity:(op==null?1:op), depthWrite:false, side:THREE.DoubleSide, fog:true });
+    const w=(radius*2*Math.PI/n)*1.55;
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(w, H), mat);
+    m.position.set(Math.sin(ang)*radius, baseY, Math.cos(ang)*radius);
+    m.rotation.y=ang; m.__env=true; scene.add(m);
+  }
+}
 function dPillar(x,z,h,col){ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.62,h,16), new THREE.MeshStandardMaterial({color:col,emissive:0x6a5024,emissiveIntensity:0.3,metalness:0.6,roughness:0.3})); c.position.set(x,-0.5+h/2,z); addDecor(c); const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.78,0.7,0.4,16), dMat(col)); cap.position.set(x,-0.5+h+0.2,z); addDecor(cap); }
 const faceCentre = (x,z)=>Math.atan2(-x,-z);   // yaw so a prop faces the pyramid at the origin
 // EGYPT: a reclining Great Sphinx
@@ -2045,16 +2073,14 @@ function buildBackdrop(era){
       dGiza(-4,-52);                                                    // the three Pyramids of Giza, mid-distance
       dSphinx(18,-26,2.8);                                             // a proper Sphinx, off to one side facing in
       dSphinx(-30,20,1.7);
-      // tall, mountainy rolling dune ridges receding into the haze (layered bands, strong ups & downs)
-      duneBand(-26, 3.6, 8, 9); duneBand(-42, 5.6, 10, 8); duneBand(-58, 7.5, 12, 7); duneBand(-74, 9.5, 14, 6);
-      dOasis(-22,-12,3.6);                                             // an oasis pool with palms, in clear view
-      dCaravan(-10,-46,5,1.6);                                         // a static camel caravan, far back in the haze
-      ringPlace(12,10,24,(x,z)=>dDune(x,z,1.0+Math.random()*1.4));      // a few subtle drifts on the near sand
-      ringPlace(6,22,38,(x,z)=>dObelisk(x,z,3+Math.random()*2));
-      ringPlace(10,18,40,(x,z)=>dPalm(x,z,0.9+Math.random()*0.6));
-      ringPlace(14,18,42,(x,z)=>dRock(x,z,0.5+Math.random()*0.7,0x8a6a44));
-      for(let i=0;i<6;i++){ const a=Math.random()*6.28,d=28+Math.random()*22; dCloud(Math.sin(a)*d,9+Math.random()*5,Math.cos(a)*d,1.3+Math.random()*1.4); }
-      dBirds(10,0x3a2a22,28); dBirds(8,0x2a2018,36); dBirds(6,0x4a3a2a,44);   // more flocks wheeling over the desert
+      // 2D layered dune horizon (vertical ridge billboards ringing the scene; near richer, far hazier)
+      duneRing(40, 6.5, '#c6a468', 18, 1.0); duneRing(56, 9.0, '#d4bf90', 16, 0.95); duneRing(72, 12.0, '#dcccA0', 13, 0.9);
+      dCaravan(-10,-50,5,1.5);                                         // a static camel caravan, far back on the horizon
+      ringPlace(6,24,40,(x,z)=>dObelisk(x,z,3+Math.random()*2));
+      ringPlace(5,20,40,(x,z)=>dPalm(x,z,0.9+Math.random()*0.6));
+      ringPlace(12,18,42,(x,z)=>dRock(x,z,0.5+Math.random()*0.7,0x8a6a44));
+      for(let i=0;i<6;i++){ const a=Math.random()*6.28,d=30+Math.random()*20; dCloud(Math.sin(a)*d,8+Math.random()*5,Math.cos(a)*d,2.2+Math.random()*2.0); }
+      dBirds(9,0x3a2a22,26); dBirds(7,0x2a2018,38);                     // flocks wheeling over the desert
       dSnake(10,-12,1.3); dSnake(-15,7,-0.7); dSnake(6,16,2.4);          // snakes slithering across the sand
     } else if (era.key === 'aztec'){
       dHeroStep(0,-42,8); dHeroStep(-34,26,6.5);                        // Chichen-Itza temples
