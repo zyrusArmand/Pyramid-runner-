@@ -763,7 +763,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.0 · 2026.06.09</div>
+  <div id="appVersion">v1.158 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1928,8 +1928,8 @@ function dDune(x,z,s,col){ const m=new THREE.Mesh(new THREE.SphereGeometry(s,16,
 // the three Pyramids of Giza in their classic stagger, fronted by queen's pyramids — a big iconic skyline
 function dGiza(cx,cz){
   const col=0x9a7048;
-  // three clean regular pyramids in the classic Giza skyline (no small stepped queen's pyramids)
-  dPyramid(cx-16, cz-4, 20, col); dPyramid(cx, cz, 17, col); dPyramid(cx+15, cz+3, 15, col);
+  // three matching regular pyramids (same size/style) in a clean skyline — no stepped queen's pyramids
+  dPyramid(cx-17, cz-3, 18, col); dPyramid(cx, cz, 18, col); dPyramid(cx+16, cz+2, 18, col);
 }
 function buildBackdrop(era){
   if (!era || era.key === _backdropEra) return;          // only rebuild when the era actually changes
