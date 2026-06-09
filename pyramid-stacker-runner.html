@@ -767,7 +767,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.167 · 2026.06.09</div>
+  <div id="appVersion">v1.168 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1781,6 +1781,9 @@ function animateBackdrop(T){
     else if (a.t==='aurora'){ o.rotation.z = a.rz + Math.sin(T*0.5+a.ph)*0.22; if (o.material) o.material.opacity = a.op*(0.55+0.45*Math.abs(Math.sin(T*0.35+a.ph))); }
     else if (a.t==='star'){ const s=0.6+0.6*Math.abs(Math.sin(T*1.8+a.ph)); o.scale.set(s,s,s); }
     else if (a.t==='sway'){ o.rotation.z = Math.sin(T*0.7+a.ph)*0.05; }
+    else if (a.t==='caravan'){                               // a camel caravan plodding across the horizon
+      o.position.x += a.spd; if (o.position.x > a.max) o.position.x = a.min;
+    }
     else if (a.t==='snake'){                                 // a desert snake slithering across the sand
       a.head += a.spd; if (a.head > a.len) a.head = -8;       // crawl forward, then loop back
       const segs=o.__snakeSegs; if (segs){ for (let k=0;k<segs.length;k++){
@@ -1815,20 +1818,55 @@ function dCloud(x,y,z,s){ const g=new THREE.Group(); for(let i=0;i<4;i++){ const
 function dPillar(x,z,h,col){ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.62,h,16), new THREE.MeshStandardMaterial({color:col,emissive:0x6a5024,emissiveIntensity:0.3,metalness:0.6,roughness:0.3})); c.position.set(x,-0.5+h/2,z); addDecor(c); const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.78,0.7,0.4,16), dMat(col)); cap.position.set(x,-0.5+h+0.2,z); addDecor(cap); }
 const faceCentre = (x,z)=>Math.atan2(-x,-z);   // yaw so a prop faces the pyramid at the origin
 // EGYPT: a reclining Great Sphinx
-function dSphinx(x,z,s){ const g=new THREE.Group(), sand=dMat(0xc6ac80), gold=dMat(0xd6b24c);
-  // smooth, rounded reclining-lion forms instead of stacked boxes
-  const body=new THREE.Mesh(new THREE.SphereGeometry(s*0.78,18,14), sand); body.scale.set(2.0,0.82,0.92); body.position.set(-s*0.25,s*0.62,0); body.castShadow=true; g.add(body);
-  const haunch=new THREE.Mesh(new THREE.SphereGeometry(s*0.66,16,12), sand); haunch.scale.set(1,1,1.05); haunch.position.set(-s*1.55,s*0.6,0); g.add(haunch);
-  const chest=new THREE.Mesh(new THREE.SphereGeometry(s*0.58,16,12), sand); chest.scale.set(1.05,1.45,1); chest.position.set(s*1.0,s*0.82,0); g.add(chest);
-  [-1,1].forEach(d=>{                                    // outstretched front legs + rounded paws
-    const leg=new THREE.Mesh(new THREE.CylinderGeometry(s*0.15,s*0.19,s*1.7,12), sand); leg.rotation.z=Math.PI/2; leg.position.set(s*1.15,s*0.17,d*s*0.34); g.add(leg);
-    const paw=new THREE.Mesh(new THREE.SphereGeometry(s*0.21,12,10), sand); paw.scale.set(1.2,1,1); paw.position.set(s*2.0,s*0.17,d*s*0.34); g.add(paw); });
-  const head=new THREE.Mesh(new THREE.SphereGeometry(s*0.4,18,14), sand); head.scale.set(0.95,1.08,1.0); head.position.set(s*1.4,s*1.55,0); head.castShadow=true; g.add(head);
-  const snout=new THREE.Mesh(new THREE.SphereGeometry(s*0.2,12,10), sand); snout.scale.set(1.3,0.85,0.9); snout.position.set(s*1.68,s*1.48,0); g.add(snout);
-  // nemes headdress — a domed cap over the head, with side lappets, gold-striped
-  const nemes=new THREE.Mesh(new THREE.SphereGeometry(s*0.5,18,12,0,Math.PI*2,0,1.75), gold); nemes.scale.set(1.18,1.05,1.25); nemes.position.set(s*1.34,s*1.6,0); g.add(nemes);
-  [-1,1].forEach(d=>{ const lap=new THREE.Mesh(new THREE.BoxGeometry(s*0.17,s*0.55,s*0.16), gold); lap.position.set(s*1.34,s*1.3,d*s*0.46); g.add(lap); });
+function dSphinx(x,z,s){ const g=new THREE.Group();
+  const sand=dMat(0xceb083), sd=dMat(0xb89a68), gold=dMat(0xd8b048), blue=dMat(0x35538a);
+  // long, low recumbent lion body (head end at +x)
+  const body=new THREE.Mesh(new THREE.BoxGeometry(s*2.8,s*0.8,s*1.0), sand); body.position.set(-s*0.35,s*0.6,0); body.castShadow=true; g.add(body);
+  const haunch=new THREE.Mesh(new THREE.SphereGeometry(s*0.6,14,12), sand); haunch.scale.set(1.1,1,1.05); haunch.position.set(-s*1.55,s*0.58,0); g.add(haunch);
+  const chest=new THREE.Mesh(new THREE.BoxGeometry(s*0.78,s*1.25,s*0.92), sand); chest.position.set(s*0.95,s*0.85,0); chest.castShadow=true; g.add(chest);
+  [-1,1].forEach(d=>{                                    // outstretched front legs ending in paws
+    const leg=new THREE.Mesh(new THREE.BoxGeometry(s*1.9,s*0.32,s*0.28), sd); leg.position.set(s*0.95,s*0.17,d*s*0.33); leg.castShadow=true; g.add(leg);
+    const paw=new THREE.Mesh(new THREE.BoxGeometry(s*0.44,s*0.3,s*0.32), sd); paw.position.set(s*1.96,s*0.16,d*s*0.33); g.add(paw); });
+  const head=new THREE.Mesh(new THREE.BoxGeometry(s*0.56,s*0.62,s*0.56), sand); head.position.set(s*1.3,s*1.72,0); head.castShadow=true; g.add(head);
+  const face=new THREE.Mesh(new THREE.BoxGeometry(s*0.26,s*0.42,s*0.18), sd); face.position.set(s*1.6,s*1.66,0); g.add(face);            // snout
+  // NEMES headdress — the iconic wide striped headcloth (gold with a blue brow band + side lappets)
+  const nemTop=new THREE.Mesh(new THREE.BoxGeometry(s*0.92,s*0.42,s*0.8), gold); nemTop.position.set(s*1.2,s*2.04,0); g.add(nemTop);     // cap, wider than the head
+  const nemBack=new THREE.Mesh(new THREE.BoxGeometry(s*0.5,s*0.72,s*0.88), gold); nemBack.position.set(s*0.98,s*1.7,0); g.add(nemBack);   // back flare
+  const brow=new THREE.Mesh(new THREE.BoxGeometry(s*0.64,s*0.13,s*0.62), blue); brow.position.set(s*1.3,s*1.96,0); g.add(brow);          // blue brow band
+  [-1,1].forEach(d=>{                                    // side lappets hanging beside the face to the chest
+    const lap=new THREE.Mesh(new THREE.BoxGeometry(s*0.2,s*0.85,s*0.2), gold); lap.position.set(s*1.34,s*1.42,d*s*0.45); g.add(lap);
+    const lapB=new THREE.Mesh(new THREE.BoxGeometry(s*0.21,s*0.18,s*0.21), blue); lapB.position.set(s*1.34,s*1.05,d*s*0.45); g.add(lapB); });
+  const beard=new THREE.Mesh(new THREE.BoxGeometry(s*0.15,s*0.42,s*0.15), gold); beard.position.set(s*1.55,s*1.3,0); g.add(beard);       // false beard
   g.position.set(x,-0.5,z); g.rotation.y=faceCentre(x,z); addDecor(g); }
+// ---- caravan of camel silhouettes crossing the dunes ----
+function camelSil(s,col){ const g=new THREE.Group(), m=dMat(col);
+  const body=new THREE.Mesh(new THREE.SphereGeometry(s*0.5,12,10), m); body.scale.set(1.6,0.85,0.78); body.position.y=s*1.0; g.add(body);
+  const hump=new THREE.Mesh(new THREE.SphereGeometry(s*0.3,10,8), m); hump.scale.set(1,0.95,0.9); hump.position.set(-s*0.05,s*1.34,0); g.add(hump);
+  const neck=new THREE.Mesh(new THREE.CylinderGeometry(s*0.1,s*0.17,s*1.0,8), m); neck.position.set(s*0.6,s*1.34,0); neck.rotation.z=-0.55; g.add(neck);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(s*0.15,8,7), m); head.scale.set(1.5,0.85,0.85); head.position.set(s*0.96,s*1.7,0); g.add(head);
+  [[-0.55,-0.28],[-0.55,0.28],[0.5,-0.28],[0.5,0.28]].forEach(p=>{ const leg=new THREE.Mesh(new THREE.CylinderGeometry(s*0.055,s*0.05,s*1.0,6), m); leg.position.set(p[0]*s,s*0.5,p[1]*s); g.add(leg); });
+  return g; }
+function dCaravan(z,n){
+  const g=new THREE.Group(), s=2.0, sp=s*2.2;
+  for(let i=0;i<n;i++){ const c=camelSil(s,0x231a12); c.position.set(i*sp,-0.5,0); g.add(c);
+    if (i>0){ const rider=new THREE.Mesh(new THREE.SphereGeometry(0.55,8,7), dMat(0x1a140e)); rider.scale.set(0.7,1.15,0.7); rider.position.set(i*sp,-0.5+s*1.6,0); g.add(rider); } }
+  g.position.set(-34,0,z); g.__anim={t:'caravan', spd:0.02, min:-38, max:48};
+  addDecor(g); }
+// ---- a desert oasis: a still pool ringed with grass + palms ----
+function dOasis(x,z,s){
+  const g=new THREE.Group();
+  const water=new THREE.Mesh(new THREE.CircleGeometry(s*1.6,26), new THREE.MeshStandardMaterial({ color:0x2f7382, metalness:0.5, roughness:0.18, emissive:0x0c2c33, emissiveIntensity:0.25 }));
+  water.rotation.x=-Math.PI/2; water.position.y=-0.46; g.add(water);
+  const rim=new THREE.Mesh(new THREE.RingGeometry(s*1.55,s*2.15,26), dMat(0x52743c)); rim.rotation.x=-Math.PI/2; rim.position.y=-0.45; g.add(rim);
+  g.position.set(x,0,z); addDecor(g);
+  for(let i=0;i<6;i++){ const a=i/6*6.28; dPalm(x+Math.cos(a)*s*2.0, z+Math.sin(a)*s*2.0, 1.0+Math.random()*0.6); }
+}
+// ---- big, smooth wind-blown dune ridges for the deep horizon (elongated, tilted, overlapping) ----
+function dBigDune(x,z,len,height,width,rot){
+  const m=new THREE.Mesh(new THREE.SphereGeometry(8,22,14), duneMat);
+  m.scale.set(len,height,width); m.rotation.y=rot; m.position.set(x,-0.5,z);
+  m.__env=true; scene.add(m);
+}
 // a low desert snake that slithers across the sand (animated via the 'snake' type)
 function dSnake(x0, z0, dir){
   const g=new THREE.Group(), col=[0x7a6238,0x5a4a30,0x8a7048][Math.floor(Math.random()*3)], skin=dMat(col), segs=[];
@@ -1988,12 +2026,17 @@ function buildBackdrop(era){
       dPyramidH(-60,16, 5, 9, 0x6f4f31);   dPyramidH(56,28, 5, 6.5, 0x6a4a2e);
       dPyramidH(38,46, 4.5, 7.5, 0x6f4f31); dPyramidH(64,-8, 6, 6, 0x6a4a2e);
       dPyramidH(-30,-58, 7, 10, 0x6a4a2e);
-      dSphinx(0,-24,3.3);                                              // smaller, smoother Sphinx fronting the pyramids
-      dSphinx(24,24,2.1); dSphinx(-28,18,1.9);
-      ringPlace(30,22,56,(x,z)=>dDune(x,z,2.5+Math.random()*4));        // lots of small rolling sand dunes
+      dSphinx(20,-26,3.0);                                             // a proper Sphinx, off to one side facing in
+      dSphinx(-30,20,1.9);
+      // big smooth dune ridges across the deep horizon (behind the pyramids) — overlapping for that layered-dune look
+      [[-40,-68,3.6,0.42,1.3,0.5],[8,-74,4.2,0.46,1.4,-0.3],[52,-64,3.2,0.4,1.2,0.8],[-66,-56,3.0,0.38,1.1,0.2],
+       [30,-60,2.6,0.34,1.0,1.1],[-12,-58,3.4,0.4,1.25,-0.6],[70,-44,2.8,0.36,1.1,0.4]].forEach(d=>dBigDune(d[0],d[1],d[2],d[3],d[4],d[5]));
+      dOasis(-44,-22,3.4);                                             // an oasis pool with palms in the mid-distance
+      dCaravan(-40,5);                                                 // a camel caravan crossing the horizon
+      ringPlace(28,22,56,(x,z)=>dDune(x,z,2.5+Math.random()*4));        // small rolling sand dunes
       ringPlace(16,9,18,(x,z)=>dDune(x,z,1.2+Math.random()*1.8));        // tiny low drifts hugging the pyramid base
       ringPlace(6,22,38,(x,z)=>dObelisk(x,z,3+Math.random()*2));
-      ringPlace(12,18,40,(x,z)=>dPalm(x,z,0.9+Math.random()*0.6));
+      ringPlace(10,18,40,(x,z)=>dPalm(x,z,0.9+Math.random()*0.6));
       ringPlace(14,18,42,(x,z)=>dRock(x,z,0.5+Math.random()*0.7,0x8a6a44));
       for(let i=0;i<7;i++){ const a=Math.random()*6.28,d=26+Math.random()*22; dCloud(Math.sin(a)*d,15+Math.random()*9,Math.cos(a)*d,2.4+Math.random()*2.6); }
       dBirds(10,0x3a2a22,28); dBirds(8,0x2a2018,36); dBirds(6,0x4a3a2a,44);   // more flocks wheeling over the desert
