@@ -766,7 +766,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.160 · 2026.06.09</div>
+  <div id="appVersion">v1.161 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -3440,7 +3440,7 @@ function lbAvatarHtml(charKey, mine){
   let img = null;
   try {
     if (mine) img = Store.get('avatar', null);                 // your row shows your uploaded photo if you have one
-    if (!img) img = characterThumb((charKey && CHARACTERS[charKey]) ? charKey : 'explorer');
+    if (!img){ const k = mine ? curChar : ((charKey && CHARACTERS[charKey]) ? charKey : 'explorer'); img = characterThumb(k); }
   } catch(e){ img = null; }
   return img ? `<img class="lbav" src="${img}" alt="">` : `<span class="lbav lbavPh"></span>`;
 }
