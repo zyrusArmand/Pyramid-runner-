@@ -497,6 +497,9 @@
   #lb .lbrow.top { background:rgba(243,200,120,.13); border:1px solid rgba(243,200,120,.3); }
   #lb .lbrank { width:22px; height:22px; flex:0 0 auto; border-radius:50%; border:1.5px solid rgba(243,200,120,.35);
     display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; opacity:.9; }
+  #lb .lbav { width:28px; height:28px; flex:0 0 auto; border-radius:50%; object-fit:cover; object-position:center 28%;
+    background:rgba(255,255,255,.07); border:1px solid rgba(243,200,120,.3); }
+  #lb .lbavPh { display:inline-block; }
   #lb .lbrow b { margin-left:auto; font-size:15px; color:#f3d99a; letter-spacing:1px; }
   #lb .lbtag { color:#9fd0ff; font-size:11px; opacity:.8; }
   #lb .lbname { font-size:13px; letter-spacing:1px; color:#f6e9d2; opacity:.9; max-width:46%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -763,7 +766,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.158 · 2026.06.09</div>
+  <div id="appVersion">v1.159 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -918,9 +921,13 @@ const RemoteBoard = {
   async submit(entry){
     if (!this.enabled()) return false;
     this.lastError = '';
+    const post = body => this._fetch('/rest/v1/scores', { method:'POST',
+      headers:this._h({ 'Content-Type':'application/json', Prefer:'return=minimal' }), body:JSON.stringify(body) });
     try {
-      const r = await this._fetch('/rest/v1/scores', { method:'POST',
-        headers:this._h({ 'Content-Type':'application/json', Prefer:'return=minimal' }), body:JSON.stringify(entry) });
+      let r = await post(entry);
+      if (!r.ok && entry && ('char' in entry)){          // the optional 'char' column may not exist yet → retry without it
+        const rest = Object.assign({}, entry); delete rest.char; r = await post(rest);
+      }
       if (!r.ok){ let t=''; try { t = await r.text(); } catch(e){} this.lastError = 'HTTP ' + r.status + (t ? ' — ' + t.slice(0,90) : ''); console.warn('leaderboard submit failed', this.lastError); }
       return r.ok;
     } catch(e){ this.lastError = (e && e.name==='AbortError') ? 'timed out' : 'network blocked'; console.warn('leaderboard submit error', e); return false; }
@@ -928,7 +935,7 @@ const RemoteBoard = {
   async top(n){
     if (!this.enabled()) return null;
     try {
-      const r = await this._fetch('/rest/v1/scores?select=name,score,level&order=score.desc&limit='+(n||20), { headers:this._h() });
+      const r = await this._fetch('/rest/v1/scores?select=*&order=score.desc&limit='+(n||20), { headers:this._h() });
       if (!r.ok){ try { console.warn('leaderboard read failed', r.status, await r.text()); } catch(e){} return null; }
       return await r.json();
     } catch(e){ console.warn('leaderboard read error', e); return null; }
@@ -3430,6 +3437,15 @@ function runAd(done){
 // ---------- share + leaderboard + 2× coins ----------
 function recordScore(entry){ scores.push(entry); scores.sort((a,b)=>b.score-a.score); scores = scores.slice(0,10); Store.set('scores', scores); }
 const MEDAL = ['#ffd86a','#d6d6d6','#cd8b54'];
+// small character portrait (or your own uploaded photo) for a leaderboard row
+function lbAvatarHtml(charKey, mine){
+  let img = null;
+  try {
+    if (mine) img = Store.get('avatar', null);                 // your row shows your uploaded photo if you have one
+    if (!img) img = characterThumb((charKey && CHARACTERS[charKey]) ? charKey : 'explorer');
+  } catch(e){ img = null; }
+  return img ? `<img class="lbav" src="${img}" alt="">` : `<span class="lbav lbavPh"></span>`;
+}
 function renderLeaderboard(){
   const lb = $('lb'); if (!lb) return;
   if (RemoteBoard.enabled()){
@@ -3440,7 +3456,7 @@ function renderLeaderboard(){
       if (!rows){ renderLocalBoard(lb, 'TOP RUNS · OFFLINE'); return; }
       // keep only each player's BEST score (we post several times per run), then take the top 12
       const best = {};
-      rows.forEach(s => { const k=(s.name||'ANON').toString().toUpperCase().slice(0,12); if (!(k in best) || (s.score||0) > best[k].score) best[k] = { name:k, score:s.score||0 }; });
+      rows.forEach(s => { const k=(s.name||'ANON').toString().toUpperCase().slice(0,12); if (!(k in best) || (s.score||0) > best[k].score) best[k] = { name:k, score:s.score||0, char:s.char }; });
       rows = Object.values(best).sort((a,b)=> b.score - a.score).slice(0,12);
       if (!rows.length){ lb.innerHTML = '<div class="lbttl">GLOBAL TOP RUNS</div><div class="lbttl">BE THE FIRST — PLAY A RUN!</div>'; return; }
       lb.innerHTML = '<div class="lbttl">GLOBAL TOP RUNS</div>' + rows.map((s,i)=>{
@@ -3448,7 +3464,7 @@ function renderLeaderboard(){
         const nm = escapeHtml((s.name||'ANON').toString().toUpperCase().slice(0,12));
         const mine = playerName && nm === playerName.toUpperCase();
         return `<div class="lbrow${i===0?' top':''}${mine?' me':''}"><span class="lbrank" style="${rankStyle}">${i+1}</span>`+
-          `<span class="lbname">${nm}</span><b>${(s.score||0).toLocaleString()}</b></div>`;
+          lbAvatarHtml(s.char, mine) + `<span class="lbname">${nm}</span><b>${(s.score||0).toLocaleString()}</b></div>`;
       }).join('');
     });
     return;
@@ -3460,7 +3476,7 @@ function renderLocalBoard(lb, title){
   lb.innerHTML = `<div class="lbttl">${title}</div>` + scores.slice(0,8).map((s,i)=>{
     const rankStyle = i<3 ? `color:${MEDAL[i]};border-color:${MEDAL[i]}` : '';
     return `<div class="lbrow${i===0?' top':''}"><span class="lbrank" style="${rankStyle}">${i+1}</span>`+
-      `<b>${(s.score||0).toLocaleString()}</b>${s.daily?'<span class="lbtag">◈</span>':''}</div>`;
+      lbAvatarHtml(s.char || curChar, true) + `<b>${(s.score||0).toLocaleString()}</b>${s.daily?'<span class="lbtag">◈</span>':''}</div>`;
   }).join('');
 }
 function shareScore(){
@@ -4104,7 +4120,7 @@ function postScore(force){
   if (!force && sc <= _runPostedScore){ rec('skipped: already posted this score'); return Promise.resolve(null); }
   _runPostedScore = sc;
   rec('posting…');
-  return RemoteBoard.submit({ name:(playerName||'ANON').slice(0,12), score:sc, level:Math.round(gameLevel)||1, height:Math.round((S.peakY||0)*10)/10 })
+  return RemoteBoard.submit({ name:(playerName||'ANON').slice(0,12), score:sc, level:Math.round(gameLevel)||1, height:Math.round((S.peakY||0)*10)/10, char:curChar })
     .then(ok => { rec(ok ? 'POSTED OK' : 'FAILED', ok ? '' : (RemoteBoard.lastError||'')); return ok; });
 }
 function endGame(won, how){
