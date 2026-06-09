@@ -767,7 +767,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.170 · 2026.06.09</div>
+  <div id="appVersion">v1.171 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1849,12 +1849,12 @@ function camelSil(s,col){ const g=new THREE.Group(), m=dMat(col);
   const neck=new THREE.Mesh(new THREE.CylinderGeometry(s*0.09,s*0.16,s*1.0,8), m); neck.position.set(s*0.62,s*1.58,0); neck.rotation.z=-0.5; g.add(neck);
   const head=new THREE.Mesh(new THREE.SphereGeometry(s*0.14,8,7), m); head.scale.set(1.7,0.85,0.8); head.position.set(s*0.98,s*1.96,0); g.add(head);
   return g; }
-function dCaravan(z,n){
-  const g=new THREE.Group(), s=2.1, sp=s*1.95;
-  for(let i=0;i<n;i++){ const c=camelSil(s,0x231a12); c.position.set(i*sp,-0.5,0); g.add(c);
-    if (i>0){ const rider=new THREE.Mesh(new THREE.SphereGeometry(0.42,8,7), dMat(0x18120c)); rider.scale.set(0.7,1.2,0.7); rider.position.set(i*sp,-0.5+s*1.7,0); g.add(rider); } }
-  g.position.set(-42,0,z); g.__anim={t:'caravan', spd:0.022, min:-46, max:52};
-  addDecor(g); }
+// a STATIC caravan of camel silhouettes, centred on (x,z), facing in profile
+function dCaravan(x,z,n,s){
+  const g=new THREE.Group(); s=s||1.7; const sp=s*1.9;
+  for(let i=0;i<n;i++){ const c=camelSil(s,0x241b12); c.position.set(i*sp,-0.5,0); g.add(c);
+    if (i>0){ const rider=new THREE.Mesh(new THREE.SphereGeometry(0.42,8,7), dMat(0x1a140c)); rider.scale.set(0.7,1.2,0.7); rider.position.set(i*sp,-0.5+s*1.7,0); g.add(rider); } }
+  g.position.set(x-((n-1)*sp)/2, 0, z); addDecor(g); }   // no __anim → does not move
 // ---- a desert oasis: a still pool ringed with grass + palms ----
 function dOasis(x,z,s){
   const g=new THREE.Group();
@@ -1864,11 +1864,18 @@ function dOasis(x,z,s){
   g.position.set(x,0,z); addDecor(g);
   for(let i=0;i<6;i++){ const a=i/6*6.28; dPalm(x+Math.cos(a)*s*2.0, z+Math.sin(a)*s*2.0, 1.0+Math.random()*0.6); }
 }
-// ---- big, smooth wind-blown dune ridges for the deep horizon (elongated, tilted, overlapping) ----
-function dBigDune(x,z,len,height,width,rot){
-  const m=new THREE.Mesh(new THREE.SphereGeometry(8,22,14), duneMat);
-  m.scale.set(len,height,width); m.rotation.y=rot; m.position.set(x,-0.5,z);
-  m.__env=true; scene.add(m);
+// ---- a continuous, wavy dune ridge spanning the whole view at depth z (wide low mounds heavily
+// overlapping so they merge into one rolling ridge-line). Stack several bands for receding dunes. ----
+function duneBand(z, h, segW, n){
+  for (let i=0;i<n;i++){
+    const x=(i-(n-1)/2)*segW*1.25 + (Math.random()-0.5)*segW*0.3;
+    const hh=h*(0.72+Math.random()*0.55);
+    const d=new THREE.Mesh(new THREE.SphereGeometry(1,20,12), duneMat);
+    d.scale.set(segW*(1.0+Math.random()*0.3), hh, segW*0.5);   // very wide, low → a broad smooth dune, never a circle
+    d.position.set(x, -0.5, z + (Math.random()-0.5)*segW*0.45);
+    d.rotation.y=(Math.random()-0.5)*0.3; d.receiveShadow=true;
+    d.__env=true; scene.add(d);
+  }
 }
 // a low desert snake that slithers across the sand — VERY thin (animated via the 'snake' type)
 function dSnake(x0, z0, dir){
@@ -2031,10 +2038,11 @@ function buildBackdrop(era){
       dPyramidH(-30,-58, 7, 10, 0x6a4a2e);
       dSphinx(20,-26,3.0);                                             // a proper Sphinx, off to one side facing in
       dSphinx(-30,20,1.9);
-      dOasis(-26,-13,4.2);                                             // an oasis pool with palms, in clear view
-      dCaravan(-30,5);                                                 // a camel caravan crossing the background
-      ringPlace(22,8,22,(x,z)=>dDune(x,z,1.1+Math.random()*1.6));       // miniature elongated drifts hugging the pyramid base
-      ringPlace(18,22,46,(x,z)=>dDune(x,z,1.4+Math.random()*2.0));      // a few more drifts scattered further out
+      // rolling dune ridges receding into the haze (layered bands → continuous dunescape, not circles)
+      duneBand(-30, 2.6, 9, 8); duneBand(-46, 4.2, 11, 7); duneBand(-62, 6.0, 13, 6); duneBand(-80, 7.5, 16, 5);
+      dOasis(-24,-12,4.0);                                             // an oasis pool with palms, in clear view
+      dCaravan(-12,-44,5,1.7);                                         // a static camel caravan, far back in the haze
+      ringPlace(14,10,24,(x,z)=>dDune(x,z,1.0+Math.random()*1.4));      // a few subtle drifts on the near sand
       ringPlace(6,22,38,(x,z)=>dObelisk(x,z,3+Math.random()*2));
       ringPlace(10,18,40,(x,z)=>dPalm(x,z,0.9+Math.random()*0.6));
       ringPlace(14,18,42,(x,z)=>dRock(x,z,0.5+Math.random()*0.7,0x8a6a44));
