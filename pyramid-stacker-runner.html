@@ -768,7 +768,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.179 · 2026.06.09</div>
+  <div id="appVersion">v1.180 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1767,7 +1767,7 @@ function loadEgyptPBR(){
   if (_egyptPBR!==0) return _egyptPBR; _egyptPBR=null;
   try {
     if (!_texLoader) _texLoader = new THREE.TextureLoader();
-    const B='assets/', SET='worn_rock_natural_01';     // current Egypt sandstone set (swap this name to A/B different downloads)
+    const B='assets/', SET='sandstone_cracks';     // current Egypt sandstone set (swap this name to A/B different downloads)
     const map=_texLoader.load(B+SET+'_diff_1k.jpg');
     const nor=_texLoader.load(B+SET+'_nor_gl_1k.png');
     const rgh=_texLoader.load(B+SET+'_rough_1k.jpg');
