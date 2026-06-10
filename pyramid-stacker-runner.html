@@ -768,7 +768,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.185 · 2026.06.09</div>
+  <div id="appVersion">v1.186 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1842,6 +1842,10 @@ function animateBackdrop(T){
     else if (a.t==='caravan'){                               // a camel caravan plodding across the horizon
       o.position.x += a.spd; if (o.position.x > a.max) o.position.x = a.min;
     }
+    else if (a.t==='oasis'){                                 // expanding water ripples
+      const rings=o.__rings; if (rings){ for (let k=0;k<rings.length;k++){ const ph=((T*0.35 + k/rings.length) % 1);
+        const sc=0.3 + ph*(o.__rs||4); rings[k].scale.set(sc,sc,sc); if (rings[k].material) rings[k].material.opacity=0.55*(1-ph); } }
+    }
     else if (a.t==='snake'){                                 // a desert snake slithering across the sand
       a.head += a.spd; if (a.head > a.len) a.head = -8;       // crawl forward, then loop back
       const segs=o.__snakeSegs; if (segs){ for (let k=0;k<segs.length;k++){
@@ -1863,8 +1867,32 @@ function dMat(c, r){ return new THREE.MeshStandardMaterial({ color:c, roughness:
 function dGlow(c, e){ return new THREE.MeshStandardMaterial({ color:c, emissive:c, emissiveIntensity:e==null?0.5:e, metalness:0.3, roughness:0.35, transparent:true, opacity:0.92 }); }
 // prop builders
 function dPyramid(x,z,s,col){ const m=new THREE.Mesh(new THREE.ConeGeometry(s,s*1.4,4), dMat(col)); m.rotation.y=Math.PI/4; m.position.set(x,-1.4+s*0.7,z); addDecor(m); }
-function dPalm(x,z,s){ const p=new THREE.Group(); const t=new THREE.Mesh(new THREE.CylinderGeometry(0.1*s,0.17*s,2.3*s,7), dMat(0x6e4f2e)); t.position.y=1.15*s; t.castShadow=true; p.add(t);
-  for(let i=0;i<7;i++){ const pv=new THREE.Group(); pv.position.y=2.3*s; pv.rotation.y=i/7*6.28; const f=new THREE.Mesh(new THREE.ConeGeometry(0.13*s,1.5*s,5), new THREE.MeshStandardMaterial({color:0x4f7a37,roughness:0.85,side:THREE.DoubleSide})); f.rotation.z=-Math.PI/2+0.35; f.position.set(0.72*s,-0.12*s,0); pv.add(f); p.add(pv);} p.position.set(x,-0.5,z); addDecor(p); }
+function dPalm(x,z,s){
+  const p=new THREE.Group();
+  // tapered, segmented, slightly leaning trunk
+  const trunkMat=dMat(0x7a5a34), segs=7, segH=0.36*s; let lean=0;
+  for(let i=0;i<segs;i++){ const r=(0.165-i*0.014)*s; lean += (0.04+Math.random()*0.03)*s;
+    const seg=new THREE.Mesh(new THREE.CylinderGeometry(r*0.9,r,segH*1.06,8), trunkMat);
+    seg.position.set(lean*0.18, segH*(i+0.5), 0); seg.castShadow=true; p.add(seg); }
+  const crownY=segH*segs, cx=lean*0.18;
+  // feathered drooping fronds — a central rib with a row of leaflet blades down each side
+  const nF=10;
+  for(let f=0;f<nF;f++){
+    const fr=new THREE.Group(); const len=1.7*s, green=[0x3f7a33,0x4d8c3d,0x356b2c][f%3];
+    const rib=new THREE.Mesh(new THREE.CylinderGeometry(0.018*s,0.03*s,len,5), dMat(0x4a6e2e)); rib.rotation.z=Math.PI/2; rib.position.x=len/2; fr.add(rib);
+    const nL=7;
+    for(let l=1;l<=nL;l++){ const t=l/nL, px=t*len, ll=(0.42-t*0.3)*s;
+      [-1,1].forEach(d=>{ const leaf=new THREE.Mesh(new THREE.ConeGeometry(0.05*s, ll, 4), dMat(green));
+        leaf.scale.set(1,1,0.32); leaf.position.set(px, 0, d*0.02*s); leaf.rotation.x=d*1.15; leaf.rotation.z=-0.5; fr.add(leaf); }); }
+    fr.position.set(cx, crownY, 0); fr.rotation.y=f/nF*6.28 + Math.random()*0.2;
+    fr.rotation.z=-0.42 - Math.random()*0.28;                       // droop
+    p.add(fr);
+  }
+  // coconut cluster under the crown
+  for(let i=0;i<5;i++){ const a=i/5*6.28; const c=new THREE.Mesh(new THREE.SphereGeometry(0.085*s,8,6), dMat(0x6a4a26));
+    c.position.set(cx+Math.sin(a)*0.16*s, crownY-0.1*s, Math.cos(a)*0.16*s); p.add(c); }
+  p.position.set(x,-0.5,z); p.rotation.y=Math.random()*6.28; addDecor(p);
+}
 function dRock(x,z,s,col){ const r=new THREE.Mesh(new THREE.DodecahedronGeometry(s,0), dMat(col)); r.position.set(x,-0.5+s*0.35,z); r.scale.set(1+Math.random()*0.5,0.7+Math.random()*0.4,1+Math.random()*0.5); r.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3); r.castShadow=true; addDecor(r); }
 function dObelisk(x,z,h){ const g=new THREE.Group(); const sh=new THREE.Mesh(new THREE.BoxGeometry(0.5,h,0.5), dMat(0xb59866)); sh.position.y=h/2; sh.castShadow=true; g.add(sh); const tip=new THREE.Mesh(new THREE.ConeGeometry(0.36,0.7,4), dMat(0xd9b066)); tip.rotation.y=Math.PI/4; tip.position.y=h+0.3; g.add(tip); g.position.set(x,-0.5,z); addDecor(g); }
 function dColumn(x,z,h,col){ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.5,h,12), dMat(col)); c.position.set(x,-0.5+h/2,z); c.castShadow=true; addDecor(c); const cap=new THREE.Mesh(new THREE.BoxGeometry(1.1,0.25,1.1), dMat(col)); cap.position.set(x,-0.5+h+0.1,z); addDecor(cap); }
@@ -1948,11 +1976,16 @@ function dCaravan(x,z,n,s){
 // ---- a desert oasis: a still pool ringed with grass + palms ----
 function dOasis(x,z,s){
   const g=new THREE.Group();
-  const water=new THREE.Mesh(new THREE.CircleGeometry(s*1.6,26), new THREE.MeshStandardMaterial({ color:0x2f7382, metalness:0.5, roughness:0.18, emissive:0x0c2c33, emissiveIntensity:0.25 }));
+  const water=new THREE.Mesh(new THREE.CircleGeometry(s*1.6,30), new THREE.MeshStandardMaterial({ color:0x276a86, metalness:0.55, roughness:0.12, emissive:0x0a2838, emissiveIntensity:0.25 }));
   water.rotation.x=-Math.PI/2; water.position.y=-0.46; g.add(water);
-  const rim=new THREE.Mesh(new THREE.RingGeometry(s*1.55,s*2.15,26), dMat(0x52743c)); rim.rotation.x=-Math.PI/2; rim.position.y=-0.45; g.add(rim);
+  const sand=new THREE.Mesh(new THREE.RingGeometry(s*1.55,s*1.95,30), dMat(0xc9a96a)); sand.rotation.x=-Math.PI/2; sand.position.y=-0.47; g.add(sand);   // damp-sand shore (no green)
+  // expanding ripple rings on the surface
+  const rings=[];
+  for(let i=0;i<3;i++){ const r=new THREE.Mesh(new THREE.RingGeometry(0.92,1.0,30), new THREE.MeshBasicMaterial({ color:0xbfe6f0, transparent:true, opacity:0.5, side:THREE.DoubleSide, depthWrite:false }));
+    r.rotation.x=-Math.PI/2; r.position.y=-0.45; g.add(r); rings.push(r); }
+  g.__rings=rings; g.__rs=s*1.5; g.__anim={t:'oasis'};
   g.position.set(x,0,z); addDecor(g);
-  for(let i=0;i<6;i++){ const a=i/6*6.28; dPalm(x+Math.cos(a)*s*2.0, z+Math.sin(a)*s*2.0, 1.0+Math.random()*0.6); }
+  for(let i=0;i<6;i++){ const a=i/6*6.28; dPalm(x+Math.cos(a)*s*1.9, z+Math.sin(a)*s*1.9, 0.85+Math.random()*0.6); }
 }
 // ---- a continuous, wavy dune ridge spanning the whole view at depth z (wide low mounds heavily
 // overlapping so they merge into one rolling ridge-line). Stack several bands for receding dunes. ----
@@ -2114,7 +2147,7 @@ function dGiza(cx,cz){
 function dPyramidH(x,z,base,height,col){ const m=new THREE.Mesh(new THREE.ConeGeometry(base,height,4), dMat(col));
   m.rotation.y=Math.PI/4; m.position.set(x,-1.4+height/2,z); addDecor(m); }
 // a crisp dark pyramid SILHOUETTE on the far horizon (fog-independent so it reads as a clean silhouette)
-function dPyrSil(x,z,base,height){ const m=new THREE.Mesh(new THREE.ConeGeometry(base,height,4), new THREE.MeshBasicMaterial({ color:0x2a2240, fog:false }));
+function dPyrSil(x,z,base,height){ const m=new THREE.Mesh(new THREE.ConeGeometry(base,height,4), new THREE.MeshBasicMaterial({ color:0x231c14, fog:false }));   // warm-dark silhouette (not blue)
   m.rotation.y=Math.PI/4; m.position.set(x,-1.4+height/2,z); addDecor(m); }
 function buildBackdrop(era){
   if (!era || era.key === _backdropEra) return;          // only rebuild when the era actually changes
@@ -2136,8 +2169,9 @@ function buildBackdrop(era){
       // 2D layered dune horizon (vertical ridge billboards ringing the scene; near richer, far hazier)
       duneRing(40, 4.0, '#c6a468', 18, 1.0); duneRing(56, 5.5, '#d4bf90', 16, 0.95); duneRing(72, 7.0, '#dcccA0', 13, 0.9);   // lower dunes so the pyramids behind them stay visible
       dCaravan(-10,-50,5,1.5);                                         // a static camel caravan, far back on the horizon
+      dOasis(38,-34,3.2);                                             // an oasis far off but observable, with rippling water + palms
       ringPlace(6,24,40,(x,z)=>dObelisk(x,z,3+Math.random()*2));
-      ringPlace(5,20,40,(x,z)=>dPalm(x,z,0.9+Math.random()*0.6));
+      ringPlace(14,19,44,(x,z)=>dPalm(x,z,0.7+Math.random()*1.0));      // many more palms, all different sizes
       ringPlace(12,18,42,(x,z)=>dRock(x,z,0.5+Math.random()*0.7,0x8a6a44));
       for(let i=0;i<6;i++){ const a=Math.random()*6.28,d=30+Math.random()*20; dCloud(Math.sin(a)*d,8+Math.random()*5,Math.cos(a)*d,2.2+Math.random()*2.0); }
       dBirds(9,0x3a2a22,26); dBirds(7,0x2a2018,38);                     // flocks wheeling over the desert
