@@ -768,7 +768,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.182 · 2026.06.09</div>
+  <div id="appVersion">v1.183 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1785,8 +1785,9 @@ function applyEraBlockTex(mat){
       if (t && t.map){            // real Poly Haven sandstone
         mat.map=t.map; if(t.normalMap) mat.normalMap=t.normalMap; if(t.roughnessMap) mat.roughnessMap=t.roughnessMap;
         mat.bumpMap=null; mat.roughness=1.0; mat.metalness=0.0;
-        if (mat.color && mat.color.setRGB) mat.color.setRGB(1,1,1);   // let the diffuse show at its true (light) brightness — no darkening tint
-        if (mat.normalScale && mat.normalScale.set) mat.normalScale.set(3.0,3.0);   // heavy relief → rough, rocky pyramid-stone surface
+        const j=0.8+Math.random()*0.2;                               // per-block tone jitter → irregular masonry, not one flat colour
+        if (mat.color && mat.color.setRGB) mat.color.setRGB(j, j*0.97, j*0.9);
+        if (mat.normalScale && mat.normalScale.set) mat.normalScale.set(3.2,3.2);   // heavy relief → rough, rocky pyramid-stone surface
         mat.needsUpdate=true; return;
       }
       const s=sandstoneTex();     // procedural fallback
