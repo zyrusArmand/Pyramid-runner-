@@ -768,7 +768,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.193 · 2026.06.09</div>
+  <div id="appVersion">v1.194 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1918,6 +1918,9 @@ function ridgeTex(rgb){ if (_ridgeTex[rgb]!==undefined) return _ridgeTex[rgb]; _
     x.fillStyle=rgb; x.beginPath(); x.moveTo(0,h);
     for(let i=0;i<=w;i+=5){ const t=i/w; const y=h*0.46 + Math.sin(t*6.28*1.4+0.6)*h*0.20 + Math.sin(t*6.28*3.1+2)*h*0.10 + Math.sin(t*6.28*6.5)*h*0.04; x.lineTo(i,y); }
     x.lineTo(w,h); x.closePath(); x.fill();
+    // fade the BOTTOM of the dune to transparent so the billboard blends into the sand instead of a hard edge
+    const grad=x.createLinearGradient(0,h*0.55,0,h); grad.addColorStop(0,'rgba(0,0,0,0)'); grad.addColorStop(1,'rgba(0,0,0,1)');
+    x.globalCompositeOperation='destination-out'; x.fillStyle=grad; x.fillRect(0,h*0.55,w,h*0.45); x.globalCompositeOperation='source-over';
     const tex=new THREE.CanvasTexture(c); _ridgeTex[rgb]=tex;
   } catch(e){ _ridgeTex[rgb]=null; } return _ridgeTex[rgb]; }
 function dCloud(x,y,z,s){
@@ -2181,7 +2184,9 @@ function buildBackdrop(era){
       // 2D layered dune horizon (vertical ridge billboards ringing the scene; near richer, far hazier)
       duneRing(40, 4.0, '#c6a468', 18, 1.0); duneRing(56, 5.5, '#d4bf90', 16, 0.95); duneRing(72, 7.0, '#dcccA0', 13, 0.9);   // lower dunes so the pyramids behind them stay visible
       dCaravan(-10,-50,5,1.5);                                         // a static camel caravan, far back on the horizon
-      dOasis(-9,-23,4.4);                                             // a bigger oasis, closer & centre-left — unmistakable tall-palm cluster + open rippling water
+      dOasis(-3,-35,4.2);                                             // an oasis mid-distance, centre (where circled), at the foot of the dunes
+      // 3D sand mounds at the foot of the dune ring → the flat ground rolls UP into the dunes, smoothing the hard seam
+      ringPlace(30,30,46,(x,z)=>dDune(x,z,2.4+Math.random()*3.6));
       ringPlace(6,24,40,(x,z)=>dObelisk(x,z,3+Math.random()*2));
       ringPlace(22,18,48,(x,z)=>dPalm(x,z,0.7+Math.random()*1.1));      // many more palms, all different sizes, scattered around
       ringPlace(20,18,46,(x,z)=>dRock(x,z,0.45+Math.random()*0.9,0x8a6a44));   // more rocks
