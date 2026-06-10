@@ -771,7 +771,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.213 · 2026.06.10</div>
+  <div id="appVersion">v1.214 · 2026.06.10</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -4740,7 +4740,10 @@ function animate(){
   });
 
   if (S.phase==='run'){ if (!S.paused) updateRun(sdt); }
-  else if (atMenu){ camera.position.set(0, 4.0, 13.0); camera.lookAt(0, 1.6, 0); }   // FIXED menu framing (independent of level) so the backdrop composition is consistent
+  else if (atMenu){                                  // FIXED menu framing (level-independent) with a gentle parallax sway
+    const a = Math.sin(performance.now()*0.00022)*0.16;
+    camera.position.set(Math.sin(a)*13.0, 4.0, Math.cos(a)*13.0); camera.lookAt(0, 1.6, 0);
+  }
   else updateBuildCam(dt);
 
   if (composer) composer.render(); else renderer.render(scene, camera);
