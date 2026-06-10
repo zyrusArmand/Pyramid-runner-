@@ -771,7 +771,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.203 · 2026.06.10</div>
+  <div id="appVersion">v1.204 · 2026.06.10</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1982,7 +1982,9 @@ function dCaravan(x,z,n,s){
 // ---- a desert oasis: a still pool ringed with grass + palms ----
 function dOasis(x,z,s){
   const g=new THREE.Group();
-  const water=new THREE.Mesh(new THREE.CircleGeometry(s*2.0,32), new THREE.MeshStandardMaterial({ color:0x2c87a6, metalness:0.4, roughness:0.1, emissive:0x176f8c, emissiveIntensity:0.6 }));   // a touch darker, still luminous
+  // LOW metalness + strong teal emissive so the surface reads as solid teal water — a reflective surface
+  // here just mirrors the warm sky and the centre washes out to sand-colour ("sand on top"). This stays teal.
+  const water=new THREE.Mesh(new THREE.CircleGeometry(s*2.0,32), new THREE.MeshStandardMaterial({ color:0x1f6f8c, metalness:0.0, roughness:0.55, emissive:0x1d7e9a, emissiveIntensity:0.95 }));
   water.rotation.x=-Math.PI/2; water.position.y=-0.43; g.add(water);
   const rings=[];
   // ONE ripple expanding from the centre, built as a short open cylinder so it has a small raised wave-lip
