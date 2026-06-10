@@ -771,7 +771,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.208 · 2026.06.10</div>
+  <div id="appVersion">v1.209 · 2026.06.10</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1822,7 +1822,7 @@ coverPyramid.castShadow = true; coverPyramid.__env = true; scene.add(coverPyrami
 // while a game is running, just like the cover pyramid.
 const menuAztec = (function(){
   const g = new THREE.Group();
-  const s = 8, tiers = 12, hStep = s*0.058, baseW = s, topW = s*0.32;       // many SMALL steps, tapering in
+  const s = 6.5, tiers = 12, hStep = s*0.06, baseW = s, topW = s*0.32;      // many SMALL steps, tapering in
   const stone = ()=> new THREE.MeshStandardMaterial({ color:0xb59164, roughness:0.96, metalness:0.0, emissive:0x2a1c0c, emissiveIntensity:0.4, flatShading:true });
   for (let i=0;i<tiers;i++){ const t=i/(tiers-1), w=baseW+(topW-baseW)*t;
     const b=new THREE.Mesh(new THREE.BoxGeometry(w, hStep, w), stone());
@@ -1840,7 +1840,7 @@ const menuAztec = (function(){
   for (let i=0;i<tiers;i++){ const tt=i/(tiers-1), yy=hStep*0.5+tt*(topY-hStep), zz=baseW/2+(topW/2-baseW/2)*tt+0.14;
     const tr=new THREE.Mesh(new THREE.BoxGeometry(s*0.24, hStep*0.5, hStep*0.5), stairMat);
     tr.position.set(0, yy, zz); g.add(tr); }
-  g.position.set(9.5, -0.5, -2); g.rotation.y = -0.45;        // to the right, angled so the staircase faces the camera
+  g.position.set(5.2, -0.5, -1.2); g.rotation.y = -0.3;      // right of the title, in frame; staircase angled toward the camera
   g.__env = true; scene.add(g);
   return g;
 })();
