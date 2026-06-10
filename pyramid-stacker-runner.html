@@ -768,7 +768,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.178 · 2026.06.09</div>
+  <div id="appVersion">v1.179 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1767,12 +1767,12 @@ function loadEgyptPBR(){
   if (_egyptPBR!==0) return _egyptPBR; _egyptPBR=null;
   try {
     if (!_texLoader) _texLoader = new THREE.TextureLoader();
-    const B='assets/', SET='old_sandstone_02';     // current Egypt sandstone set (swap this name to A/B different downloads)
+    const B='assets/', SET='worn_rock_natural_01';     // current Egypt sandstone set (swap this name to A/B different downloads)
     const map=_texLoader.load(B+SET+'_diff_1k.jpg');
     const nor=_texLoader.load(B+SET+'_nor_gl_1k.png');
     const rgh=_texLoader.load(B+SET+'_rough_1k.jpg');
     [map,nor,rgh].forEach(t=>{ if(t){ t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(2,2); } });
-    if (map && THREE.sRGBEncoding!==undefined) map.encoding=THREE.sRGBEncoding;   // diffuse is colour data (sRGB)
+    // NOTE: deliberately NOT setting sRGB encoding — this renderer outputs linear, so decoding would crush the stone dark.
     _egyptPBR={ map, normalMap:nor, roughnessMap:rgh };
   } catch(e){ _egyptPBR=null; }
   return _egyptPBR;
@@ -1785,7 +1785,7 @@ function applyEraBlockTex(mat){
       if (t && t.map){            // real Poly Haven sandstone
         mat.map=t.map; if(t.normalMap) mat.normalMap=t.normalMap; if(t.roughnessMap) mat.roughnessMap=t.roughnessMap;
         mat.bumpMap=null; mat.roughness=1.0; mat.metalness=0.0;
-        if (mat.color && mat.color.lerp) mat.color.lerp(new THREE.Color(1,1,1), 0.55);   // brighten so the diffuse reads true (keep a little per-layer tint)
+        if (mat.color && mat.color.setRGB) mat.color.setRGB(1,1,1);   // let the diffuse show at its true (light) brightness — no darkening tint
         if (mat.normalScale && mat.normalScale.set) mat.normalScale.set(0.8,0.8);
         mat.needsUpdate=true; return;
       }
@@ -3198,7 +3198,8 @@ function startRun(){
       if (!plate.material) return;
       let m = plate.material;
       if (m.clone){ m = m.clone(); plate.material = m;
-        if (m.color && m.color.multiplyScalar) m.color.multiplyScalar(idx % 2 === 1 ? 0.72 : 1.05); }   // deeper shadow band + lifted lit band → crisper staircase
+        if (m.color && m.color.multiplyScalar){ const eg=(curStone==='sand'&&curEra&&curEra.key==='egypt');
+          m.color.multiplyScalar(idx % 2 === 1 ? (eg?0.9:0.72) : (eg?1.02:1.05)); } }   // gentler banding on textured Egypt so rows don't go dark
       m.roughness = 0.95; m.metalness = 0.0;
       if (!(curStone==='sand' && curEra && curEra.key==='egypt')){ m.bumpMap = null; m.bumpScale = 0; }   // Egypt keeps its sandstone PBR maps; others go clean matte
       m.needsUpdate = true;
