@@ -789,7 +789,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.216 · 2026.06.10</div>
+  <div id="appVersion">v1.217 · 2026.06.10</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1880,7 +1880,7 @@ function animateBackdrop(T){
       const ang = a.ph + T*a.spd;
       o.position.set(a.d*Math.sin(ang), a.y + Math.sin(T*0.4+a.ph)*1.1, a.d*Math.cos(ang));
       o.rotation.y = -ang;
-      const bb=o.__birds; if (bb){ for (let k=0;k<bb.length;k++){ const bd=bb[k]; if (bd.__w){ const f=Math.sin(T*7+bd.__ph)*0.6; bd.__w[0].rotation.z=f; bd.__w[1].rotation.z=-f; } } }
+      const bb=o.__birds; if (bb){ for (let k=0;k<bb.length;k++){ const bd=bb[k]; if (bd.__w){ const f=Math.sin(T*7+bd.__ph)*0.45; bd.__w[0].rotation.z=0.28+f; bd.__w[1].rotation.z=-(0.28+f); } } }
     }
   }
 }
@@ -2154,17 +2154,19 @@ function dFloatIsland(x,y,z,s){ const g=new THREE.Group();   // EMPYREAN floatin
 // a flock of birds wheeling high over the scene (themed colour); flaps + orbits via the 'bird' anim type
 function dBirds(count, col, radius){
   const flock=new THREE.Group(), birds=[];
+  const c = col==null?0x2a2018:col;
   for(let i=0;i<count;i++){
-    const b=new THREE.Group(), wMat=dMat(col==null?0x2a2a2e:col);
-    const body=new THREE.Mesh(new THREE.SphereGeometry(0.1,7,6), wMat); body.scale.set(0.7,0.6,2.2); b.add(body);            // small slim body
-    // swept-back gull wings (thin tapered blades, angled rearward)
+    const b=new THREE.Group();
+    const wMat=new THREE.MeshBasicMaterial({ color:c, fog:true });
+    const body=new THREE.Mesh(new THREE.BoxGeometry(0.13,0.13,0.55), wMat); b.add(body);   // tiny body
+    // two thin wing bars angled up into a shallow V — the classic seagull silhouette, reads at any distance
     const mkWing=(sx)=>{ const piv=new THREE.Group();
-      const w=new THREE.Mesh(new THREE.ConeGeometry(0.16,1.2,4), wMat); w.scale.set(1,0.07,0.42);                            // thin flat blade
-      w.rotation.z = sx>0 ? -Math.PI/2 : Math.PI/2; w.position.x = sx*0.6;
-      piv.add(w); piv.rotation.y = sx*0.32;                                                                                   // sweep the wings back
-      b.add(piv); return piv; };
+      const w=new THREE.Mesh(new THREE.BoxGeometry(1.05,0.1,0.24), wMat); w.position.x = sx*0.58;
+      piv.add(w); b.add(piv); return piv; };
     const wL=mkWing(-1), wR=mkWing(1);
+    wL.rotation.z=0.28; wR.rotation.z=-0.28;                                                // base V
     b.__w=[wL,wR]; b.__ph=Math.random()*6.28;
+    const sc=0.8+Math.random()*0.5; b.scale.set(sc,sc,sc);
     b.position.set((Math.random()-0.5)*7,(Math.random()-0.5)*3.5,(Math.random()-0.5)*7);
     flock.add(b); birds.push(b);
   }
@@ -2212,18 +2214,18 @@ function buildBackdrop(era, level){
       dSphinx(18,-26,2.8);                                             // a proper Sphinx, off to one side facing in
       dSphinx(-30,20,1.7);
       // 2D layered dune horizon (vertical ridge billboards ringing the scene; near richer, far hazier)
-      // angle of the oasis (-4,-26) in duneRing's (sin,cos) convention → leave an open gap there so no sand band sits behind the pool
-      const oasisAng=(Math.atan2(-4,-26)+6.283)%6.283;
+      // angle of the oasis (-13,-21) in duneRing's (sin,cos) convention → leave an open gap there so no sand band sits behind the pool
+      const oasisAng=(Math.atan2(-13,-21)+6.283)%6.283;
       duneRing(40, 4.0, '#c6a468', 18, 1.0, oasisAng, 0.55); duneRing(56, 5.5, '#d4bf90', 16, 0.95, oasisAng, 0.45); duneRing(72, 7.0, '#dcccA0', 13, 0.9);   // lower dunes so the pyramids behind them stay visible
       dCaravan(-10,-50,5,1.5);                                         // a static camel caravan, far back on the horizon
-      dOasis(-4,-26,4.2);                                             // an oasis centre, in FRONT of the dune mounds so nothing hides the water
+      dOasis(-13,-21,4.2);                                            // an oasis to the LEFT of the pyramid (offset off-centre + closer) so it stays visible in-frame at every level
       // ---- THE OASIS KEEP-OUT ----------------------------------------------------------------------
       // One protected zone around the pool. EVERY random prop (sand, rocks, palms, obelisks) must clear it,
       // so the oasis always loads in completely unbothered no matter how the rest of the scene shuffles.
       // The zone is stretched BEHIND the pool (more-negative z) because, from the low camera, anything back
       // there visually rises up over the far water edge and reads as "sand on top".
       // clear(x,z,margin) → true when the point is safely outside the pool + margin.
-      const OAS={ x:-4, z:-26, r:9 };   // pool centre + water radius (s*2.0≈8.4, rounded up)
+      const OAS={ x:-13, z:-21, r:9 };   // pool centre + water radius (s*2.0≈8.4, rounded up)
       const clearOasis=(x,z,margin)=>{ const dx=x-OAS.x, dz=z-OAS.z, eff=dz<0?dz*2.1:dz; return Math.hypot(dx,eff) > OAS.r + (margin==null?6:margin); };
       // scattered random props — each respects the keep-out (bigger margin for bigger things)
       ringPlace(6,24,40,(x,z)=>{ if(clearOasis(x,z,7)) dObelisk(x,z,3+Math.random()*2); });
@@ -3434,7 +3436,9 @@ function updateRun(dt){
 
   setSpeedFx(0);                                    // off by default; the active-climb branch dials it up with speed
 
-  if (r.awaitStart){ overviewCam(dt); placeShadow(g, r); return; }   // holding on the rating screen; show the whole pyramid
+  if (r.awaitStart){                                                  // holding on the rating screen; show the whole pyramid + surroundings
+    scene.fog.far += (82 - scene.fog.far) * Math.min(1, dt*1.1); scene.fog.near = scene.fog.far * 0.28;
+    overviewCam(dt); placeShadow(g, r); return; }
 
   if (r.falling){
     r.fallV -= 12*dt; g.position.y += r.fallV*dt; g.rotation.z += dt*4;
@@ -3448,6 +3452,8 @@ function updateRun(dt){
 
   if (r.celebrating){                               // VICTORY: planted on the summit, both fists thrown straight up
     r.celebT = (r.celebT || 0) + dt;
+    scene.fog.far += (82 - scene.fog.far) * Math.min(1, dt*1.1);     // pull the fog WAY back so the desert surroundings (oasis, dunes, pyramids) reveal behind the conquered pyramid
+    scene.fog.near = scene.fog.far * 0.28;
     const top = r.tiles[r.tiles.length-1].pos;
     const cs = RUN_SCALE * (1 + 0.25*Math.min(r.celebT/0.6, 1));       // a subtle settle to ~1.25x — no jarring giant-grow
     g.position.set(top.x, top.y, top.z);                              // feet planted — no jumping
