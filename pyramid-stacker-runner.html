@@ -771,7 +771,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.204 · 2026.06.10</div>
+  <div id="appVersion">v1.205 · 2026.06.10</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -2195,15 +2195,21 @@ function buildBackdrop(era){
       // (more-negative z) because, from the low camera, any mound back there visually rises over the far
       // water edge and reads as "sand on top". dz<0 = behind the pool → counted ~2× → wider clear zone.
       const offOasis=(x,z)=>{ const dx=x+4, dz=z+26; const eff=dz<0?dz*2.1:dz; return Math.hypot(dx, eff) > 22; };
-      // 3D sand mounds at the foot of the dune ring → the flat ground rolls UP into the dunes, smoothing the hard seam
-      ringPlace(30,32,48,(x,z)=>{ if(offOasis(x,z)) dDune(x,z,2.4+Math.random()*3.6); });
       ringPlace(6,24,40,(x,z)=>dObelisk(x,z,3+Math.random()*2));
       ringPlace(9,20,48,(x,z)=>dPalm(x,z,0.6+Math.random()*0.8));       // a handful of smaller scattered palms (decluttered)
       ringPlace(18,18,46,(x,z)=>{ if(offOasis(x,z)) dRock(x,z,0.45+Math.random()*0.9,0x8a6a44); });   // rocks (kept off the pool too)
-      ringPlace(14,36,54,(x,z)=>{ if(offOasis(x,z)) dDune(x,z,1.8+Math.random()*2.6); });   // low sand waves beyond the oasis
-      // little sand waves scattered across the surrounding ground — small & low, kept clear of the oasis pool
-      for(let i=0;i<34;i++){ const a=Math.random()*6.28, d=18+Math.random()*34, sx=Math.sin(a)*d, sz=Math.cos(a)*d;
-        if (offOasis(sx,sz)) dDune(sx, sz, 0.9+Math.random()*1.6); }
+      // 3D sand mounds — FIXED set positions [x, z, size] (no longer random). Big mounds ring the dune
+      // foot so the flat ground rolls up into the dunes; low waves & small ripples fill the surrounding sand.
+      // All chosen to sit clear of the oasis pool (offOasis guard kept as a safety net).
+      const SAND=[
+        // big mounds at the dune-ring foot
+        [-38,-18,4.2],[38,-22,4.6],[44,2,3.8],[40,24,4.4],[20,40,4.0],[-18,42,4.6],[-40,28,4.2],[-46,4,3.6],[8,-44,4.0],[30,-36,4.2],
+        // low sand waves
+        [28,-12,2.6],[34,14,2.4],[16,30,2.8],[-12,34,2.6],[-30,16,2.4],[-34,-8,2.6],[24,-28,2.4],[-46,-10,2.2],[46,-4,2.4],[12,44,2.6],[-26,-40,2.4],
+        // small ripples
+        [22,-6,1.4],[26,8,1.2],[14,22,1.6],[-10,26,1.4],[-22,10,1.2],[-26,-4,1.5],[18,-16,1.3],[30,2,1.4],[8,30,1.5],[-16,18,1.2],[20,18,1.4],[-26,-30,1.3],[16,-30,1.3],[-32,-26,1.4]
+      ];
+      for (const [sx,sz,ss] of SAND){ if (offOasis(sx,sz)) dDune(sx,sz,ss); }
       for(let i=0;i<11;i++){ const a=Math.random()*6.28,d=28+Math.random()*22; dCloud(Math.sin(a)*d,8+Math.random()*6,Math.cos(a)*d,2.0+Math.random()*2.2); }   // more clouds
       dBirds(9,0x3a2a22,26); dBirds(7,0x2a2018,38);                     // flocks wheeling over the desert
       dSnake(10,-12,1.3); dSnake(-15,7,-0.7); dSnake(6,16,2.4);          // snakes slithering across the sand
