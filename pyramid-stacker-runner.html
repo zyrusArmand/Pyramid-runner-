@@ -768,7 +768,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.186 · 2026.06.09</div>
+  <div id="appVersion">v1.187 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -2123,8 +2123,13 @@ function dBirds(count, col, radius){
   const flock=new THREE.Group(), birds=[];
   for(let i=0;i<count;i++){
     const b=new THREE.Group(), wMat=dMat(col==null?0x2a2a2e:col);
-    const wL=new THREE.Mesh(new THREE.BoxGeometry(0.95,0.05,0.34), wMat); wL.position.x=-0.5; b.add(wL);
-    const wR=new THREE.Mesh(new THREE.BoxGeometry(0.95,0.05,0.34), wMat); wR.position.x= 0.5; b.add(wR);
+    const body=new THREE.Mesh(new THREE.SphereGeometry(0.14,8,6), wMat); body.scale.set(0.55,0.5,1.8); b.add(body);          // slim body
+    const head=new THREE.Mesh(new THREE.SphereGeometry(0.09,7,6), wMat); head.position.z=0.26; b.add(head);                  // head forward
+    const tail=new THREE.Mesh(new THREE.ConeGeometry(0.09,0.36,4), wMat); tail.scale.set(1.8,0.18,1); tail.rotation.x=Math.PI/2; tail.position.z=-0.34; b.add(tail);   // fanned tail
+    const mkWing=(sx)=>{ const piv=new THREE.Group();
+      const w=new THREE.Mesh(new THREE.ConeGeometry(0.19,1.15,4), wMat); w.scale.set(1,0.1,0.5);                              // flat, tapered wing
+      w.rotation.z = sx>0 ? -Math.PI/2 : Math.PI/2; w.position.x = sx*0.58; piv.add(w); b.add(piv); return piv; };
+    const wL=mkWing(-1), wR=mkWing(1);
     b.__w=[wL,wR]; b.__ph=Math.random()*6.28;
     b.position.set((Math.random()-0.5)*7,(Math.random()-0.5)*3.5,(Math.random()-0.5)*7);
     flock.add(b); birds.push(b);
