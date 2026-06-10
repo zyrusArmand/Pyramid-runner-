@@ -163,6 +163,8 @@
   #ratingStars { font-size:clamp(36px,12vw,68px); letter-spacing:7px; text-shadow:0 2px 18px rgba(0,0,0,.7); }
   #ratingPhrase { font-family:'Cinzel',serif; font-weight:700; font-size:clamp(20px,6vw,34px); letter-spacing:3px; text-shadow:0 2px 14px rgba(0,0,0,.8); }
   #ratingSub { font-size:12px; letter-spacing:4px; opacity:.75; color:#f6e9d2; }
+  #ratingLevel { font-family:'Space Mono',monospace; font-size:10px; letter-spacing:3px; color:#e7d3a6; opacity:.85; text-align:center; line-height:1.5; }
+  #ratingLevel span { font-family:'Cinzel',serif; font-weight:700; font-size:15px; letter-spacing:1.5px; color:#ffe9b8; }
   #ratingReward { font-size:13px; letter-spacing:2px; color:#ffe0a0; text-shadow:0 1px 8px rgba(0,0,0,.7); margin-top:2px; }
   #climbBtn { position:absolute; bottom:max(40px,calc(env(safe-area-inset-bottom) + 26px)); z-index:2; pointer-events:auto; }
   @keyframes ratePop { 0%{transform:scale(.55);opacity:0;} 45%{transform:scale(1.14);opacity:1;} 100%{transform:scale(1);opacity:1;} }
@@ -585,6 +587,7 @@
   <div id="ratingFoot"></div>
   <div id="ratingFlames"></div>
   <div id="ratingTop">
+    <div id="ratingLevel"></div>
     <div id="ratingSub">PYRAMID COMPLETE</div>
     <div id="ratingStars"></div>
     <div id="ratingPhrase"></div>
@@ -768,7 +771,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.194 · 2026.06.09</div>
+  <div id="appVersion">v1.195 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -2172,9 +2175,9 @@ function buildBackdrop(era){
     // NB: nothing is placed inside ~18 units so the props never block the camera's view of the pyramid.
     if (era.key === 'egypt'){
       // pyramid silhouettes ringing the horizon — a FAR layer (very distant) + a MID layer (closer, more present), both tall enough that clean peaks clear the dune line
-      for (let i=0;i<22;i++){ const a=(i/22)*6.28 + (Math.random()-0.5)*0.25, d=82+Math.random()*22, h=15+Math.random()*9;
+      for (let i=0;i<18;i++){ const a=(i/18)*6.28 + (Math.random()-0.5)*0.12, d=84+Math.random()*20, h=15+Math.random()*9;
         dPyrSil(Math.sin(a)*d, Math.cos(a)*d, h*(0.5+Math.random()*0.15), h); }
-      for (let i=0;i<14;i++){ const a=(i/14)*6.28 + (Math.random()-0.5)*0.3, d=56+Math.random()*18, h=11+Math.random()*8;
+      for (let i=0;i<9;i++){ const a=(i/9)*6.28 + 0.35 + (Math.random()-0.5)*0.1, d=58+Math.random()*16, h=11+Math.random()*7;   // evenly spaced + offset from the far ring so they don't sit in front of each other
         dPyrSil(Math.sin(a)*d, Math.cos(a)*d, h*(0.5+Math.random()*0.15), h); }
       // CLOSE 3D pyramids you read clearly in three dimensions (lit sandstone)
       dPyramidH(-24,-30, 6, 9, 0x8a6a44); dPyramidH(26,-34, 7, 10, 0x7e6038); dPyramidH(-40,-40, 5, 7.5, 0x8a6a44);
@@ -2184,9 +2187,9 @@ function buildBackdrop(era){
       // 2D layered dune horizon (vertical ridge billboards ringing the scene; near richer, far hazier)
       duneRing(40, 4.0, '#c6a468', 18, 1.0); duneRing(56, 5.5, '#d4bf90', 16, 0.95); duneRing(72, 7.0, '#dcccA0', 13, 0.9);   // lower dunes so the pyramids behind them stay visible
       dCaravan(-10,-50,5,1.5);                                         // a static camel caravan, far back on the horizon
-      dOasis(-3,-35,4.2);                                             // an oasis mid-distance, centre (where circled), at the foot of the dunes
+      dOasis(-4,-26,4.2);                                             // an oasis centre, in FRONT of the dune mounds so nothing hides the water
       // 3D sand mounds at the foot of the dune ring → the flat ground rolls UP into the dunes, smoothing the hard seam
-      ringPlace(30,30,46,(x,z)=>dDune(x,z,2.4+Math.random()*3.6));
+      ringPlace(30,32,48,(x,z)=>dDune(x,z,2.4+Math.random()*3.6));
       ringPlace(6,24,40,(x,z)=>dObelisk(x,z,3+Math.random()*2));
       ringPlace(22,18,48,(x,z)=>dPalm(x,z,0.7+Math.random()*1.1));      // many more palms, all different sizes, scattered around
       ringPlace(20,18,46,(x,z)=>dRock(x,z,0.45+Math.random()*0.9,0x8a6a44));   // more rocks
@@ -2873,6 +2876,7 @@ function showRating(){
   $('ratingStars').textContent = '★'.repeat(stars) + '☆'.repeat(5-stars);
   $('ratingStars').style.color = r.col;
   $('ratingPhrase').textContent = r.phrase; $('ratingPhrase').style.color = r.col;
+  { const b=biomeFor(gameLevel), e=$('ratingLevel'); if (e) e.innerHTML = 'LEVEL ' + gameLevel + ' · ' + b.era + '<br><span>' + b.name + '</span>'; }
   // VIGNETTE tint — clear in the middle so you can see the whole pyramid you built behind it
   const tint = $('ratingTint');
   tint.classList.remove('storm','sun');
