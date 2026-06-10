@@ -771,7 +771,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.195 · 2026.06.09</div>
+  <div id="appVersion">v1.196 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1879,20 +1879,22 @@ function dPalm(x,z,s){
     const seg=new THREE.Mesh(new THREE.CylinderGeometry(r*0.9,r,segH*1.12,8), trunkMat);
     seg.position.set(mx,my,0); seg.rotation.z=-Math.atan2(bp.x-a.x, bp.y-a.y); seg.castShadow=true; p.add(seg); }
   const crownY=pts[nseg].y, cx=pts[nseg].x;
-  // feathered fronds that ARCH — rise out of the crown then curve down at the tip (natural palm sweep)
-  const nF=9;
+  // realistic pinnate fronds — an arching central spine with rows of thin pointed leaflets feathering off each side
+  const nF=11;
   for(let f=0;f<nF;f++){
-    const fr=new THREE.Group(); const len=1.9*s, green=[0x3f7a33,0x4d8c3d,0x356b2c][f%3], ribMat=dMat(0x4a6e2e);
-    const nL=7;
+    const fr=new THREE.Group(), len=2.0*s, green=[0x3f7a33,0x4d8c3d,0x356b2c,0x447f38][f%4], ribMat=dMat(0x46682c);
+    const nL=11;
     for(let l=0;l<=nL;l++){ const t=l/nL, px=t*len;
-      const py=(Math.sin(t*Math.PI*0.62)*0.5 - t*t*0.95)*s;            // arch: up then drooping down at the tip
-      // rib bead along the arched midrib
-      const rb=new THREE.Mesh(new THREE.SphereGeometry(0.03*s,5,4), ribMat); rb.position.set(px,py,0); fr.add(rb);
+      const py=(Math.sin(t*Math.PI*0.55)*0.42 - t*t*1.05)*s;            // arch: rise then droop toward the tip
+      const rb=new THREE.Mesh(new THREE.CylinderGeometry(0.018*s,0.026*s,len/nL*1.1,5), ribMat); rb.position.set(px,py,0); rb.rotation.z=Math.PI/2 - (t-0.3)*0.9; fr.add(rb);   // spine segment
       if(l===0) continue;
-      const ll=(0.5-t*0.34)*s;
-      [-1,1].forEach(d=>{ const leaf=new THREE.Mesh(new THREE.ConeGeometry(0.04*s, ll, 4), dMat(green));
-        leaf.scale.set(1,1,0.3); leaf.position.set(px, py, d*0.02*s); leaf.rotation.x=d*0.95; leaf.rotation.z=-0.6 - t*0.4; fr.add(leaf); }); }
-    fr.position.set(cx, crownY, 0); fr.rotation.y=f/nF*6.28 + Math.random()*0.25;
+      const ll=(0.62-t*0.46)*s;                                        // leaflets shorten toward the tip
+      [-1,1].forEach(d=>{ const leaf=new THREE.Mesh(new THREE.ConeGeometry(0.016*s, ll, 4), dMat(green));
+        leaf.scale.set(1,1,0.5); leaf.position.set(px, py, 0);
+        leaf.rotation.z = -1.05 - t*0.45;                              // sweep forward along the frond + droop
+        leaf.rotation.x = d*0.85;                                      // feather out to side d
+        fr.add(leaf); }); }
+    fr.position.set(cx, crownY, 0); fr.rotation.y=f/nF*6.28 + Math.random()*0.18;
     fr.rotation.z=0.1 - Math.random()*0.15;                            // slight lift at the base — the tips droop via the arch
     p.add(fr);
   }
@@ -1994,10 +1996,10 @@ function dOasis(x,z,s){
     r.rotation.x=-Math.PI/2; r.position.y=-0.44; g.add(r); rings.push(r); }
   g.__rings=rings; g.__rs=s*1.6; g.__anim={t:'oasis'};
   g.position.set(x,0,z); addDecor(g);
-  // sporadic palms — random angles, some clustered in twos/threes, all different sizes (not an even ring)
-  for(let i=0;i<10;i++){ const a=Math.random()*6.28, dist=s*(1.25+Math.random()*0.95);
-    const px=x+Math.cos(a)*dist, pz=z+Math.sin(a)*dist; dPalm(px, pz, 1.1+Math.random()*1.3);
-    if (Math.random()<0.45) dPalm(px+(Math.random()-0.5)*1.6, pz+(Math.random()-0.5)*1.6, 0.9+Math.random()*1.1); }   // sometimes a clustered neighbour
+  // a few sporadic palms — random angles, occasional clustered neighbour, varied sizes (decluttered)
+  for(let i=0;i<5;i++){ const a=Math.random()*6.28, dist=s*(1.3+Math.random()*0.9);
+    const px=x+Math.cos(a)*dist, pz=z+Math.sin(a)*dist; dPalm(px, pz, 1.2+Math.random()*1.3);
+    if (Math.random()<0.35) dPalm(px+(Math.random()-0.5)*1.8, pz+(Math.random()-0.5)*1.8, 1.0+Math.random()*1.0); }   // sometimes a clustered neighbour
 }
 // ---- a continuous, wavy dune ridge spanning the whole view at depth z (wide low mounds heavily
 // overlapping so they merge into one rolling ridge-line). Stack several bands for receding dunes. ----
@@ -2191,9 +2193,9 @@ function buildBackdrop(era){
       // 3D sand mounds at the foot of the dune ring → the flat ground rolls UP into the dunes, smoothing the hard seam
       ringPlace(30,32,48,(x,z)=>dDune(x,z,2.4+Math.random()*3.6));
       ringPlace(6,24,40,(x,z)=>dObelisk(x,z,3+Math.random()*2));
-      ringPlace(22,18,48,(x,z)=>dPalm(x,z,0.7+Math.random()*1.1));      // many more palms, all different sizes, scattered around
-      ringPlace(20,18,46,(x,z)=>dRock(x,z,0.45+Math.random()*0.9,0x8a6a44));   // more rocks
-      ringPlace(26,16,46,(x,z)=>dDune(x,z,1.6+Math.random()*2.6));      // low wind-rippled sand waves across the ground
+      ringPlace(9,20,48,(x,z)=>dPalm(x,z,0.8+Math.random()*1.1));       // a handful of scattered palms (decluttered)
+      ringPlace(18,18,46,(x,z)=>dRock(x,z,0.45+Math.random()*0.9,0x8a6a44));   // rocks
+      ringPlace(18,34,54,(x,z)=>dDune(x,z,1.8+Math.random()*2.6));      // low sand waves kept BEYOND the oasis so they don't bury it
       for(let i=0;i<11;i++){ const a=Math.random()*6.28,d=28+Math.random()*22; dCloud(Math.sin(a)*d,8+Math.random()*6,Math.cos(a)*d,2.0+Math.random()*2.2); }   // more clouds
       dBirds(9,0x3a2a22,26); dBirds(7,0x2a2018,38);                     // flocks wheeling over the desert
       dSnake(10,-12,1.3); dSnake(-15,7,-0.7); dSnake(6,16,2.4);          // snakes slithering across the sand
