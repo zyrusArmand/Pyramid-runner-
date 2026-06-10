@@ -771,7 +771,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.207 · 2026.06.10</div>
+  <div id="appVersion">v1.208 · 2026.06.10</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1817,6 +1817,33 @@ const coverPyramid = new THREE.Mesh(new THREE.ConeGeometry(3.7, 5.4, 4),
 coverPyramid.rotation.y = Math.PI/4;                 // a flat face squared to the camera
 coverPyramid.position.set(0, -0.5 + 2.7, 0);         // base seated on the ground line
 coverPyramid.castShadow = true; coverPyramid.__env = true; scene.add(coverPyramid);
+// a realistic stepped Aztec pyramid (El-Castillo style: many small tiers, a front staircase + a temple on
+// top) standing to the RIGHT as a menu backdrop piece. Large overall but finely stepped. Menu-only → hidden
+// while a game is running, just like the cover pyramid.
+const menuAztec = (function(){
+  const g = new THREE.Group();
+  const s = 8, tiers = 12, hStep = s*0.058, baseW = s, topW = s*0.32;       // many SMALL steps, tapering in
+  const stone = ()=> new THREE.MeshStandardMaterial({ color:0xb59164, roughness:0.96, metalness:0.0, emissive:0x2a1c0c, emissiveIntensity:0.4, flatShading:true });
+  for (let i=0;i<tiers;i++){ const t=i/(tiers-1), w=baseW+(topW-baseW)*t;
+    const b=new THREE.Mesh(new THREE.BoxGeometry(w, hStep, w), stone());
+    b.position.y = hStep/2 + i*hStep; b.castShadow=true; g.add(b); }
+  const topY = tiers*hStep;
+  const shrine=new THREE.Mesh(new THREE.BoxGeometry(topW*0.82, hStep*2.4, topW*0.82), stone());   // temple shrine
+  shrine.position.y = topY + hStep*1.2; shrine.castShadow=true; g.add(shrine);
+  const lintel=new THREE.Mesh(new THREE.BoxGeometry(topW*0.94, hStep*0.5, topW*0.94), stone());    // shrine roof lintel
+  lintel.position.y = topY + hStep*2.45; g.add(lintel);
+  // central staircase down the front (+z) face: a solid stair body plus protruding treads
+  const run=(baseW-topW)/2, L=Math.hypot(run, topY), tilt=Math.atan2(run, topY);
+  const stairMat=new THREE.MeshStandardMaterial({ color:0x8a6a40, roughness:1, emissive:0x2a1c0c, emissiveIntensity:0.3, flatShading:true });
+  const ramp=new THREE.Mesh(new THREE.BoxGeometry(s*0.22, L, hStep*0.7), stairMat);
+  ramp.position.set(0, topY/2, (baseW+topW)/4 + hStep*0.25); ramp.rotation.x=-tilt; ramp.castShadow=true; g.add(ramp);
+  for (let i=0;i<tiers;i++){ const tt=i/(tiers-1), yy=hStep*0.5+tt*(topY-hStep), zz=baseW/2+(topW/2-baseW/2)*tt+0.14;
+    const tr=new THREE.Mesh(new THREE.BoxGeometry(s*0.24, hStep*0.5, hStep*0.5), stairMat);
+    tr.position.set(0, yy, zz); g.add(tr); }
+  g.position.set(9.5, -0.5, -2); g.rotation.y = -0.45;        // to the right, angled so the staircase faces the camera
+  g.__env = true; scene.add(g);
+  return g;
+})();
 // low, natural rolling dunes on the horizon (small humps that don't block the skyline)
 const duneMat = new THREE.MeshStandardMaterial({ color:0x946642, roughness:1, bumpMap:SAND_BUMP||undefined, bumpScale:0.1 });
 for (let i=0;i<20;i++){
@@ -3910,6 +3937,7 @@ function startGame(atLevel){
   resetState();
   [...scene.children].forEach(o => { if (o.__env || o===ground || o===sky) return; if (o.isMesh) scene.remove(o); if (o.isGroup) scene.remove(o); });
   if (typeof coverPyramid !== 'undefined' && coverPyramid) coverPyramid.visible = false;   // hide the menu centrepiece during play
+  if (typeof menuAztec !== 'undefined' && menuAztec) menuAztec.visible = false;            // hide the menu Aztec pyramid during play
   S.phase='build';
   if (dailyMode){ __seeded = true; __seed = dailySeed(); } else { __seeded = false; }
   atMenu = false;
@@ -3989,10 +4017,12 @@ function showStart(){            // the main "home" menu (cover art + PLAY / LEA
   // sweep away the just-built (stepped) pyramid + runner so the menu shows the smooth cover pyramid, not your last build
   [...scene.children].forEach(o => { if (o.__env || o===ground || o===sky) return; if (o.isMesh || o.isGroup) scene.remove(o); });
   if (typeof coverPyramid !== 'undefined' && coverPyramid) coverPyramid.visible = true;
+  if (typeof menuAztec !== 'undefined' && menuAztec) menuAztec.visible = true;
   renderHome();
 }
 function renderHome(){
   if (typeof coverPyramid !== 'undefined' && coverPyramid && atMenu) coverPyramid.visible = true;   // menu centrepiece
+  if (typeof menuAztec !== 'undefined' && menuAztec && atMenu) menuAztec.visible = true;            // right-side Aztec pyramid
   // home stat chips were removed — guard in case any of these elements aren't present
   { const e=$('bestScore');  if (e) e.textContent = bestScore; }
   { const e=$('bestHeight'); if (e) e.textContent = (bestHeight||0).toFixed(0)+'m'; }
