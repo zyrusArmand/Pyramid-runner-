@@ -771,7 +771,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.197 · 2026.06.09</div>
+  <div id="appVersion">v1.198 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1845,9 +1845,9 @@ function animateBackdrop(T){
     else if (a.t==='caravan'){                               // a camel caravan plodding across the horizon
       o.position.x += a.spd; if (o.position.x > a.max) o.position.x = a.min;
     }
-    else if (a.t==='oasis'){                                 // expanding water ripples
-      const rings=o.__rings; if (rings){ for (let k=0;k<rings.length;k++){ const ph=((T*0.15 + k/rings.length) % 1);
-        const sc=0.3 + ph*(o.__rs||4); rings[k].scale.set(sc,sc,sc); if (rings[k].material) rings[k].material.opacity=0.55*(1-ph); } }
+    else if (a.t==='oasis'){                                 // small water ripples expanding from scattered points
+      const rings=o.__rings; if (rings){ for (let k=0;k<rings.length;k++){ const ph=((T*0.32 + k*0.618) % 1);
+        const sc=0.15 + ph*(o.__rs||1); rings[k].scale.set(sc,sc,sc); if (rings[k].material) rings[k].material.opacity=0.6*(1-ph); } }
     }
     else if (a.t==='snake'){                                 // a desert snake slithering across the sand
       a.head += a.spd; if (a.head > a.len) a.head = -8;       // crawl forward, then loop back
@@ -1985,14 +1985,16 @@ function dOasis(x,z,s){
   const water=new THREE.Mesh(new THREE.CircleGeometry(s*2.5,32), new THREE.MeshStandardMaterial({ color:0x3fb0d8, metalness:0.4, roughness:0.08, emissive:0x239ec4, emissiveIntensity:0.75 }));   // big & luminous so it clearly reads even from a low/grazing angle
   water.rotation.x=-Math.PI/2; water.position.y=-0.43; g.add(water);
   const rings=[];   // (no sand shore ring — keeps the water fully open/visible)
-  for(let i=0;i<3;i++){ const r=new THREE.Mesh(new THREE.RingGeometry(0.9,1.02,30), new THREE.MeshBasicMaterial({ color:0xd6f2fa, transparent:true, opacity:0.6, side:THREE.DoubleSide, depthWrite:false }));
-    r.rotation.x=-Math.PI/2; r.position.y=-0.44; g.add(r); rings.push(r); }
-  g.__rings=rings; g.__rs=s*2.4; g.__anim={t:'oasis'};
+  // small ripples emanating from a few points on the pool surface
+  for(let i=0;i<7;i++){ const r=new THREE.Mesh(new THREE.RingGeometry(0.9,1.0,28), new THREE.MeshBasicMaterial({ color:0xd6f2fa, transparent:true, opacity:0.55, side:THREE.DoubleSide, depthWrite:false }));
+    r.rotation.x=-Math.PI/2; r.position.set((Math.random()-0.5)*s*2.4, -0.42, (Math.random()-0.5)*s*2.4);   // scattered ripple origins
+    r.__o={x:r.position.x, z:r.position.z}; g.add(r); rings.push(r); }
+  g.__rings=rings; g.__rs=s*0.9; g.__anim={t:'oasis'};   // small ripples
   g.position.set(x,0,z); addDecor(g);
-  // a few sporadic palms ringing the pool edge — random angles, occasional clustered neighbour, varied sizes (decluttered)
-  for(let i=0;i<5;i++){ const a=Math.random()*6.28, dist=s*(2.6+Math.random()*0.9);
-    const px=x+Math.cos(a)*dist, pz=z+Math.sin(a)*dist; dPalm(px, pz, 1.2+Math.random()*1.3);
-    if (Math.random()<0.35) dPalm(px+(Math.random()-0.5)*1.8, pz+(Math.random()-0.5)*1.8, 1.0+Math.random()*1.0); }   // sometimes a clustered neighbour
+  // a few sporadic palms ringing the pool edge — random angles, occasional clustered neighbour, smaller varied sizes
+  for(let i=0;i<5;i++){ const a=Math.random()*6.28, dist=s*(2.5+Math.random()*0.9);
+    const px=x+Math.cos(a)*dist, pz=z+Math.sin(a)*dist; dPalm(px, pz, 0.8+Math.random()*0.8);
+    if (Math.random()<0.35) dPalm(px+(Math.random()-0.5)*1.8, pz+(Math.random()-0.5)*1.8, 0.7+Math.random()*0.7); }   // sometimes a clustered neighbour
 }
 // ---- a continuous, wavy dune ridge spanning the whole view at depth z (wide low mounds heavily
 // overlapping so they merge into one rolling ridge-line). Stack several bands for receding dunes. ----
@@ -2186,9 +2188,12 @@ function buildBackdrop(era){
       // 3D sand mounds at the foot of the dune ring → the flat ground rolls UP into the dunes, smoothing the hard seam
       ringPlace(30,32,48,(x,z)=>dDune(x,z,2.4+Math.random()*3.6));
       ringPlace(6,24,40,(x,z)=>dObelisk(x,z,3+Math.random()*2));
-      ringPlace(9,20,48,(x,z)=>dPalm(x,z,0.8+Math.random()*1.1));       // a handful of scattered palms (decluttered)
+      ringPlace(9,20,48,(x,z)=>dPalm(x,z,0.6+Math.random()*0.8));       // a handful of smaller scattered palms (decluttered)
       ringPlace(18,18,46,(x,z)=>dRock(x,z,0.45+Math.random()*0.9,0x8a6a44));   // rocks
-      ringPlace(18,34,54,(x,z)=>dDune(x,z,1.8+Math.random()*2.6));      // low sand waves kept BEYOND the oasis so they don't bury it
+      ringPlace(14,36,54,(x,z)=>dDune(x,z,1.8+Math.random()*2.6));      // low sand waves beyond the oasis
+      // little sand waves scattered across the surrounding ground — small & low, kept clear of the oasis pool
+      for(let i=0;i<34;i++){ const a=Math.random()*6.28, d=18+Math.random()*34, sx=Math.sin(a)*d, sz=Math.cos(a)*d;
+        if (Math.hypot(sx+4, sz+26) < 15) continue; dDune(sx, sz, 0.9+Math.random()*1.6); }
       for(let i=0;i<11;i++){ const a=Math.random()*6.28,d=28+Math.random()*22; dCloud(Math.sin(a)*d,8+Math.random()*6,Math.cos(a)*d,2.0+Math.random()*2.2); }   // more clouds
       dBirds(9,0x3a2a22,26); dBirds(7,0x2a2018,38);                     // flocks wheeling over the desert
       dSnake(10,-12,1.3); dSnake(-15,7,-0.7); dSnake(6,16,2.4);          // snakes slithering across the sand
