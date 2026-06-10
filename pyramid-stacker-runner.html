@@ -771,7 +771,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.200 · 2026.06.09</div>
+  <div id="appVersion">v1.201 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -2167,6 +2167,11 @@ function dPyrSil(x,z,base,height){ const m=new THREE.Mesh(new THREE.ConeGeometry
 function buildBackdrop(era){
   if (!era || era.key === _backdropEra) return;          // only rebuild when the era actually changes
   _backdropEra = era.key;
+  // DETERMINISTIC layout: seed a pseudo-random from the era name so the scene (oasis, sand, palms, pyramids)
+  // is IDENTICAL every time this era is built — no more shuffling on restart / reload.
+  const _realRandom = Math.random;
+  let _seed = 0; for (let i=0;i<era.key.length;i++) _seed = (_seed*131 + era.key.charCodeAt(i)) >>> 0; _seed = _seed || 1;
+  Math.random = function(){ _seed = (_seed*1103515245 + 12345) & 0x7fffffff; return _seed / 0x7fffffff; };
   try {
     clearEraDecor();
     // NB: nothing is placed inside ~18 units so the props never block the camera's view of the pyramid.
@@ -2252,6 +2257,7 @@ function buildBackdrop(era){
       for(let i=0;i<9;i++){ const a=Math.random()*6.28,d=20+Math.random()*24; dLightBeam(Math.sin(a)*d, Math.cos(a)*d); }
     }
   } catch(e){ /* backdrop is best-effort */ }
+  finally { Math.random = _realRandom; }                 // restore real randomness for gameplay
 }
 
 let sunCore = new THREE.Mesh(new THREE.SphereGeometry(4.2, 28, 18),     // a sphere always reads as a round disk from any angle
