@@ -771,7 +771,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.202 · 2026.06.09</div>
+  <div id="appVersion">v1.203 · 2026.06.10</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -2189,12 +2189,15 @@ function buildBackdrop(era){
       duneRing(40, 4.0, '#c6a468', 18, 1.0); duneRing(56, 5.5, '#d4bf90', 16, 0.95); duneRing(72, 7.0, '#dcccA0', 13, 0.9);   // lower dunes so the pyramids behind them stay visible
       dCaravan(-10,-50,5,1.5);                                         // a static camel caravan, far back on the horizon
       dOasis(-4,-26,4.2);                                             // an oasis centre, in FRONT of the dune mounds so nothing hides the water
-      const offOasis=(x,z)=>Math.hypot(x+4, z+26) > 19;   // keep ALL sand well off the oasis pool (centre -4,-26)
+      // keep ALL sand off the oasis pool (centre -4,-26). The exclusion is stretched BEHIND the pool
+      // (more-negative z) because, from the low camera, any mound back there visually rises over the far
+      // water edge and reads as "sand on top". dz<0 = behind the pool → counted ~2× → wider clear zone.
+      const offOasis=(x,z)=>{ const dx=x+4, dz=z+26; const eff=dz<0?dz*2.1:dz; return Math.hypot(dx, eff) > 22; };
       // 3D sand mounds at the foot of the dune ring → the flat ground rolls UP into the dunes, smoothing the hard seam
       ringPlace(30,32,48,(x,z)=>{ if(offOasis(x,z)) dDune(x,z,2.4+Math.random()*3.6); });
       ringPlace(6,24,40,(x,z)=>dObelisk(x,z,3+Math.random()*2));
       ringPlace(9,20,48,(x,z)=>dPalm(x,z,0.6+Math.random()*0.8));       // a handful of smaller scattered palms (decluttered)
-      ringPlace(18,18,46,(x,z)=>dRock(x,z,0.45+Math.random()*0.9,0x8a6a44));   // rocks
+      ringPlace(18,18,46,(x,z)=>{ if(offOasis(x,z)) dRock(x,z,0.45+Math.random()*0.9,0x8a6a44); });   // rocks (kept off the pool too)
       ringPlace(14,36,54,(x,z)=>{ if(offOasis(x,z)) dDune(x,z,1.8+Math.random()*2.6); });   // low sand waves beyond the oasis
       // little sand waves scattered across the surrounding ground — small & low, kept clear of the oasis pool
       for(let i=0;i<34;i++){ const a=Math.random()*6.28, d=18+Math.random()*34, sx=Math.sin(a)*d, sz=Math.cos(a)*d;
