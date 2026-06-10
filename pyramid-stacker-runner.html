@@ -768,7 +768,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.181 · 2026.06.09</div>
+  <div id="appVersion">v1.182 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1767,11 +1767,11 @@ function loadEgyptPBR(){
   if (_egyptPBR!==0) return _egyptPBR; _egyptPBR=null;
   try {
     if (!_texLoader) _texLoader = new THREE.TextureLoader();
-    const B='assets/', SET='old_sandstone_02';     // current Egypt sandstone set (swap this name to A/B different downloads)
+    const B='assets/', SET='worn_rock_natural_01';     // current Egypt sandstone set (swap this name to A/B different downloads)
     const map=_texLoader.load(B+SET+'_diff_1k.jpg');
     const nor=_texLoader.load(B+SET+'_nor_gl_1k.png');
     const rgh=_texLoader.load(B+SET+'_rough_1k.jpg');
-    [map,nor,rgh].forEach(t=>{ if(t){ t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(4,4); } });   // denser tiling so grain/cracks read
+    [map,nor,rgh].forEach(t=>{ if(t){ t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(3,3); } });   // chunky rough-stone scale
     // NOTE: deliberately NOT setting sRGB encoding — this renderer outputs linear, so decoding would crush the stone dark.
     _egyptPBR={ map, normalMap:nor, roughnessMap:rgh };
   } catch(e){ _egyptPBR=null; }
@@ -1786,7 +1786,7 @@ function applyEraBlockTex(mat){
         mat.map=t.map; if(t.normalMap) mat.normalMap=t.normalMap; if(t.roughnessMap) mat.roughnessMap=t.roughnessMap;
         mat.bumpMap=null; mat.roughness=1.0; mat.metalness=0.0;
         if (mat.color && mat.color.setRGB) mat.color.setRGB(1,1,1);   // let the diffuse show at its true (light) brightness — no darkening tint
-        if (mat.normalScale && mat.normalScale.set) mat.normalScale.set(2.2,2.2);   // strong relief so the surface clearly reads as textured stone
+        if (mat.normalScale && mat.normalScale.set) mat.normalScale.set(3.0,3.0);   // heavy relief → rough, rocky pyramid-stone surface
         mat.needsUpdate=true; return;
       }
       const s=sandstoneTex();     // procedural fallback
