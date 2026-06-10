@@ -768,7 +768,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.192 · 2026.06.09</div>
+  <div id="appVersion">v1.193 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1869,12 +1869,13 @@ function dGlow(c, e){ return new THREE.MeshStandardMaterial({ color:c, emissive:
 function dPyramid(x,z,s,col){ const m=new THREE.Mesh(new THREE.ConeGeometry(s,s*1.4,4), dMat(col)); m.rotation.y=Math.PI/4; m.position.set(x,-1.4+s*0.7,z); addDecor(m); }
 function dPalm(x,z,s){
   const p=new THREE.Group();
-  // tapered, segmented, slightly leaning trunk
-  const trunkMat=dMat(0x7a5a34), segs=7, segH=0.36*s; let lean=0;
-  for(let i=0;i<segs;i++){ const r=(0.165-i*0.014)*s; lean += (0.04+Math.random()*0.03)*s;
-    const seg=new THREE.Mesh(new THREE.CylinderGeometry(r*0.9,r,segH*1.06,8), trunkMat);
-    seg.position.set(lean*0.18, segH*(i+0.5), 0); seg.castShadow=true; p.add(seg); }
-  const crownY=segH*segs, cx=lean*0.18;
+  // tapered trunk that CURVES — a relaxed lean following an arc (not a stiff pole)
+  const trunkMat=dMat(0x7a5a34), nseg=8, segH=0.34*s, bend=(0.7+Math.random()*0.9)*s, bow=1.5+Math.random()*0.6;
+  const pts=[]; for(let i=0;i<=nseg;i++){ const t=i/nseg; pts.push({x:Math.pow(t,bow)*bend, y:t*segH*nseg}); }
+  for(let i=0;i<nseg;i++){ const r=(0.16-i*0.013)*s, a=pts[i], bp=pts[i+1], mx=(a.x+bp.x)/2, my=(a.y+bp.y)/2;
+    const seg=new THREE.Mesh(new THREE.CylinderGeometry(r*0.9,r,segH*1.12,8), trunkMat);
+    seg.position.set(mx,my,0); seg.rotation.z=-Math.atan2(bp.x-a.x, bp.y-a.y); seg.castShadow=true; p.add(seg); }
+  const crownY=pts[nseg].y, cx=pts[nseg].x;
   // feathered fronds that ARCH — rise out of the crown then curve down at the tip (natural palm sweep)
   const nF=9;
   for(let f=0;f<nF;f++){
@@ -1987,7 +1988,10 @@ function dOasis(x,z,s){
     r.rotation.x=-Math.PI/2; r.position.y=-0.44; g.add(r); rings.push(r); }
   g.__rings=rings; g.__rs=s*1.6; g.__anim={t:'oasis'};
   g.position.set(x,0,z); addDecor(g);
-  for(let i=0;i<8;i++){ const a=i/8*6.28; dPalm(x+Math.cos(a)*s*1.55, z+Math.sin(a)*s*1.55, 1.5+Math.random()*0.9); }   // a ring of TALL palms — the visible marker of the oasis
+  // sporadic palms — random angles, some clustered in twos/threes, all different sizes (not an even ring)
+  for(let i=0;i<10;i++){ const a=Math.random()*6.28, dist=s*(1.25+Math.random()*0.95);
+    const px=x+Math.cos(a)*dist, pz=z+Math.sin(a)*dist; dPalm(px, pz, 1.1+Math.random()*1.3);
+    if (Math.random()<0.45) dPalm(px+(Math.random()-0.5)*1.6, pz+(Math.random()-0.5)*1.6, 0.9+Math.random()*1.1); }   // sometimes a clustered neighbour
 }
 // ---- a continuous, wavy dune ridge spanning the whole view at depth z (wide low mounds heavily
 // overlapping so they merge into one rolling ridge-line). Stack several bands for receding dunes. ----
@@ -2164,8 +2168,10 @@ function buildBackdrop(era){
     clearEraDecor();
     // NB: nothing is placed inside ~18 units so the props never block the camera's view of the pyramid.
     if (era.key === 'egypt'){
-      // FAR pyramid silhouettes ringing the WHOLE horizon — placed BEYOND the dunes and tall enough that clean peaks rise above the dune line (no ragged cut-offs)
-      for (let i=0;i<26;i++){ const a=(i/26)*6.28 + (Math.random()-0.5)*0.22, d=80+Math.random()*22, h=14+Math.random()*9;
+      // pyramid silhouettes ringing the horizon — a FAR layer (very distant) + a MID layer (closer, more present), both tall enough that clean peaks clear the dune line
+      for (let i=0;i<22;i++){ const a=(i/22)*6.28 + (Math.random()-0.5)*0.25, d=82+Math.random()*22, h=15+Math.random()*9;
+        dPyrSil(Math.sin(a)*d, Math.cos(a)*d, h*(0.5+Math.random()*0.15), h); }
+      for (let i=0;i<14;i++){ const a=(i/14)*6.28 + (Math.random()-0.5)*0.3, d=56+Math.random()*18, h=11+Math.random()*8;
         dPyrSil(Math.sin(a)*d, Math.cos(a)*d, h*(0.5+Math.random()*0.15), h); }
       // CLOSE 3D pyramids you read clearly in three dimensions (lit sandstone)
       dPyramidH(-24,-30, 6, 9, 0x8a6a44); dPyramidH(26,-34, 7, 10, 0x7e6038); dPyramidH(-40,-40, 5, 7.5, 0x8a6a44);
@@ -2177,9 +2183,10 @@ function buildBackdrop(era){
       dCaravan(-10,-50,5,1.5);                                         // a static camel caravan, far back on the horizon
       dOasis(-9,-23,4.4);                                             // a bigger oasis, closer & centre-left — unmistakable tall-palm cluster + open rippling water
       ringPlace(6,24,40,(x,z)=>dObelisk(x,z,3+Math.random()*2));
-      ringPlace(20,18,46,(x,z)=>dPalm(x,z,0.7+Math.random()*1.1));      // many more palms, all different sizes, scattered around
-      ringPlace(12,18,42,(x,z)=>dRock(x,z,0.5+Math.random()*0.7,0x8a6a44));
-      for(let i=0;i<6;i++){ const a=Math.random()*6.28,d=30+Math.random()*20; dCloud(Math.sin(a)*d,8+Math.random()*5,Math.cos(a)*d,2.2+Math.random()*2.0); }
+      ringPlace(22,18,48,(x,z)=>dPalm(x,z,0.7+Math.random()*1.1));      // many more palms, all different sizes, scattered around
+      ringPlace(20,18,46,(x,z)=>dRock(x,z,0.45+Math.random()*0.9,0x8a6a44));   // more rocks
+      ringPlace(26,16,46,(x,z)=>dDune(x,z,1.6+Math.random()*2.6));      // low wind-rippled sand waves across the ground
+      for(let i=0;i<11;i++){ const a=Math.random()*6.28,d=28+Math.random()*22; dCloud(Math.sin(a)*d,8+Math.random()*6,Math.cos(a)*d,2.0+Math.random()*2.2); }   // more clouds
       dBirds(9,0x3a2a22,26); dBirds(7,0x2a2018,38);                     // flocks wheeling over the desert
       dSnake(10,-12,1.3); dSnake(-15,7,-0.7); dSnake(6,16,2.4);          // snakes slithering across the sand
     } else if (era.key === 'aztec'){
