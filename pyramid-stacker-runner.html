@@ -771,7 +771,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.206 · 2026.06.10</div>
+  <div id="appVersion">v1.207 · 2026.06.10</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1701,7 +1701,7 @@ function applyBiome(level){
   }
   curEra = e; curEraBlock = e.block;
   applyGrade(e);                          // tint the screen colour-grade + rim light to the era
-  buildBackdrop(e);                       // swap the background props when the era changes
+  buildBackdrop(e, level);                // rebuild the background props per level (fresh layout each level)
 }
 // the level/biome name banner at the top of the screen during a level
 function setLevelName(show){
@@ -1830,7 +1830,7 @@ for (let i=0;i<20;i++){
 
 // ---------- ERA BACKDROPS: themed background props (pyramids → temples → ruins → alien spires → heaven),
 // rebuilt only when the era changes. All tagged __env so they survive level resets. ----------
-let eraDecor = [], animProps = [], _backdropEra = null;
+let eraDecor = [], animProps = [], _backdropEra = null, _backdropLevel = null;
 function addDecor(o){ o.__env = true; eraDecor.push(o); if (o.__anim) animProps.push(o); scene.add(o); return o; }
 function clearEraDecor(){ eraDecor.forEach(o => scene.remove(o)); eraDecor = []; animProps = []; }
 // gently animate a curated handful of backdrop props (clouds drift, saucers spin & bob, aurora sways, stars twinkle)
@@ -2170,13 +2170,14 @@ function dPyramidH(x,z,base,height,col){ const m=new THREE.Mesh(new THREE.ConeGe
 // a crisp dark pyramid SILHOUETTE on the far horizon (fog-independent so it reads as a clean silhouette)
 function dPyrSil(x,z,base,height){ const m=new THREE.Mesh(new THREE.ConeGeometry(base,height,4), new THREE.MeshBasicMaterial({ color:0x171109, fog:false }));   // very dark warm silhouette (no blue)
   m.rotation.y=Math.PI/4; m.position.set(x,-1.4+height/2,z); addDecor(m); }
-function buildBackdrop(era){
-  if (!era || era.key === _backdropEra) return;          // only rebuild when the era actually changes
-  _backdropEra = era.key;
-  // DETERMINISTIC layout: seed a pseudo-random from the era name so the scene (oasis, sand, palms, pyramids)
-  // is IDENTICAL every time this era is built — no more shuffling on restart / reload.
+function buildBackdrop(era, level){
+  level = level || 1;
+  if (!era || (era.key === _backdropEra && level === _backdropLevel)) return;   // rebuild when era OR level changes
+  _backdropEra = era.key; _backdropLevel = level;
+  // PER-LEVEL layout: seed the pseudo-random from era name + level. Each level gets a fresh, different scene,
+  // but replaying / restarting the SAME level rebuilds the IDENTICAL scene (no shuffling within a round).
   const _realRandom = Math.random;
-  let _seed = 0; for (let i=0;i<era.key.length;i++) _seed = (_seed*131 + era.key.charCodeAt(i)) >>> 0; _seed = _seed || 1;
+  let _seed = (level*2654435761) >>> 0; for (let i=0;i<era.key.length;i++) _seed = (_seed*131 + era.key.charCodeAt(i)) >>> 0; _seed = _seed || 1;
   Math.random = function(){ _seed = (_seed*1103515245 + 12345) & 0x7fffffff; return _seed / 0x7fffffff; };
   try {
     clearEraDecor();
@@ -2198,25 +2199,24 @@ function buildBackdrop(era){
       duneRing(40, 4.0, '#c6a468', 18, 1.0, oasisAng, 0.55); duneRing(56, 5.5, '#d4bf90', 16, 0.95, oasisAng, 0.45); duneRing(72, 7.0, '#dcccA0', 13, 0.9);   // lower dunes so the pyramids behind them stay visible
       dCaravan(-10,-50,5,1.5);                                         // a static camel caravan, far back on the horizon
       dOasis(-4,-26,4.2);                                             // an oasis centre, in FRONT of the dune mounds so nothing hides the water
-      // keep ALL sand off the oasis pool (centre -4,-26). The exclusion is stretched BEHIND the pool
-      // (more-negative z) because, from the low camera, any mound back there visually rises over the far
-      // water edge and reads as "sand on top". dz<0 = behind the pool → counted ~2× → wider clear zone.
-      const offOasis=(x,z)=>{ const dx=x+4, dz=z+26; const eff=dz<0?dz*2.1:dz; return Math.hypot(dx, eff) > 22; };
-      ringPlace(6,24,40,(x,z)=>dObelisk(x,z,3+Math.random()*2));
-      ringPlace(9,20,48,(x,z)=>dPalm(x,z,0.6+Math.random()*0.8));       // a handful of smaller scattered palms (decluttered)
-      ringPlace(18,18,46,(x,z)=>{ if(offOasis(x,z)) dRock(x,z,0.45+Math.random()*0.9,0x8a6a44); });   // rocks (kept off the pool too)
-      // 3D sand mounds — FIXED set positions [x, z, size] (no longer random). Big mounds ring the dune
-      // foot so the flat ground rolls up into the dunes; low waves & small ripples fill the surrounding sand.
-      // All chosen to sit clear of the oasis pool (offOasis guard kept as a safety net).
-      const SAND=[
-        // big mounds at the dune-ring foot
-        [-38,-18,4.2],[38,-22,4.6],[44,2,3.8],[40,24,4.4],[20,40,4.0],[-18,42,4.6],[-40,28,4.2],[-46,4,3.6],[8,-44,4.0],[30,-36,4.2],
-        // low sand waves
-        [28,-12,2.6],[34,14,2.4],[16,30,2.8],[-12,34,2.6],[-30,16,2.4],[-34,-8,2.6],[24,-28,2.4],[-46,-10,2.2],[46,-4,2.4],[12,44,2.6],[-26,-40,2.4],
-        // small ripples
-        [22,-6,1.4],[26,8,1.2],[14,22,1.6],[-10,26,1.4],[-22,10,1.2],[-26,-4,1.5],[18,-16,1.3],[30,2,1.4],[8,30,1.5],[-16,18,1.2],[20,18,1.4],[-26,-30,1.3],[16,-30,1.3],[-32,-26,1.4]
-      ];
-      for (const [sx,sz,ss] of SAND){ if (offOasis(sx,sz)) dDune(sx,sz,ss); }
+      // ---- THE OASIS KEEP-OUT ----------------------------------------------------------------------
+      // One protected zone around the pool. EVERY random prop (sand, rocks, palms, obelisks) must clear it,
+      // so the oasis always loads in completely unbothered no matter how the rest of the scene shuffles.
+      // The zone is stretched BEHIND the pool (more-negative z) because, from the low camera, anything back
+      // there visually rises up over the far water edge and reads as "sand on top".
+      // clear(x,z,margin) → true when the point is safely outside the pool + margin.
+      const OAS={ x:-4, z:-26, r:9 };   // pool centre + water radius (s*2.0≈8.4, rounded up)
+      const clearOasis=(x,z,margin)=>{ const dx=x-OAS.x, dz=z-OAS.z, eff=dz<0?dz*2.1:dz; return Math.hypot(dx,eff) > OAS.r + (margin==null?6:margin); };
+      // scattered random props — each respects the keep-out (bigger margin for bigger things)
+      ringPlace(6,24,40,(x,z)=>{ if(clearOasis(x,z,7)) dObelisk(x,z,3+Math.random()*2); });
+      ringPlace(9,20,48,(x,z)=>{ if(clearOasis(x,z,5)) dPalm(x,z,0.6+Math.random()*0.8); });       // scattered palms (the pool's OWN shore palms are added inside dOasis)
+      ringPlace(18,18,46,(x,z)=>{ if(clearOasis(x,z,6)) dRock(x,z,0.45+Math.random()*0.9,0x8a6a44); });   // rocks — never in the lake
+      // 3D sand mounds — RANDOM again so every level differs, but all kept off the oasis. Big mounds at the
+      // dune-ring foot (ground rolls up into the dunes), then low waves, then small ripples filling the sand.
+      ringPlace(16,30,50,(x,z)=>{ if(clearOasis(x,z,11)) dDune(x,z,2.4+Math.random()*3.6); });   // big mounds
+      ringPlace(14,22,46,(x,z)=>{ if(clearOasis(x,z,10)) dDune(x,z,1.8+Math.random()*2.4); });   // low sand waves
+      for(let i=0;i<26;i++){ const a=Math.random()*6.28, d=16+Math.random()*34, sx=Math.sin(a)*d, sz=Math.cos(a)*d;
+        if (clearOasis(sx,sz,8)) dDune(sx, sz, 0.9+Math.random()*1.6); }                          // small ripples
       for(let i=0;i<11;i++){ const a=Math.random()*6.28,d=28+Math.random()*22; dCloud(Math.sin(a)*d,8+Math.random()*6,Math.cos(a)*d,2.0+Math.random()*2.2); }   // more clouds
       dBirds(9,0x3a2a22,26); dBirds(7,0x2a2018,38);                     // flocks wheeling over the desert
       dSnake(10,-12,1.3); dSnake(-15,7,-0.7); dSnake(6,16,2.4);          // snakes slithering across the sand
