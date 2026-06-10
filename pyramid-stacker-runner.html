@@ -768,7 +768,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.187 · 2026.06.09</div>
+  <div id="appVersion">v1.188 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -2152,7 +2152,7 @@ function dGiza(cx,cz){
 function dPyramidH(x,z,base,height,col){ const m=new THREE.Mesh(new THREE.ConeGeometry(base,height,4), dMat(col));
   m.rotation.y=Math.PI/4; m.position.set(x,-1.4+height/2,z); addDecor(m); }
 // a crisp dark pyramid SILHOUETTE on the far horizon (fog-independent so it reads as a clean silhouette)
-function dPyrSil(x,z,base,height){ const m=new THREE.Mesh(new THREE.ConeGeometry(base,height,4), new THREE.MeshBasicMaterial({ color:0x231c14, fog:false }));   // warm-dark silhouette (not blue)
+function dPyrSil(x,z,base,height){ const m=new THREE.Mesh(new THREE.ConeGeometry(base,height,4), new THREE.MeshBasicMaterial({ color:0x171109, fog:false }));   // very dark warm silhouette (no blue)
   m.rotation.y=Math.PI/4; m.position.set(x,-1.4+height/2,z); addDecor(m); }
 function buildBackdrop(era){
   if (!era || era.key === _backdropEra) return;          // only rebuild when the era actually changes
@@ -2161,11 +2161,13 @@ function buildBackdrop(era){
     clearEraDecor();
     // NB: nothing is placed inside ~18 units so the props never block the camera's view of the pyramid.
     if (era.key === 'egypt'){
-      // FAR pyramid silhouettes scattered across the horizon — many, all different sizes, peaks rising above the dune line
-      dPyrSil(-62,-58, 7, 12);   dPyrSil(-44,-64, 9, 15);   dPyrSil(-28,-56, 6, 10);
-      dPyrSil(-10,-66, 8.5, 14); dPyrSil(8,-58, 6.5, 11);   dPyrSil(26,-64, 8, 13);
-      dPyrSil(44,-56, 5.5, 9.5); dPyrSil(60,-62, 7.5, 12.5);dPyrSil(74,-58, 6, 10);
-      dPyrSil(-74,-54, 7, 11);   dPyrSil(34,-70, 9, 15.5);
+      // FAR pyramid silhouettes scattered widely — many, all different sizes & depths so they read as separate pyramids, not one ridge
+      dPyrSil(-82,-58, 6, 10);   dPyrSil(-68,-66, 8.5, 14);  dPyrSil(-56,-52, 4.5, 7.5);
+      dPyrSil(-44,-70, 7.5, 12.5);dPyrSil(-32,-56, 5.5, 9);  dPyrSil(-20,-64, 9, 15);
+      dPyrSil(-8,-54, 4, 6.5);   dPyrSil(6,-68, 7, 11.5);    dPyrSil(20,-58, 5.5, 9.5);
+      dPyrSil(34,-66, 8.5, 14);  dPyrSil(48,-54, 4.5, 7.5);  dPyrSil(62,-64, 7, 12);
+      dPyrSil(78,-58, 6, 10);    dPyrSil(-30,-78, 9.5, 16);  dPyrSil(52,-74, 8, 13.5);
+      dPyrSil(14,-80, 6.5, 11);  dPyrSil(-50,-82, 7.5, 12.5);
       // CLOSE 3D pyramids you read clearly in three dimensions (lit sandstone)
       dPyramidH(-24,-30, 6, 9, 0x8a6a44); dPyramidH(26,-34, 7, 10, 0x7e6038); dPyramidH(-40,-40, 5, 7.5, 0x8a6a44);
       dGiza(-4,-52);                                                    // the three Pyramids of Giza, mid-distance
@@ -2174,7 +2176,7 @@ function buildBackdrop(era){
       // 2D layered dune horizon (vertical ridge billboards ringing the scene; near richer, far hazier)
       duneRing(40, 4.0, '#c6a468', 18, 1.0); duneRing(56, 5.5, '#d4bf90', 16, 0.95); duneRing(72, 7.0, '#dcccA0', 13, 0.9);   // lower dunes so the pyramids behind them stay visible
       dCaravan(-10,-50,5,1.5);                                         // a static camel caravan, far back on the horizon
-      dOasis(38,-34,3.2);                                             // an oasis far off but observable, with rippling water + palms
+      dOasis(15,-36,3.2);                                             // an oasis mid-distance, centre-right (where circled), rippling water + palms
       ringPlace(6,24,40,(x,z)=>dObelisk(x,z,3+Math.random()*2));
       ringPlace(14,19,44,(x,z)=>dPalm(x,z,0.7+Math.random()*1.0));      // many more palms, all different sizes
       ringPlace(12,18,42,(x,z)=>dRock(x,z,0.5+Math.random()*0.7,0x8a6a44));
