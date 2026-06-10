@@ -768,7 +768,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.184 · 2026.06.09</div>
+  <div id="appVersion">v1.185 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -2108,7 +2108,7 @@ function dDune(x,z,s,col){ const m=new THREE.Mesh(new THREE.SphereGeometry(s,14,
 // the three Pyramids of Giza in a clean skyline (smooth, matching) — kept modestly sized so they don't loom
 function dGiza(cx,cz){
   const col=0x9a7048;
-  dPyramid(cx-11, cz-3, 11, col); dPyramid(cx, cz, 11, col); dPyramid(cx+10, cz+2, 11, col);
+  dPyramid(cx-12, cz-3, 14, col); dPyramid(cx, cz, 11, col); dPyramid(cx+10, cz+2, 8.5, col);   // three different sizes (Khufu / Khafre / Menkaure)
 }
 // a pyramid with custom base/height so the skyline can mix steep and broad Egyptian types
 function dPyramidH(x,z,base,height,col){ const m=new THREE.Mesh(new THREE.ConeGeometry(base,height,4), dMat(col));
@@ -2123,18 +2123,18 @@ function buildBackdrop(era){
     clearEraDecor();
     // NB: nothing is placed inside ~18 units so the props never block the camera's view of the pyramid.
     if (era.key === 'egypt'){
-      // FAR pyramid silhouettes scattered across the horizon — many, all different sizes, kept short so the peaks stay in frame
-      dPyrSil(-58,-70, 5.5, 9);  dPyrSil(-40,-76, 7, 12);  dPyrSil(-24,-72, 4.5, 7.5);
-      dPyrSil(-8,-82, 8, 14);    dPyrSil(8,-74, 5, 8.5);   dPyrSil(24,-80, 6.5, 11);
-      dPyrSil(42,-73, 4, 6.5);   dPyrSil(58,-78, 7, 12);   dPyrSil(72,-70, 5, 8);
-      dPyrSil(-72,-66, 6, 10);   dPyrSil(34,-88, 5.5, 9);
+      // FAR pyramid silhouettes scattered across the horizon — many, all different sizes, peaks rising above the dune line
+      dPyrSil(-62,-58, 7, 12);   dPyrSil(-44,-64, 9, 15);   dPyrSil(-28,-56, 6, 10);
+      dPyrSil(-10,-66, 8.5, 14); dPyrSil(8,-58, 6.5, 11);   dPyrSil(26,-64, 8, 13);
+      dPyrSil(44,-56, 5.5, 9.5); dPyrSil(60,-62, 7.5, 12.5);dPyrSil(74,-58, 6, 10);
+      dPyrSil(-74,-54, 7, 11);   dPyrSil(34,-70, 9, 15.5);
       // CLOSE 3D pyramids you read clearly in three dimensions (lit sandstone)
       dPyramidH(-24,-30, 6, 9, 0x8a6a44); dPyramidH(26,-34, 7, 10, 0x7e6038); dPyramidH(-40,-40, 5, 7.5, 0x8a6a44);
       dGiza(-4,-52);                                                    // the three Pyramids of Giza, mid-distance
       dSphinx(18,-26,2.8);                                             // a proper Sphinx, off to one side facing in
       dSphinx(-30,20,1.7);
       // 2D layered dune horizon (vertical ridge billboards ringing the scene; near richer, far hazier)
-      duneRing(40, 6.5, '#c6a468', 18, 1.0); duneRing(56, 9.0, '#d4bf90', 16, 0.95); duneRing(72, 12.0, '#dcccA0', 13, 0.9);
+      duneRing(40, 4.0, '#c6a468', 18, 1.0); duneRing(56, 5.5, '#d4bf90', 16, 0.95); duneRing(72, 7.0, '#dcccA0', 13, 0.9);   // lower dunes so the pyramids behind them stay visible
       dCaravan(-10,-50,5,1.5);                                         // a static camel caravan, far back on the horizon
       ringPlace(6,24,40,(x,z)=>dObelisk(x,z,3+Math.random()*2));
       ringPlace(5,20,40,(x,z)=>dPalm(x,z,0.9+Math.random()*0.6));
