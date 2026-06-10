@@ -768,7 +768,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.190 · 2026.06.09</div>
+  <div id="appVersion">v1.191 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1886,8 +1886,8 @@ function dPalm(x,z,s){
       const rb=new THREE.Mesh(new THREE.SphereGeometry(0.03*s,5,4), ribMat); rb.position.set(px,py,0); fr.add(rb);
       if(l===0) continue;
       const ll=(0.5-t*0.34)*s;
-      [-1,1].forEach(d=>{ const leaf=new THREE.Mesh(new THREE.ConeGeometry(0.05*s, ll, 4), dMat(green));
-        leaf.scale.set(1,1,0.3); leaf.position.set(px, py, d*0.02*s); leaf.rotation.x=d*1.2; leaf.rotation.z=-0.35 - t*0.6; fr.add(leaf); }); }
+      [-1,1].forEach(d=>{ const leaf=new THREE.Mesh(new THREE.ConeGeometry(0.04*s, ll, 4), dMat(green));
+        leaf.scale.set(1,1,0.3); leaf.position.set(px, py, d*0.02*s); leaf.rotation.x=d*0.95; leaf.rotation.z=-0.6 - t*0.4; fr.add(leaf); }); }
     fr.position.set(cx, crownY, 0); fr.rotation.y=f/nF*6.28 + Math.random()*0.25;
     fr.rotation.z=0.1 - Math.random()*0.15;                            // slight lift at the base — the tips droop via the arch
     p.add(fr);
@@ -1982,8 +1982,7 @@ function dOasis(x,z,s){
   const g=new THREE.Group();
   const water=new THREE.Mesh(new THREE.CircleGeometry(s*1.7,30), new THREE.MeshStandardMaterial({ color:0x3a93b4, metalness:0.5, roughness:0.1, emissive:0x1a5a72, emissiveIntensity:0.5 }));   // brighter, more luminous so it reads from a low angle
   water.rotation.x=-Math.PI/2; water.position.y=-0.45; g.add(water);
-  const sand=new THREE.Mesh(new THREE.RingGeometry(s*1.6,s*2.1,30), dMat(0xb89868)); sand.rotation.x=-Math.PI/2; sand.position.y=-0.47; g.add(sand);   // damp-sand shore (no green)
-  const rings=[];
+  const rings=[];   // (no sand shore ring — keeps the water fully open/visible)
   for(let i=0;i<3;i++){ const r=new THREE.Mesh(new THREE.RingGeometry(0.9,1.02,30), new THREE.MeshBasicMaterial({ color:0xd6f2fa, transparent:true, opacity:0.6, side:THREE.DoubleSide, depthWrite:false }));
     r.rotation.x=-Math.PI/2; r.position.y=-0.44; g.add(r); rings.push(r); }
   g.__rings=rings; g.__rs=s*1.6; g.__anim={t:'oasis'};
@@ -2006,9 +2005,9 @@ function duneBand(z, h, segW, n){
 // a low desert snake that slithers across the sand — VERY thin (animated via the 'snake' type)
 function dSnake(x0, z0, dir){
   const g=new THREE.Group(), col=[0x4a3a26,0x6a5230,0x3a2e1e][Math.floor(Math.random()*3)], skin=dMat(col), segs=[];
-  const head=new THREE.Mesh(new THREE.SphereGeometry(0.12,9,7), skin); head.scale.set(1.6,0.72,0.9); head.castShadow=true; segs.push(head); g.add(head);
-  const N=52;
-  for (let i=0;i<N;i++){ const t=i/N, r=0.095*(t<0.82?1:1-(t-0.82)/0.18*0.82); const m=new THREE.Mesh(new THREE.SphereGeometry(Math.max(0.022,r),8,6), skin); segs.push(m); g.add(m); }
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.13,9,7), skin); head.scale.set(1.7,0.6,1.05); head.castShadow=true; segs.push(head); g.add(head);   // flat, slightly wide head
+  const N=56;
+  for (let i=0;i<N;i++){ const t=i/N, r=0.085*(t<0.7?1:1-(t-0.7)/0.3*0.9); const m=new THREE.Mesh(new THREE.SphereGeometry(Math.max(0.018,r),8,6), skin); m.scale.set(1,0.62,1.12); segs.push(m); g.add(m); }   // flattened, slightly wider cross-section like a real snake
   g.__snakeSegs=segs;
   const dx=Math.sin(dir), dz=Math.cos(dir);
   g.__anim={ t:'snake', x0, z0, dx, dz, px:dz, pz:-dx, head:-6+Math.random()*22, gap:0.044, len:20, amp:0.8, freq:1.8, ph:Math.random()*6.28, spd:0.02+Math.random()*0.012, y:-0.43 };   // tight overlap → smooth thin tube; much slower
@@ -2126,12 +2125,13 @@ function dBirds(count, col, radius){
   const flock=new THREE.Group(), birds=[];
   for(let i=0;i<count;i++){
     const b=new THREE.Group(), wMat=dMat(col==null?0x2a2a2e:col);
-    const body=new THREE.Mesh(new THREE.SphereGeometry(0.14,8,6), wMat); body.scale.set(0.55,0.5,1.8); b.add(body);          // slim body
-    const head=new THREE.Mesh(new THREE.SphereGeometry(0.09,7,6), wMat); head.position.z=0.26; b.add(head);                  // head forward
-    const tail=new THREE.Mesh(new THREE.ConeGeometry(0.09,0.36,4), wMat); tail.scale.set(1.8,0.18,1); tail.rotation.x=Math.PI/2; tail.position.z=-0.34; b.add(tail);   // fanned tail
+    const body=new THREE.Mesh(new THREE.SphereGeometry(0.1,7,6), wMat); body.scale.set(0.7,0.6,2.2); b.add(body);            // small slim body
+    // swept-back gull wings (thin tapered blades, angled rearward)
     const mkWing=(sx)=>{ const piv=new THREE.Group();
-      const w=new THREE.Mesh(new THREE.ConeGeometry(0.19,1.15,4), wMat); w.scale.set(1,0.1,0.5);                              // flat, tapered wing
-      w.rotation.z = sx>0 ? -Math.PI/2 : Math.PI/2; w.position.x = sx*0.58; piv.add(w); b.add(piv); return piv; };
+      const w=new THREE.Mesh(new THREE.ConeGeometry(0.16,1.2,4), wMat); w.scale.set(1,0.07,0.42);                            // thin flat blade
+      w.rotation.z = sx>0 ? -Math.PI/2 : Math.PI/2; w.position.x = sx*0.6;
+      piv.add(w); piv.rotation.y = sx*0.32;                                                                                   // sweep the wings back
+      b.add(piv); return piv; };
     const wL=mkWing(-1), wR=mkWing(1);
     b.__w=[wL,wR]; b.__ph=Math.random()*6.28;
     b.position.set((Math.random()-0.5)*7,(Math.random()-0.5)*3.5,(Math.random()-0.5)*7);
@@ -2164,15 +2164,9 @@ function buildBackdrop(era){
     clearEraDecor();
     // NB: nothing is placed inside ~18 units so the props never block the camera's view of the pyramid.
     if (era.key === 'egypt'){
-      // FAR pyramid silhouettes scattered widely — many, all different sizes & depths so they read as separate pyramids, not one ridge
-      dPyrSil(-82,-58, 6, 10);   dPyrSil(-68,-66, 8.5, 14);  dPyrSil(-56,-52, 4.5, 7.5);
-      dPyrSil(-44,-70, 7.5, 12.5);dPyrSil(-32,-56, 5.5, 9);  dPyrSil(-20,-64, 9, 15);
-      dPyrSil(-8,-54, 4, 6.5);   dPyrSil(6,-68, 7, 11.5);    dPyrSil(20,-58, 5.5, 9.5);
-      dPyrSil(34,-66, 8.5, 14);  dPyrSil(48,-54, 4.5, 7.5);  dPyrSil(62,-64, 7, 12);
-      dPyrSil(78,-58, 6, 10);    dPyrSil(-30,-78, 9.5, 16);  dPyrSil(52,-74, 8, 13.5);
-      dPyrSil(14,-80, 6.5, 11);  dPyrSil(-50,-82, 7.5, 12.5);
-      dPyrSil(-14,-72, 6, 10);   dPyrSil(28,-78, 7, 12);     dPyrSil(-62,-76, 6.5, 11);
-      dPyrSil(70,-72, 8, 13);    dPyrSil(2,-62, 4.5, 7.5);   dPyrSil(-40,-60, 5, 8);
+      // FAR pyramid silhouettes ringing the WHOLE horizon (every side), all different sizes & distances
+      for (let i=0;i<28;i++){ const a=(i/28)*6.28 + (Math.random()-0.5)*0.26, d=50+Math.random()*28, h=7+Math.random()*9.5;
+        dPyrSil(Math.sin(a)*d, Math.cos(a)*d, h*(0.5+Math.random()*0.2), h); }
       // CLOSE 3D pyramids you read clearly in three dimensions (lit sandstone)
       dPyramidH(-24,-30, 6, 9, 0x8a6a44); dPyramidH(26,-34, 7, 10, 0x7e6038); dPyramidH(-40,-40, 5, 7.5, 0x8a6a44);
       dGiza(-4,-52);                                                    // the three Pyramids of Giza, mid-distance
