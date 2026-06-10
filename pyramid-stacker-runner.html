@@ -768,7 +768,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.188 · 2026.06.09</div>
+  <div id="appVersion">v1.189 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1976,16 +1976,15 @@ function dCaravan(x,z,n,s){
 // ---- a desert oasis: a still pool ringed with grass + palms ----
 function dOasis(x,z,s){
   const g=new THREE.Group();
-  const water=new THREE.Mesh(new THREE.CircleGeometry(s*1.6,30), new THREE.MeshStandardMaterial({ color:0x276a86, metalness:0.55, roughness:0.12, emissive:0x0a2838, emissiveIntensity:0.25 }));
-  water.rotation.x=-Math.PI/2; water.position.y=-0.46; g.add(water);
-  const sand=new THREE.Mesh(new THREE.RingGeometry(s*1.55,s*1.95,30), dMat(0xc9a96a)); sand.rotation.x=-Math.PI/2; sand.position.y=-0.47; g.add(sand);   // damp-sand shore (no green)
-  // expanding ripple rings on the surface
+  const water=new THREE.Mesh(new THREE.CircleGeometry(s*1.7,30), new THREE.MeshStandardMaterial({ color:0x3a93b4, metalness:0.5, roughness:0.1, emissive:0x1a5a72, emissiveIntensity:0.5 }));   // brighter, more luminous so it reads from a low angle
+  water.rotation.x=-Math.PI/2; water.position.y=-0.45; g.add(water);
+  const sand=new THREE.Mesh(new THREE.RingGeometry(s*1.6,s*2.1,30), dMat(0xb89868)); sand.rotation.x=-Math.PI/2; sand.position.y=-0.47; g.add(sand);   // damp-sand shore (no green)
   const rings=[];
-  for(let i=0;i<3;i++){ const r=new THREE.Mesh(new THREE.RingGeometry(0.92,1.0,30), new THREE.MeshBasicMaterial({ color:0xbfe6f0, transparent:true, opacity:0.5, side:THREE.DoubleSide, depthWrite:false }));
-    r.rotation.x=-Math.PI/2; r.position.y=-0.45; g.add(r); rings.push(r); }
-  g.__rings=rings; g.__rs=s*1.5; g.__anim={t:'oasis'};
+  for(let i=0;i<3;i++){ const r=new THREE.Mesh(new THREE.RingGeometry(0.9,1.02,30), new THREE.MeshBasicMaterial({ color:0xd6f2fa, transparent:true, opacity:0.6, side:THREE.DoubleSide, depthWrite:false }));
+    r.rotation.x=-Math.PI/2; r.position.y=-0.44; g.add(r); rings.push(r); }
+  g.__rings=rings; g.__rs=s*1.6; g.__anim={t:'oasis'};
   g.position.set(x,0,z); addDecor(g);
-  for(let i=0;i<6;i++){ const a=i/6*6.28; dPalm(x+Math.cos(a)*s*1.9, z+Math.sin(a)*s*1.9, 0.85+Math.random()*0.6); }
+  for(let i=0;i<7;i++){ const a=i/7*6.28; dPalm(x+Math.cos(a)*s*1.7, z+Math.sin(a)*s*1.7, 1.2+Math.random()*0.8); }   // a ring of TALL palms — the visible marker of the oasis
 }
 // ---- a continuous, wavy dune ridge spanning the whole view at depth z (wide low mounds heavily
 // overlapping so they merge into one rolling ridge-line). Stack several bands for receding dunes. ----
@@ -2176,7 +2175,7 @@ function buildBackdrop(era){
       // 2D layered dune horizon (vertical ridge billboards ringing the scene; near richer, far hazier)
       duneRing(40, 4.0, '#c6a468', 18, 1.0); duneRing(56, 5.5, '#d4bf90', 16, 0.95); duneRing(72, 7.0, '#dcccA0', 13, 0.9);   // lower dunes so the pyramids behind them stay visible
       dCaravan(-10,-50,5,1.5);                                         // a static camel caravan, far back on the horizon
-      dOasis(15,-36,3.2);                                             // an oasis mid-distance, centre-right (where circled), rippling water + palms
+      dOasis(11,-28,3.6);                                             // an oasis centre-right, close enough to clearly read — rippling water + tall palms
       ringPlace(6,24,40,(x,z)=>dObelisk(x,z,3+Math.random()*2));
       ringPlace(14,19,44,(x,z)=>dPalm(x,z,0.7+Math.random()*1.0));      // many more palms, all different sizes
       ringPlace(12,18,42,(x,z)=>dRock(x,z,0.5+Math.random()*0.7,0x8a6a44));
