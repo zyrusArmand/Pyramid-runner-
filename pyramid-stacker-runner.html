@@ -771,7 +771,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.196 · 2026.06.09</div>
+  <div id="appVersion">v1.197 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1879,23 +1879,16 @@ function dPalm(x,z,s){
     const seg=new THREE.Mesh(new THREE.CylinderGeometry(r*0.9,r,segH*1.12,8), trunkMat);
     seg.position.set(mx,my,0); seg.rotation.z=-Math.atan2(bp.x-a.x, bp.y-a.y); seg.castShadow=true; p.add(seg); }
   const crownY=pts[nseg].y, cx=pts[nseg].x;
-  // realistic pinnate fronds — an arching central spine with rows of thin pointed leaflets feathering off each side
-  const nF=11;
+  // full fronds — wide flat leaf-blades, built as a chain of flat segments following an arch that rises then DROOPS down (palm sweep)
+  const nF=14;
   for(let f=0;f<nF;f++){
-    const fr=new THREE.Group(), len=2.0*s, green=[0x3f7a33,0x4d8c3d,0x356b2c,0x447f38][f%4], ribMat=dMat(0x46682c);
-    const nL=11;
-    for(let l=0;l<=nL;l++){ const t=l/nL, px=t*len;
-      const py=(Math.sin(t*Math.PI*0.55)*0.42 - t*t*1.05)*s;            // arch: rise then droop toward the tip
-      const rb=new THREE.Mesh(new THREE.CylinderGeometry(0.018*s,0.026*s,len/nL*1.1,5), ribMat); rb.position.set(px,py,0); rb.rotation.z=Math.PI/2 - (t-0.3)*0.9; fr.add(rb);   // spine segment
-      if(l===0) continue;
-      const ll=(0.62-t*0.46)*s;                                        // leaflets shorten toward the tip
-      [-1,1].forEach(d=>{ const leaf=new THREE.Mesh(new THREE.ConeGeometry(0.016*s, ll, 4), dMat(green));
-        leaf.scale.set(1,1,0.5); leaf.position.set(px, py, 0);
-        leaf.rotation.z = -1.05 - t*0.45;                              // sweep forward along the frond + droop
-        leaf.rotation.x = d*0.85;                                      // feather out to side d
-        fr.add(leaf); }); }
-    fr.position.set(cx, crownY, 0); fr.rotation.y=f/nF*6.28 + Math.random()*0.18;
-    fr.rotation.z=0.1 - Math.random()*0.15;                            // slight lift at the base — the tips droop via the arch
+    const fr=new THREE.Group(), len=2.1*s, green=[0x3f7a33,0x4d8c3d,0x356b2c,0x447f38][f%4], seg=5;
+    const pts=[]; for(let k=0;k<=seg;k++){ const t=k/seg; pts.push({x:t*len, y:(Math.sin(t*1.5)*0.42 - t*t*1.5)*s}); }   // up then strong droop
+    for(let k=0;k<seg;k++){ const a=pts[k], b=pts[k+1], t=(k+0.5)/seg, w=(0.34-t*0.27)*s, dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy);
+      const blade=new THREE.Mesh(new THREE.BoxGeometry(L*1.08, 0.022*s, w*2), dMat(green));   // flat wide blade segment
+      blade.position.set((a.x+b.x)/2,(a.y+b.y)/2,0); blade.rotation.z=Math.atan2(dy,dx); blade.castShadow=true; fr.add(blade); }
+    fr.position.set(cx, crownY, 0); fr.rotation.y=f/nF*6.28 + Math.random()*0.16;
+    fr.rotation.z=0.15 - Math.random()*0.12;
     p.add(fr);
   }
   // coconut cluster under the crown
@@ -1989,15 +1982,15 @@ function dCaravan(x,z,n,s){
 // ---- a desert oasis: a still pool ringed with grass + palms ----
 function dOasis(x,z,s){
   const g=new THREE.Group();
-  const water=new THREE.Mesh(new THREE.CircleGeometry(s*1.7,30), new THREE.MeshStandardMaterial({ color:0x3a93b4, metalness:0.5, roughness:0.1, emissive:0x1a5a72, emissiveIntensity:0.5 }));   // brighter, more luminous so it reads from a low angle
-  water.rotation.x=-Math.PI/2; water.position.y=-0.45; g.add(water);
+  const water=new THREE.Mesh(new THREE.CircleGeometry(s*2.5,32), new THREE.MeshStandardMaterial({ color:0x3fb0d8, metalness:0.4, roughness:0.08, emissive:0x239ec4, emissiveIntensity:0.75 }));   // big & luminous so it clearly reads even from a low/grazing angle
+  water.rotation.x=-Math.PI/2; water.position.y=-0.43; g.add(water);
   const rings=[];   // (no sand shore ring — keeps the water fully open/visible)
   for(let i=0;i<3;i++){ const r=new THREE.Mesh(new THREE.RingGeometry(0.9,1.02,30), new THREE.MeshBasicMaterial({ color:0xd6f2fa, transparent:true, opacity:0.6, side:THREE.DoubleSide, depthWrite:false }));
     r.rotation.x=-Math.PI/2; r.position.y=-0.44; g.add(r); rings.push(r); }
-  g.__rings=rings; g.__rs=s*1.6; g.__anim={t:'oasis'};
+  g.__rings=rings; g.__rs=s*2.4; g.__anim={t:'oasis'};
   g.position.set(x,0,z); addDecor(g);
-  // a few sporadic palms — random angles, occasional clustered neighbour, varied sizes (decluttered)
-  for(let i=0;i<5;i++){ const a=Math.random()*6.28, dist=s*(1.3+Math.random()*0.9);
+  // a few sporadic palms ringing the pool edge — random angles, occasional clustered neighbour, varied sizes (decluttered)
+  for(let i=0;i<5;i++){ const a=Math.random()*6.28, dist=s*(2.6+Math.random()*0.9);
     const px=x+Math.cos(a)*dist, pz=z+Math.sin(a)*dist; dPalm(px, pz, 1.2+Math.random()*1.3);
     if (Math.random()<0.35) dPalm(px+(Math.random()-0.5)*1.8, pz+(Math.random()-0.5)*1.8, 1.0+Math.random()*1.0); }   // sometimes a clustered neighbour
 }
@@ -2176,10 +2169,10 @@ function buildBackdrop(era){
     clearEraDecor();
     // NB: nothing is placed inside ~18 units so the props never block the camera's view of the pyramid.
     if (era.key === 'egypt'){
-      // pyramid silhouettes ringing the horizon — a FAR layer (very distant) + a MID layer (closer, more present), both tall enough that clean peaks clear the dune line
-      for (let i=0;i<18;i++){ const a=(i/18)*6.28 + (Math.random()-0.5)*0.12, d=84+Math.random()*20, h=15+Math.random()*9;
+      // pyramid silhouettes ringing the horizon — kept FAR and modest height so peaks always stay in frame (no cut-off at the top)
+      for (let i=0;i<18;i++){ const a=(i/18)*6.28 + (Math.random()-0.5)*0.12, d=92+Math.random()*22, h=12+Math.random()*7;
         dPyrSil(Math.sin(a)*d, Math.cos(a)*d, h*(0.5+Math.random()*0.15), h); }
-      for (let i=0;i<9;i++){ const a=(i/9)*6.28 + 0.35 + (Math.random()-0.5)*0.1, d=58+Math.random()*16, h=11+Math.random()*7;   // evenly spaced + offset from the far ring so they don't sit in front of each other
+      for (let i=0;i<9;i++){ const a=(i/9)*6.28 + 0.35 + (Math.random()-0.5)*0.1, d=70+Math.random()*16, h=8+Math.random()*4;
         dPyrSil(Math.sin(a)*d, Math.cos(a)*d, h*(0.5+Math.random()*0.15), h); }
       // CLOSE 3D pyramids you read clearly in three dimensions (lit sandstone)
       dPyramidH(-24,-30, 6, 9, 0x8a6a44); dPyramidH(26,-34, 7, 10, 0x7e6038); dPyramidH(-40,-40, 5, 7.5, 0x8a6a44);
