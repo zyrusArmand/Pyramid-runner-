@@ -768,7 +768,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.191 · 2026.06.09</div>
+  <div id="appVersion">v1.192 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1987,7 +1987,7 @@ function dOasis(x,z,s){
     r.rotation.x=-Math.PI/2; r.position.y=-0.44; g.add(r); rings.push(r); }
   g.__rings=rings; g.__rs=s*1.6; g.__anim={t:'oasis'};
   g.position.set(x,0,z); addDecor(g);
-  for(let i=0;i<7;i++){ const a=i/7*6.28; dPalm(x+Math.cos(a)*s*1.7, z+Math.sin(a)*s*1.7, 1.2+Math.random()*0.8); }   // a ring of TALL palms — the visible marker of the oasis
+  for(let i=0;i<8;i++){ const a=i/8*6.28; dPalm(x+Math.cos(a)*s*1.55, z+Math.sin(a)*s*1.55, 1.5+Math.random()*0.9); }   // a ring of TALL palms — the visible marker of the oasis
 }
 // ---- a continuous, wavy dune ridge spanning the whole view at depth z (wide low mounds heavily
 // overlapping so they merge into one rolling ridge-line). Stack several bands for receding dunes. ----
@@ -2164,9 +2164,9 @@ function buildBackdrop(era){
     clearEraDecor();
     // NB: nothing is placed inside ~18 units so the props never block the camera's view of the pyramid.
     if (era.key === 'egypt'){
-      // FAR pyramid silhouettes ringing the WHOLE horizon (every side), all different sizes & distances
-      for (let i=0;i<28;i++){ const a=(i/28)*6.28 + (Math.random()-0.5)*0.26, d=50+Math.random()*28, h=7+Math.random()*9.5;
-        dPyrSil(Math.sin(a)*d, Math.cos(a)*d, h*(0.5+Math.random()*0.2), h); }
+      // FAR pyramid silhouettes ringing the WHOLE horizon — placed BEYOND the dunes and tall enough that clean peaks rise above the dune line (no ragged cut-offs)
+      for (let i=0;i<26;i++){ const a=(i/26)*6.28 + (Math.random()-0.5)*0.22, d=80+Math.random()*22, h=14+Math.random()*9;
+        dPyrSil(Math.sin(a)*d, Math.cos(a)*d, h*(0.5+Math.random()*0.15), h); }
       // CLOSE 3D pyramids you read clearly in three dimensions (lit sandstone)
       dPyramidH(-24,-30, 6, 9, 0x8a6a44); dPyramidH(26,-34, 7, 10, 0x7e6038); dPyramidH(-40,-40, 5, 7.5, 0x8a6a44);
       dGiza(-4,-52);                                                    // the three Pyramids of Giza, mid-distance
@@ -2175,7 +2175,7 @@ function buildBackdrop(era){
       // 2D layered dune horizon (vertical ridge billboards ringing the scene; near richer, far hazier)
       duneRing(40, 4.0, '#c6a468', 18, 1.0); duneRing(56, 5.5, '#d4bf90', 16, 0.95); duneRing(72, 7.0, '#dcccA0', 13, 0.9);   // lower dunes so the pyramids behind them stay visible
       dCaravan(-10,-50,5,1.5);                                         // a static camel caravan, far back on the horizon
-      dOasis(-13,-26,3.6);                                            // an oasis to the centre-left, close enough to clearly read — rippling water + tall palms
+      dOasis(-9,-23,4.4);                                             // a bigger oasis, closer & centre-left — unmistakable tall-palm cluster + open rippling water
       ringPlace(6,24,40,(x,z)=>dObelisk(x,z,3+Math.random()*2));
       ringPlace(20,18,46,(x,z)=>dPalm(x,z,0.7+Math.random()*1.1));      // many more palms, all different sizes, scattered around
       ringPlace(12,18,42,(x,z)=>dRock(x,z,0.5+Math.random()*0.7,0x8a6a44));
