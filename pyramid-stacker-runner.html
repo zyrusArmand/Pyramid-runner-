@@ -768,7 +768,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.183 · 2026.06.09</div>
+  <div id="appVersion">v1.184 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -2123,8 +2123,11 @@ function buildBackdrop(era){
     clearEraDecor();
     // NB: nothing is placed inside ~18 units so the props never block the camera's view of the pyramid.
     if (era.key === 'egypt'){
-      // FAR crisp pyramid silhouettes on the horizon
-      dPyrSil(-34,-74, 11, 20); dPyrSil(2,-82, 13, 24); dPyrSil(40,-76, 10, 18); dPyrSil(-66,-66, 9, 16);
+      // FAR pyramid silhouettes scattered across the horizon — many, all different sizes, kept short so the peaks stay in frame
+      dPyrSil(-58,-70, 5.5, 9);  dPyrSil(-40,-76, 7, 12);  dPyrSil(-24,-72, 4.5, 7.5);
+      dPyrSil(-8,-82, 8, 14);    dPyrSil(8,-74, 5, 8.5);   dPyrSil(24,-80, 6.5, 11);
+      dPyrSil(42,-73, 4, 6.5);   dPyrSil(58,-78, 7, 12);   dPyrSil(72,-70, 5, 8);
+      dPyrSil(-72,-66, 6, 10);   dPyrSil(34,-88, 5.5, 9);
       // CLOSE 3D pyramids you read clearly in three dimensions (lit sandstone)
       dPyramidH(-24,-30, 6, 9, 0x8a6a44); dPyramidH(26,-34, 7, 10, 0x7e6038); dPyramidH(-40,-40, 5, 7.5, 0x8a6a44);
       dGiza(-4,-52);                                                    // the three Pyramids of Giza, mid-distance
