@@ -768,7 +768,7 @@
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.177 · 2026.06.09</div>
+  <div id="appVersion">v1.178 · 2026.06.09</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -1767,10 +1767,10 @@ function loadEgyptPBR(){
   if (_egyptPBR!==0) return _egyptPBR; _egyptPBR=null;
   try {
     if (!_texLoader) _texLoader = new THREE.TextureLoader();
-    const B='assets/';
-    const map=_texLoader.load(B+'sandstone_cracks_diff_1k.jpg');
-    const nor=_texLoader.load(B+'sandstone_cracks_nor_gl_1k.png');
-    const rgh=_texLoader.load(B+'sandstone_cracks_rough_1k.jpg');
+    const B='assets/', SET='old_sandstone_02';     // current Egypt sandstone set (swap this name to A/B different downloads)
+    const map=_texLoader.load(B+SET+'_diff_1k.jpg');
+    const nor=_texLoader.load(B+SET+'_nor_gl_1k.png');
+    const rgh=_texLoader.load(B+SET+'_rough_1k.jpg');
     [map,nor,rgh].forEach(t=>{ if(t){ t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(2,2); } });
     if (map && THREE.sRGBEncoding!==undefined) map.encoding=THREE.sRGBEncoding;   // diffuse is colour data (sRGB)
     _egyptPBR={ map, normalMap:nor, roughnessMap:rgh };
