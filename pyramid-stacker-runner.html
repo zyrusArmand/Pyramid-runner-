@@ -794,7 +794,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.231 · 2026.06.11</div>
+  <div id="appVersion">v1.232 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -982,7 +982,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.231';
+const APP_VERSION = '1.232';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1846,17 +1846,55 @@ function setLevelName(show){
 // ---------- true bloom (post-processing) — best-effort, falls back to plain render ----------
 // Tuned so ONLY genuinely bright/emissive things (coins, capstone) glow — not the lit stone.
 // NOTE: bloom is OFF — in this LDR pipeline it also blooms brightly-lit stone (washes the scene).
-// Flip BLOOM_ON to true only with HDR tone-mapping in place so it stays selective.
-const BLOOM_ON = false;
-let composer = null;
+// ---- CINEMATIC POST-PROCESSING ----
+// A light, mobile-safe pipeline layered ON TOP of the hand-authored linear palettes (so per-era colours stay intact):
+//   RenderPass → selective Bloom (only bright highlights glow) → filmic Grade (punch + per-era tint + vignette).
+// Anything failing here falls back to plain renderer.render — i.e. exactly the old look — so it can never break.
+const POST_ON = true;
+let composer = null, gradePass = null;
+const GradeShader = {
+  uniforms: {
+    tDiffuse:   { value: null },
+    uTint:      { value: new THREE.Color(1, 1, 1) },   // (per-era tint is handled by the CSS #grade overlay; kept here for future use)
+    uTintAmt:   { value: 0.0 },
+    uVignette:  { value: 0.12 },                        // light — the CSS grade already darkens the edges
+    uContrast:  { value: 1.06 },
+    uSaturation:{ value: 1.14 },
+    uBrightness:{ value: 1.02 },
+  },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform vec3 uTint;
+    uniform float uTintAmt, uVignette, uContrast, uSaturation, uBrightness;
+    varying vec2 vUv;
+    void main(){
+      vec4 src = texture2D(tDiffuse, vUv);
+      vec3 c = src.rgb * uBrightness;
+      c = mix(vec3(0.5), c, uContrast);                              // gentle contrast around mid
+      float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+      c = mix(vec3(l), c, uSaturation);                              // richer saturation
+      c = mix(c, c * uTint, uTintAmt);                               // subtle per-era tint
+      float d = distance(vUv, vec2(0.5));
+      c *= 1.0 - uVignette * smoothstep(0.42, 0.98, d);              // cinematic vignette
+      gl_FragColor = vec4(clamp(c, 0.0, 1.0), src.a);
+    }`
+};
 try {
-  if (BLOOM_ON && THREE.EffectComposer && THREE.UnrealBloomPass && THREE.RenderPass){
-    composer = new THREE.EffectComposer(renderer);
+  if (POST_ON && THREE.EffectComposer && THREE.RenderPass && THREE.ShaderPass){
+    let rt = null;                                                  // keep MSAA edges via a multisample target on WebGL2
+    try { if (renderer.capabilities && renderer.capabilities.isWebGL2 && THREE.WebGLMultisampleRenderTarget)
+      rt = new THREE.WebGLMultisampleRenderTarget(innerWidth, innerHeight); } catch(e){ rt = null; }
+    composer = rt ? new THREE.EffectComposer(renderer, rt) : new THREE.EffectComposer(renderer);
+    if (composer.setPixelRatio) composer.setPixelRatio(renderer.getPixelRatio());
     composer.addPass(new THREE.RenderPass(scene, camera));
-    composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.45, 0.4, 0.92));
+    if (THREE.UnrealBloomPass)                                      // selective glow: only the sun, gold & emissives bloom
+      composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(Math.max(2, innerWidth*0.5), Math.max(2, innerHeight*0.5)), 0.32, 0.5, 0.86));
+    gradePass = new THREE.ShaderPass(GradeShader); gradePass.renderToScreen = true;
+    composer.addPass(gradePass);
     composer.setSize(innerWidth, innerHeight);
   }
-} catch(e){ composer = null; }
+} catch(e){ composer = null; gradePass = null; }
+
 
 // ---------- procedural textures (stone surface relief + sand grain) ----------
 function noiseTex(size, grain, blotch){
