@@ -794,7 +794,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.232 · 2026.06.11</div>
+  <div id="appVersion">v1.233 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -982,7 +982,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.232';
+const APP_VERSION = '1.233';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1748,12 +1748,13 @@ const sky = new THREE.Mesh(skyGeo, skyMat); scene.add(sky);
 
 const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 120);
 
-const hemi = new THREE.HemisphereLight(0xffd9a8, 0x33203a, 0.55); scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xfff0d0, 0.72);          // softer key so light sandstone doesn't blow out to white
+const hemi = new THREE.HemisphereLight(0xffd9a8, 0x33203a, 0.50); scene.add(hemi);   // a touch less flat fill → more form
+const sun = new THREE.DirectionalLight(0xfff0d0, 0.82);          // slightly stronger key for shape, still gentle on light sandstone
 sun.position.set(7,16,9); sun.castShadow = true;
-sun.shadow.mapSize.set(1024,1024);
+sun.shadow.mapSize.set(2048,2048);                              // sharper, better-defined shadows
 sun.shadow.camera.near=1; sun.shadow.camera.far=60;
 sun.shadow.camera.left=-16; sun.shadow.camera.right=16; sun.shadow.camera.top=16; sun.shadow.camera.bottom=-16;
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02; sun.shadow.radius = 2.5;   // crisp but soft-edged, no acne on the bumped stone
 scene.add(sun);
 // a cool back/rim light from the opposite side — catches block & climber edges so they pop off the backdrop.
 // no shadows (cheap); colour + intensity are re-tinted per era in applyBiome.
@@ -1816,7 +1817,7 @@ function applyGrade(e){
       gr.style.boxShadow   = 'inset 0 0 175px 46px rgba(6,3,12,'+G[4]+')';
     }
   } catch(err){}
-  if (rim){ rim.color.setHex(G[5]); rim.intensity = G[6]; }
+  if (rim){ rim.color.setHex(G[5]); rim.intensity = G[6] * 1.5; }   // stronger edge light so the warm stone pops off the same-coloured ground
 }
 function applyBiome(level){
   const b = bandFor(level), e = eraFor(level);
@@ -1833,6 +1834,7 @@ function applyBiome(level){
     coverPyramid.material.color.setHSL(e.block.hue/360, e.block.sat/100, e.block.lig/100);
   }
   curEra = e; curEraBlock = e.block;
+  if (motes){ const M = MOTES[e.key] || MOTES.egypt; motes.material.color.setHex(M[0]); _moteDir = M[1]; motes.material.opacity = M[2]; }   // dust → snow → embers → stars
   applyGrade(e);                          // tint the screen colour-grade + rim light to the era
   buildBackdrop(e, level);                // rebuild the background props per level (fresh layout each level)
 }
@@ -1851,15 +1853,44 @@ function setLevelName(show){
 //   RenderPass → selective Bloom (only bright highlights glow) → filmic Grade (punch + per-era tint + vignette).
 // Anything failing here falls back to plain renderer.render — i.e. exactly the old look — so it can never break.
 const POST_ON = true;
-let composer = null, gradePass = null;
+let composer = null, gradePass = null, godrayPass = null;
+const _sunNDC = new THREE.Vector3();
+// volumetric light-scattering "god rays": sample the bloomed frame radially back toward the sun's on-screen
+// position, accumulating only the bright (unoccluded) pixels into warm shafts. Fades out when the sun leaves frame.
+const GodrayShader = {
+  uniforms: {
+    tDiffuse:  { value: null },
+    uLight:    { value: null },                         // assigned a THREE.Vector2 when the pass is built (browser only)
+    uColor:    { value: new THREE.Color(0xffe6b0) },
+    uOn:       { value: 0.0 },
+    uIntensity:{ value: 0.85 },
+  },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform vec2 uLight; uniform vec3 uColor; uniform float uOn, uIntensity;
+    varying vec2 vUv;
+    void main(){
+      vec4 base = texture2D(tDiffuse, vUv);
+      vec2 delta = (vUv - uLight) * (0.92 / 20.0);
+      vec2 uv = vUv; float decay = 1.0, accum = 0.0;
+      for (int i = 0; i < 20; i++){
+        uv -= delta;
+        vec3 s = texture2D(tDiffuse, uv).rgb;
+        accum += max(0.0, dot(s, vec3(0.299, 0.587, 0.114)) - 0.6) * decay;   // only bright pixels stream into rays
+        decay *= 0.93;
+      }
+      vec3 rays = uColor * accum * (uIntensity / 20.0) * uOn;
+      gl_FragColor = vec4(base.rgb + rays, base.a);
+    }`
+};
 const GradeShader = {
   uniforms: {
     tDiffuse:   { value: null },
     uTint:      { value: new THREE.Color(1, 1, 1) },   // (per-era tint is handled by the CSS #grade overlay; kept here for future use)
     uTintAmt:   { value: 0.0 },
-    uVignette:  { value: 0.12 },                        // light — the CSS grade already darkens the edges
-    uContrast:  { value: 1.06 },
-    uSaturation:{ value: 1.14 },
+    uVignette:  { value: 0.14 },                        // light — the CSS grade already darkens the edges
+    uContrast:  { value: 1.10 },
+    uSaturation:{ value: 1.20 },
     uBrightness:{ value: 1.02 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
@@ -1889,6 +1920,9 @@ try {
     composer.addPass(new THREE.RenderPass(scene, camera));
     if (THREE.UnrealBloomPass)                                      // selective glow: only the sun, gold & emissives bloom
       composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(Math.max(2, innerWidth*0.5), Math.max(2, innerHeight*0.5)), 0.32, 0.5, 0.86));
+    godrayPass = new THREE.ShaderPass(GodrayShader);
+    godrayPass.uniforms.uLight.value = new THREE.Vector2(0.5, 0.78);
+    composer.addPass(godrayPass);   // sun shafts
     gradePass = new THREE.ShaderPass(GradeShader); gradePass.renderToScreen = true;
     composer.addPass(gradePass);
     composer.setSize(innerWidth, innerHeight);
@@ -1997,15 +2031,52 @@ function applyEraBlockTex(mat){
 
 // ---------- richer desert ground + rolling horizon dunes ----------
 const ground = new THREE.Mesh(new THREE.CircleGeometry(64,56),
-  new THREE.MeshStandardMaterial({ color:0x6b4a32, roughness:1, bumpMap:SAND_BUMP||undefined, bumpScale:0.06 }));
+  new THREE.MeshStandardMaterial({ color:0x6b4a32, roughness:1, bumpMap:SAND_BUMP||undefined, bumpScale:0.11 }));
 ground.rotation.x = -Math.PI/2; ground.position.y = -0.5; ground.receiveShadow = true;
 scene.add(ground);
 // a soft sand mound the pyramid is bedded into, so its base sits IN the ground instead of floating above it.
 // top sits at ~-0.2 (just under the lowest course at -0.26); recoloured to the era ground in applyBiome.
-const baseMoundMat = new THREE.MeshStandardMaterial({ color:0xc9a96a, roughness:1, bumpMap:SAND_BUMP||undefined, bumpScale:0.05 });
+const baseMoundMat = new THREE.MeshStandardMaterial({ color:0xc9a96a, roughness:1, bumpMap:SAND_BUMP||undefined, bumpScale:0.08 });
 const baseMound = new THREE.Mesh(new THREE.SphereGeometry(12, 30, 18), baseMoundMat);
 baseMound.scale.set(1, 0.07, 1); baseMound.position.y = -1.11;   // top ≈ -0.27 → sand sits just below the first course / placement outline
 baseMound.receiveShadow = true; baseMound.__env = true; scene.add(baseMound);
+
+// ---------- drifting atmospheric motes (dust / pollen / snow / embers / stars) — a soft volume that follows the camera ----------
+const MOTES = {   // [colour, drift dir (+up / -down), opacity] per era
+  egypt:[0xffe0a0, 1, 0.40], aztec:[0xcfe89a, 1, 0.38], greek:[0xfff2d0, 1, 0.38], norse:[0xeaf4ff, -1, 0.70],
+  nippon:[0xffd9ea, 1, 0.42], alien:[0xc89cff, 1, 0.48], cosmos:[0x9ab0ff, 1, 0.55], heaven:[0xfff4d0, 1, 0.58],
+};
+let motes = null, _moteData = null, _moteDir = 1;
+try {
+  const N = 150, pos = new Float32Array(N*3); _moteData = [];
+  for (let i = 0; i < N; i++){
+    const x = (Math.random()-0.5)*26, y = (Math.random()-0.5)*18, z = (Math.random()-0.5)*26;
+    pos[i*3] = x; pos[i*3+1] = y; pos[i*3+2] = z;
+    _moteData.push({ baseX:x, sway:0.3 + Math.random()*0.9, ph:Math.random()*6.28, vy:0.12 + Math.random()*0.5 });
+  }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const cv = document.createElement('canvas'); cv.width = cv.height = 32; const cg = cv.getContext('2d');
+  const rg = cg.createRadialGradient(16,16,0,16,16,16); rg.addColorStop(0,'rgba(255,255,255,1)'); rg.addColorStop(1,'rgba(255,255,255,0)');
+  cg.fillStyle = rg; cg.fillRect(0,0,32,32);
+  const mat = new THREE.PointsMaterial({ size:0.16, map:new THREE.CanvasTexture(cv), color:0xffe6b0, transparent:true, opacity:0.4, depthWrite:false, blending:THREE.AdditiveBlending, sizeAttenuation:true });
+  motes = new THREE.Points(geo, mat); motes.__env = true; motes.frustumCulled = false; scene.add(motes);
+} catch(e){ motes = null; }
+function updateMotes(dt){
+  if (!motes || !_moteData) return;
+  try {
+    motes.position.copy(camera.position);                       // volume rides with the camera so the air is always alive
+    const a = motes.geometry.attributes.position.array, t = performance.now()*0.001;
+    for (let i = 0; i < _moteData.length; i++){
+      const d = _moteData[i];
+      a[i*3+1] += d.vy * dt * _moteDir;                         // gentle drift up (dust/embers) or down (snow)
+      a[i*3]   = d.baseX + Math.sin(t*0.5 + d.ph) * d.sway;     // lateral sway
+      if (a[i*3+1] >  9) a[i*3+1] = -9;                          // wrap through the volume
+      else if (a[i*3+1] < -9) a[i*3+1] = 9;
+    }
+    motes.geometry.attributes.position.needsUpdate = true;
+  } catch(e){}
+}
+
 // a smooth, pointed pyramid used ONLY as the home-menu centrepiece (so the menu never shows the
 // stepped, just-built pyramid). Hidden while a game is running; recoloured to the era's stone in applyBiome.
 const coverPyramid = new THREE.Mesh(new THREE.ConeGeometry(3.7, 5.4, 4),
@@ -2526,7 +2597,7 @@ function makePiece(len, axis, color, corner){
 // stone tapers, neighbouring stones stay visually distinct instead of merging into one slab.
 function makeSteppedPiece(len, axis, color, center, n){
   const mat = new THREE.MeshStandardMaterial({ color, roughness:0.92, metalness:0.04 });
-  if (STONE_BUMP){ mat.bumpMap = STONE_BUMP; mat.bumpScale = 0.04; }    // carved stone surface relief
+  if (STONE_BUMP){ mat.bumpMap = STONE_BUMP; mat.bumpScale = 0.07; }    // carved stone surface relief
   applyEraBlockTex(mat);                                                // richer sandstone in Egypt
   const h = LAYER_HEIGHT*1.04, GAP = 0.999;           // slightly over-tall so stacked courses overlap → NO visible gap between layers; a PERFECT (flush) seat shows NO gap at all,
                                                       // while a drifted stone still leaves a real visible gap
@@ -2555,7 +2626,7 @@ function makeSteppedPiece(len, axis, color, center, n){
 // matching the stepped stone of every other course (instead of a plain gold cube).
 function makeCapstonePeak(color){
   const mat = new THREE.MeshStandardMaterial({ color, roughness:0.92, metalness:0.04 });  // exactly the other stones' look
-  if (STONE_BUMP){ mat.bumpMap = STONE_BUMP; mat.bumpScale = 0.04; }
+  if (STONE_BUMP){ mat.bumpMap = STONE_BUMP; mat.bumpScale = 0.07; }
   applyEraBlockTex(mat);
   const g = new THREE.Group();
   // same stepping cadence as every other stone (STEP_N courses, 0.04 inset/course) but receding on ALL FOUR
@@ -5349,6 +5420,16 @@ function animate(){
   if (S.phase==='run'){ if (!S.paused) updateRun(sdt); }
   else updateBuildCam(dt);
 
+  updateMotes(dt);                                             // drifting atmospheric particles
+  if (godrayPass && sunCore){                                  // aim the god-ray shafts at the sun's on-screen position, fade as it leaves frame
+    _sunNDC.copy(sunCore.position).project(camera);
+    const u = _sunNDC.x*0.5 + 0.5, v = _sunNDC.y*0.5 + 0.5, inFront = _sunNDC.z < 1;
+    const edge = Math.max(Math.abs(_sunNDC.x), Math.abs(_sunNDC.y));
+    const on = inFront ? Math.max(0, 1 - Math.max(0, edge - 0.85) / 0.7) : 0;
+    godrayPass.uniforms.uLight.value.set(u, v);
+    godrayPass.uniforms.uOn.value = on;
+    if (sun && sun.color) godrayPass.uniforms.uColor.value.copy(sun.color);
+  }
   if (composer) composer.render(); else renderer.render(scene, camera);
 
   // shop character preview: spin briskly to show the model off from all sides
