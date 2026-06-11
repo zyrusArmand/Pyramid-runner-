@@ -550,6 +550,18 @@
     background:rgba(8,5,12,.97); color:#f6e9d2; font-family:'Space Mono',monospace; }
   #adModal .adlabel { font-size:12px; letter-spacing:3px; opacity:.6; }
   #adCount { font-family:'Cinzel',serif; font-size:64px; color:#f3d99a; margin-top:12px; }
+  /* ---- level select ---- */
+  #levelsHint { text-align:center; color:#e8d8be; font-size:12px; letter-spacing:1.5px; margin:-2px 0 6px; opacity:.6; }
+  #levelsGrid { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; width:100%; max-width:460px; padding:4px 16px 16px; box-sizing:border-box; }
+  .lvlEra { margin:16px 2px 8px; color:#ffd24a; font-family:'Cinzel',serif; font-size:14px; letter-spacing:2px; font-weight:700; opacity:.92; }
+  .lvlRow { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }
+  .lvlCell { height:50px; display:flex; align-items:center; justify-content:center; border-radius:12px; font-family:'Space Mono',monospace;
+    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.13); color:#f0e6d2; font-weight:700; font-size:17px;
+    cursor:pointer; transition:transform .1s ease, background .15s; user-select:none; }
+  .lvlCell:active { transform:scale(.9); background:rgba(255,210,74,.22); }
+  .lvlCell.boss { background:rgba(255,90,60,.16); border-color:rgba(255,120,90,.45); color:#ffd0c4; }
+  .lvlCell.cur { box-shadow:0 0 0 2px #ffd24a inset; color:#fff; }
+  .lvlCell.locked { opacity:.26; pointer-events:none; font-size:13px; }
 </style>
 </head>
 <body>
@@ -682,6 +694,7 @@
     <div class="cta hero" id="homePlay">PLAY</div>
     <div class="homeRow iconRow">
       <div class="iconCol" id="homeMapBtn" title="Journey Map"><div class="iconCircle"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4z"/><path d="M9 4v13"/><path d="M15 6.5v13"/></svg></div><div class="iconCap">MAP</div></div>
+      <div class="iconCol" id="homeLevels" title="Level Select"><div class="iconCircle"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg></div><div class="iconCap">LEVELS</div></div>
       <div class="iconCol" id="homeGoalsBtn" title="Daily Goals"><div class="iconCircle"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18"/><path d="M8 2.5v4"/><path d="M16 2.5v4"/><path d="M8.5 14.5l2.2 2.2 4.3-4.3"/></svg></div><div class="iconCap">GOALS</div></div>
       <div class="iconCol" id="homeLeader" title="Leaderboard"><div class="iconCircle"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4a5 5 0 0 1-10 0V4z"/><path d="M7 6H4v1.5A3.5 3.5 0 0 0 7.5 11"/><path d="M17 6h3v1.5A3.5 3.5 0 0 1 16.5 11"/><path d="M9.5 18h5"/><path d="M12 14.5V18"/></svg></div><div class="iconCap">RANKS</div></div>
       <div class="iconCol" id="homeShop" title="Shop"><div class="iconCircle"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12l-1 11H7L6 8z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg></div><div class="iconCap">SHOP</div></div>
@@ -736,6 +749,13 @@
   <div id="lbName">YOUR NAME <input id="nameInput" maxlength="12" placeholder="SET HANDLE" autocomplete="off" spellcheck="false" enterkeyhint="done" /><button id="nameSave">SAVE</button></div>
   <div id="lb"></div>
   <div class="backBtn" id="leaderBack">◀ BACK</div>
+</div>
+
+<div class="overlay hidden panel" id="levelsPanel">
+  <div class="panelTitle">SELECT LEVEL</div>
+  <div id="levelsHint">Jump back into any level you've reached</div>
+  <div id="levelsGrid"></div>
+  <div class="backBtn" id="levelsBack">◀ BACK</div>
 </div>
 
 <div class="overlay hidden panel" id="shopPanel">
@@ -794,7 +814,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.237 · 2026.06.11</div>
+  <div id="appVersion">v1.238 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -982,7 +1002,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.237';
+const APP_VERSION = '1.238';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4608,7 +4628,7 @@ function startGame(atLevel){
   if (dailyMode){ __seeded = true; __seed = dailySeed(); } else { __seeded = false; }
   atMenu = false;
   $('startScreen').classList.add('hidden'); $('overScreen').classList.add('hidden');
-  $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden');
+  $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden'); $('levelsPanel').classList.add('hidden');
   $('lblA').textContent='SCORE'; $('lblB').textContent='LAYER'; $('levelStat').style.display='';
   $('lives').style.display='none'; $('meterLabel').textContent='STRUCTURAL INTEGRITY'; $('meterBar').style.display='block';
   $('meterWrap').style.opacity='1';
@@ -4674,7 +4694,7 @@ function showStart(){            // the main "home" menu (cover art + PLAY / LEA
   S.phase = null; S.gameOver = false;
   $('overScreen').classList.add('hidden');
   $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden'); $('profilePanel').classList.add('hidden');
-  $('mapPanel').classList.add('hidden'); WorldMap.close();
+  $('mapPanel').classList.add('hidden'); $('levelsPanel').classList.add('hidden'); WorldMap.close();
   $('nextLevelWrap').classList.remove('show'); $('introOverlay').classList.remove('show');
   $('startScreen').classList.remove('hidden');
   $('coinHud').classList.add('hidden'); $('combo').classList.remove('show'); $('vignette').style.opacity='0';
@@ -4940,6 +4960,27 @@ function renderGoals(){
   const al = $('achList'); if (al) al.innerHTML = ah;
 }
 function showLeader(){ $('howtoPanel').classList.add('hidden'); $('startScreen').classList.add('hidden'); $('leaderPanel').classList.remove('hidden'); renderLeader(); }
+// LEVEL SELECT — replay any level you've reached (1 … maxLevel), grouped by era
+function showLevels(){ $('startScreen').classList.add('hidden'); $('levelsPanel').classList.remove('hidden'); renderLevels(); }
+function renderLevels(){
+  const grid = $('levelsGrid'); if (!grid) return;
+  const top = Math.max(1, maxLevel), lastEra = Math.floor((top-1)/10);
+  let html = '';
+  for (let ei=0; ei<=lastEra; ei++){
+    const e = ERAS[Math.min(ERAS.length-1, ei)];
+    html += '<div class="lvlEra">ERA ' + (ei+1) + ' · ' + e.name + '</div><div class="lvlRow">';
+    for (let n = ei*10+1; n <= ei*10+10; n++){
+      if (n > top){ html += '<div class="lvlCell locked">🔒</div>'; continue; }
+      const cls = 'lvlCell' + (n % 10 === 0 ? ' boss' : '') + (n === resumeLevel ? ' cur' : '');
+      html += '<div class="' + cls + '" data-lv="' + n + '">' + n + (n % 10 === 0 ? '★' : '') + '</div>';
+    }
+    html += '</div>';
+  }
+  grid.innerHTML = html;
+  if (grid.querySelectorAll) grid.querySelectorAll('.lvlCell[data-lv]').forEach(c =>
+    c.addEventListener('pointerdown', ev => { ev.stopPropagation(); ev.preventDefault(); startLevel(parseInt(c.getAttribute('data-lv'), 10)); }));
+}
+function startLevel(n){ dailyMode = false; $('levelsPanel').classList.add('hidden'); startGame(n); }
 function showShop(tab){ if (tab) shopTab = tab; $('howtoPanel').classList.add('hidden'); selChar = curChar; selStone = curStone; $('startScreen').classList.add('hidden'); $('shopPanel').classList.remove('hidden'); renderShop(); }
 function showGoals(){ goalsNew = false; $('startScreen').classList.add('hidden'); $('goalsPanel').classList.remove('hidden'); renderGoals(); }
 function showSettings(){ $('startScreen').classList.add('hidden'); $('settingsPanel').classList.remove('hidden'); renderSettings(); }
@@ -4952,7 +4993,7 @@ function howTab(which){
   $('howTabAbout').classList.toggle('sel', !play);
 }
 function closeHow(){ $('howtoPanel').classList.add('hidden'); Store.set('how', 1); }
-function backHome(){ charPrevOn = false; WorldMap.close(); $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden'); $('goalsPanel').classList.add('hidden'); $('settingsPanel').classList.add('hidden'); $('profilePanel').classList.add('hidden'); $('mapPanel').classList.add('hidden'); $('startScreen').classList.remove('hidden'); renderHome(); }
+function backHome(){ charPrevOn = false; WorldMap.close(); $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden'); $('goalsPanel').classList.add('hidden'); $('settingsPanel').classList.add('hidden'); $('profilePanel').classList.add('hidden'); $('mapPanel').classList.add('hidden'); $('levelsPanel').classList.add('hidden'); $('startScreen').classList.remove('hidden'); renderHome(); }
 
 // ---------- JOURNEY MAP: a bird's-eye 3D tour of the 8 eras, marking where you are ----------
 const WorldMap = (function(){
@@ -5248,6 +5289,8 @@ btn('homeLeader',    showLeader);
 btn('homeShop',      ()=>showShop());
 btn('homeGoalsBtn',  showGoals);
 btn('homeMapBtn',    showMap);
+btn('homeLevels',    showLevels);
+btn('levelsBack',    backHome);
 btn('mapBack',       backHome);
 btn('homeSettings',  showSettings);
 btn('homeHelp',      showHow);
