@@ -794,7 +794,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.228 · 2026.06.11</div>
+  <div id="appVersion">v1.229 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -982,7 +982,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.228';
+const APP_VERSION = '1.229';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -3302,14 +3302,14 @@ const HZ_BUILD = {
     const core = new THREE.Mesh(new THREE.ConeGeometry(0.03,0.15,10), fmat2); core.position.y = 0.13; g.add(core); t.ob.coreMesh = core;
     g.position.set(t.pos.x + L*HZL, t.pos.y, t.pos.z); scene.add(g); t.obMesh = g;
   },
-  // rolling boulder/asteroid — barrels down a lane; dodge or JUMP
+  // rolling boulder/asteroid — a smooth stone ball that rolls DOWN the pyramid toward the player; dodge or JUMP
   roll(t, s){
     const L = hzRndLane();
     t.ob = { type:'lane', lane:L, jumpable:true, phase:RND()*6.28, spd:0.004 + RND()*0.002 };
-    const ball = new THREE.Mesh(new THREE.DodecahedronGeometry(0.085, 0), hzMat(s.c1 || 0x9c8763, { roughness:0.95, metalness:0.03, flatShading:true, emissive:s.em || 0x000000 }));
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.1, 22, 16), hzMat(s.c1 || 0x9c8763, { roughness:0.92, metalness:0.04, emissive:s.em || 0x000000 }));
     ball.castShadow = true;
     const g = new THREE.Group(); g.add(ball); t.ob.ball = ball;
-    g.position.set(t.pos.x + L*HZL, t.pos.y + 0.085, t.pos.z); scene.add(g); t.obMesh = g;
+    g.position.set(t.pos.x + L*HZL, t.pos.y + 0.1, t.pos.z); scene.add(g); t.obMesh = g;
   },
   // swinging blade/scythe/wing — sweeps across the lanes; dodge clear or SLIDE under
   sweep(t, s){
@@ -3464,10 +3464,14 @@ const HZ_ANIM = {
     ob.lane = up ? ob.L : 99;
   },
   roll(ob, t, near, pulse, dt){
-    if (ob.ball) ob.ball.rotation.x += dt * 7;
-    const b = Math.sin(performance.now()*ob.spd + ob.phase);
-    t.obMesh.position.z = t.pos.z + b*0.045;
-    t.obMesh.position.y = t.pos.y + 0.085 + Math.abs(Math.cos(performance.now()*ob.spd*1.4 + ob.phase))*0.012;
+    // roll DOWN the slope toward the player: cycle from up the pyramid (off=+1) down past the tile (off=-1), then loop.
+    // Up the climb is −z / +y, so "down toward you" is +z / −y; the ball follows the stair pitch as it tumbles.
+    const cyc = ((performance.now()*ob.spd*0.5 + ob.phase) % 6.2832) / 6.2832;   // 0 (top) → 1 (bottom)
+    const off = 1 - 2*cyc, tilesUp = 3.0;
+    t.obMesh.position.x = t.pos.x + ob.L*HZL;
+    t.obMesh.position.z = t.pos.z - off * tilesUp * 0.045;        // up-slope = smaller z
+    t.obMesh.position.y = t.pos.y + 0.1 + off * tilesUp * 0.055;  // up-slope = higher
+    if (ob.ball) ob.ball.rotation.x -= dt * 11;                   // tumbling forward as it barrels down
   },
   sweep(ob, t){
     const ang = 0.72 * Math.sin(performance.now()*ob.spd + ob.phase);
