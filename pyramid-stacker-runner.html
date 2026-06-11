@@ -794,7 +794,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.224 · 2026.06.11</div>
+  <div id="appVersion">v1.225 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -982,7 +982,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.224';
+const APP_VERSION = '1.225';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1891,18 +1891,45 @@ function sandstoneTex(){
   return _sandstone;
 }
 // real Poly Haven sandstone PBR maps (diffuse + GL normal + roughness), loaded once
-let _texLoader=null, _egyptPBR=0;
+let _texLoader=null, _egyptPBR=0; const _egyptPBRPending=[];
+function _applyProcSandstone(mat){
+  const s=sandstoneTex();     // procedural CanvasTexture fallback (built synchronously → no load delay, never black)
+  if (s.map){ mat.map=s.map; mat.bumpMap=s.bump||null; mat.bumpScale=0.14; mat.roughness=0.97; mat.metalness=0.0; mat.needsUpdate=true; }
+}
+function _applyEgyptMaps(mat){
+  const t=_egyptPBR; if(!t||!t.map) return;
+  mat.map=t.map; if(t.normalMap) mat.normalMap=t.normalMap; if(t.roughnessMap) mat.roughnessMap=t.roughnessMap;
+  mat.bumpMap=null; mat.roughness=1.0; mat.metalness=0.0;
+  const j=0.8+Math.random()*0.2;                               // per-block tone jitter → irregular masonry, not one flat colour
+  if (mat.color && mat.color.setRGB) mat.color.setRGB(j, j*0.97, j*0.9);
+  if (mat.normalScale && mat.normalScale.set) mat.normalScale.set(3.2,3.2);   // heavy relief → rough, rocky pyramid-stone surface
+  mat.needsUpdate=true;
+}
+function _resolveEgyptPending(){     // textures finished (or failed) — attach the right surface to every block that was waiting
+  const ok = _egyptPBR && _egyptPBR.ok;
+  _egyptPBRPending.forEach(mat => ok ? _applyEgyptMaps(mat) : _applyProcSandstone(mat));
+  _egyptPBRPending.length=0;
+}
 function loadEgyptPBR(){
-  if (_egyptPBR!==0) return _egyptPBR; _egyptPBR=null;
+  if (_egyptPBR!==0) return _egyptPBR;
+  _egyptPBR=null;
   try {
     if (!_texLoader) _texLoader = new THREE.TextureLoader();
-    const B='assets/', SET='worn_rock_natural_01';     // current Egypt sandstone set (swap this name to A/B different downloads)
-    const map=_texLoader.load(B+SET+'_diff_1k.jpg');
+    const B='assets/', SET='worn_rock_natural_01';     // current Egypt sandstone set (swap this name for a different download)
+    _egyptPBR={ map:null, normalMap:null, roughnessMap:null, ready:false, ok:false };
+    // KEY FIX: a MeshStandardMaterial whose .map points at a not-yet-decoded texture renders BLACK until the JPEG
+    // arrives — that was the "black block for a few seconds" flash. So we DON'T attach the map up front; we wait for
+    // the diffuse texture's onLoad, then swap the PBR maps into every block that was waiting. Until then blocks keep
+    // their flat sandstone tint. If the asset 404s we fall back to the synchronous procedural sandstone instead.
+    const map=_texLoader.load(B+SET+'_diff_1k.jpg',
+      ()=>{ _egyptPBR.ok=true;  _egyptPBR.ready=true; _resolveEgyptPending(); },
+      undefined,
+      ()=>{ _egyptPBR.ok=false; _egyptPBR.ready=true; _resolveEgyptPending(); });
     const nor=_texLoader.load(B+SET+'_nor_gl_1k.png');
     const rgh=_texLoader.load(B+SET+'_rough_1k.jpg');
     [map,nor,rgh].forEach(t=>{ if(t){ t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(3,3); } });   // chunky rough-stone scale
     // NOTE: deliberately NOT setting sRGB encoding — this renderer outputs linear, so decoding would crush the stone dark.
-    _egyptPBR={ map, normalMap:nor, roughnessMap:rgh };
+    _egyptPBR.map=map; _egyptPBR.normalMap=nor; _egyptPBR.roughnessMap=rgh;
   } catch(e){ _egyptPBR=null; }
   return _egyptPBR;
 }
@@ -1911,16 +1938,14 @@ function applyEraBlockTex(mat){
   try {
     if (curStone==='sand' && curEra && curEra.key==='egypt'){
       const t=loadEgyptPBR();
-      if (t && t.map){            // real Poly Haven sandstone
-        mat.map=t.map; if(t.normalMap) mat.normalMap=t.normalMap; if(t.roughnessMap) mat.roughnessMap=t.roughnessMap;
-        mat.bumpMap=null; mat.roughness=1.0; mat.metalness=0.0;
-        const j=0.8+Math.random()*0.2;                               // per-block tone jitter → irregular masonry, not one flat colour
-        if (mat.color && mat.color.setRGB) mat.color.setRGB(j, j*0.97, j*0.9);
-        if (mat.normalScale && mat.normalScale.set) mat.normalScale.set(3.2,3.2);   // heavy relief → rough, rocky pyramid-stone surface
-        mat.needsUpdate=true; return;
+      if (t){                        // real Poly Haven sandstone (loads async)
+        mat.roughness=1.0; mat.metalness=0.0;
+        if (!t.ready) _egyptPBRPending.push(mat);   // still loading → keep the flat sandstone tint for now (no black flash)
+        else if (t.ok) _applyEgyptMaps(mat);        // already loaded → attach the PBR maps immediately
+        else _applyProcSandstone(mat);              // load failed earlier → procedural fallback
+        return;
       }
-      const s=sandstoneTex();     // procedural fallback
-      if (s.map){ mat.map=s.map; mat.bumpMap=s.bump||null; mat.bumpScale=0.14; mat.roughness=0.97; mat.metalness=0.0; mat.needsUpdate=true; }
+      _applyProcSandstone(mat);                     // no loader available → procedural fallback
     }
   } catch(e){}
 }
@@ -5261,6 +5286,7 @@ function animate(){
 // initial idle camera
 camera.position.set(0,7,11); camera.lookAt(0,2,0);
 applyBiome(1);                            // paint the era-1 (Egypt) sky + backdrop behind the menu
+if (curStone==='sand'){ try{ loadEgyptPBR(); }catch(e){} }   // kick off the sandstone texture fetch at launch so it's ready before the first block
 $('hud').style.display = 'none';          // hidden until a game starts, so the menu stays clean
 $('meterWrap').style.opacity = '0';
 renderHome();          // populate best scores & coin bank on the home screen
