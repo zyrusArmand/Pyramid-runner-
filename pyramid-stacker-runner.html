@@ -794,7 +794,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.225 · 2026.06.11</div>
+  <div id="appVersion">v1.226 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -982,7 +982,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.225';
+const APP_VERSION = '1.226';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1712,6 +1712,12 @@ function hazardsUnlocked(level){
 }
 // distinct hazard TYPES that actually appear in a single climb (keeps any one run readable): 2–3 early in an era, 3–5 in its back half
 function hazardVariety(level){ const el = eraLevelOf(level); const lo = el <= 5 ? 2 : 3, hi = el <= 5 ? 3 : 5; return lo + Math.floor(RND() * (hi - lo + 1)); }
+// hazards that unlock at EXACTLY this level (so they're guaranteed to appear the level their "NEW" card is shown)
+function freshHazards(level){
+  const now = hazardsUnlocked(level); if (level <= 1) return now;
+  const prev = hazardsUnlocked(level - 1);
+  return now.filter(k => prev.indexOf(k) < 0);
+}
 function powersUnlocked(level){ return FEATURES.filter(f => f.type==='power' && level >= f.level).map(f => f.power); }
 function goldenUnlocked(level){ return level >= 2; }
 // how busy a climb gets: flat within each 5-level band, stepping up one band at a time (hazards still gated by unlock)
@@ -3621,20 +3627,38 @@ function loadRunDressing(){
   // procedural obstacles: only this ERA's unlocked hazards appear. The unlocked set grows over the era's first levels,
   // but a per-run "variety cap" shuffles it and features only a few distinct types this climb so any one run stays readable.
   const haz = hazardsUnlocked(gameLevel);
+  const fresh = freshHazards(gameLevel);                 // unlocked at exactly this level — guarantee these appear
   const runHaz = haz.slice();
   for (let a = runHaz.length - 1; a > 0; a--){ const b = Math.floor(RND()*(a+1)); const tmp = runHaz[a]; runHaz[a] = runHaz[b]; runHaz[b] = tmp; }
   runHaz.length = Math.min(runHaz.length, hazardVariety(gameLevel));
-  const density = obstacleDensity(gameLevel) * (isGuardianLevel(gameLevel) ? 1.5 : 1);   // guardian climbs run hotter
-  let lastOb = 2;
-  for (let i = 5; haz.length && i < tiles.length - 2; i++){
-    const t = tiles[i];
-    if (t.gap || t.weak || i - lastOb < 3) continue;
-    if ((tiles[i-1] && (tiles[i-1].gap || tiles[i-1].weak)) ||
-        (tiles[i-2] && (tiles[i-2].gap || tiles[i-2].weak))) continue;   // leave landing room after a jump
-    if (RND() > density * DDA.obstacleW() * hazardMul) continue;   // adaptive + shaped by how well you built the pyramid
-    const kind = runHaz[Math.floor(RND()*runHaz.length)];          // pick from this run’s limited hazard palette
-    buildHazard(kind, t);
-    lastOb = i;
+  fresh.forEach(k => { if (runHaz.indexOf(k) < 0) runHaz.unshift(k); });   // always feature the freshly-unlocked hazard(s)
+  if (runHaz.length){
+    // collect eligible tiles (no gap/weak here or in the two preceding landing tiles), then keep only those spaced ≥3 apart
+    const slotsIdx = []; let last = -99;
+    for (let i = 5; i < tiles.length - 2; i++){
+      const t = tiles[i];
+      if (t.gap || t.weak) continue;
+      if ((tiles[i-1] && (tiles[i-1].gap || tiles[i-1].weak)) || (tiles[i-2] && (tiles[i-2].gap || tiles[i-2].weak))) continue;   // leave landing room after a jump
+      if (i - last >= 3){ slotsIdx.push(i); last = i; }
+    }
+    const density = obstacleDensity(gameLevel) * (isGuardianLevel(gameLevel) ? 1.5 : 1);   // guardian climbs run hotter
+    const effDensity = density * DDA.obstacleW() * hazardMul;            // adaptive + shaped by how well you built the pyramid
+    // how many obstacles to actually place: density-driven, but never empty — a floor of 2 (early) / 3 (later), and always
+    // enough room for every freshly-unlocked hazard. Good builds (low hazardMul) still thin the higher-level climbs out.
+    let target = Math.round(slotsIdx.length * 3 * effDensity);           // ×3 → slotsIdx is already 1-per-3-tiles
+    target = Math.max(target, Math.min(slotsIdx.length, gameLevel <= 5 ? 2 : 3), fresh.length);
+    target = Math.min(target, slotsIdx.length);
+    // choose `target` slots spread across the climb
+    const chosen = [];
+    if (target >= slotsIdx.length){ chosen.push(...slotsIdx); }
+    else { const stride = slotsIdx.length / target;
+      for (let k = 0; k < target; k++) chosen.push(slotsIdx[Math.min(slotsIdx.length-1, Math.floor(k*stride + RND()*stride*0.7))]); }
+    // build the kind list: every fresh hazard first (guaranteed), then fill from the run palette, then shuffle
+    const kinds = fresh.slice(0, chosen.length);
+    while (kinds.length < chosen.length) kinds.push(runHaz[Math.floor(RND()*runHaz.length)]);
+    for (let a = kinds.length - 1; a > 0; a--){ const b = Math.floor(RND()*(a+1)); const tmp = kinds[a]; kinds[a] = kinds[b]; kinds[b] = tmp; }
+    const seen = {};
+    chosen.forEach((i, k) => { if (!seen[i]){ seen[i] = 1; buildHazard(kinds[k], tiles[i]); } });   // dedupe any stride collisions
   }
   // coins: a glinting trail of pickups spread ACROSS the lanes (steer into a coin's lane to grab it).
   // A few hover over gaps (centred), rewarding a well-timed jump (collect-while-airborne pays a bonus).
