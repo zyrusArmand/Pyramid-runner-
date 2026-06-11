@@ -878,7 +878,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.243 · 2026.06.11</div>
+  <div id="appVersion">v1.244 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1066,7 +1066,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.243';
+const APP_VERSION = '1.244';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -2961,7 +2961,7 @@ function spawnBlock(){
     for (let c = S.cellIndex; c < S.cellIndex + len; c++) cells.push(c);
   }
 
-  const speed = 1.8 + S.layer*0.18 + RND()*0.15;
+  const speed = (1.8 + S.layer*0.18 + RND()*0.15) * (dailyMode ? 1.6 : 1);   // Daily Challenge: blocks swing much faster
   const color = layerColor(S.layer);                  // capstone matches the rest of the pyramid's stone
 
   let mesh;
@@ -4265,7 +4265,7 @@ function updateRun(dt){
   if (r.reflexCD > 0) r.reflexCD -= dt;            // near-miss slow-mo cooldown
 
   // advance along the path — the climb steadily quickens to keep the pressure on
-  r.speed = (3.1 + Math.min(r.idx * 0.028, 2.3)) * DDA.runSpeed() * levelSpeed();   // adaptive + faster each level
+  r.speed = (3.1 + Math.min(r.idx * 0.028, 2.3)) * DDA.runSpeed() * levelSpeed() * (dailyMode ? 1.35 : 1);   // adaptive + faster each level; Daily Challenge runs hot
   setSpeedFx(Math.max(0, (r.speed - 4.3) / 4) * 0.42);   // edge speed-streaks fade in as the climb accelerates
   r.t += r.speed * dt / 1;
   while (r.t >= 1){
