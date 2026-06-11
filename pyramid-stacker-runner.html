@@ -794,7 +794,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.226 · 2026.06.11</div>
+  <div id="appVersion">v1.227 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -982,7 +982,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.226';
+const APP_VERSION = '1.227';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -3642,9 +3642,9 @@ function loadRunDressing(){
       if (i - last >= 3){ slotsIdx.push(i); last = i; }
     }
     const density = obstacleDensity(gameLevel) * (isGuardianLevel(gameLevel) ? 1.5 : 1);   // guardian climbs run hotter
-    const effDensity = density * DDA.obstacleW() * hazardMul;            // adaptive + shaped by how well you built the pyramid
+    const effDensity = density * DDA.obstacleW() * hazardMul;            // level density × adaptive skill weighting (build quality no longer factors in)
     // how many obstacles to actually place: density-driven, but never empty — a floor of 2 (early) / 3 (later), and always
-    // enough room for every freshly-unlocked hazard. Good builds (low hazardMul) still thin the higher-level climbs out.
+    // enough room for every freshly-unlocked hazard.
     let target = Math.round(slotsIdx.length * 3 * effDensity);           // ×3 → slotsIdx is already 1-per-3-tiles
     target = Math.max(target, Math.min(slotsIdx.length, gameLevel <= 5 ? 2 : 3), fresh.length);
     target = Math.min(target, slotsIdx.length);
@@ -3814,8 +3814,8 @@ function startRun(){
   if (gameLevel > maxLevel){ maxLevel = gameLevel; Store.set('maxLevel', maxLevel); grantEraChars(); } // highest level reached → free peasant for any new era
   missionEvent('stars', stars); missionEvent('builds', 1);   // goals: build quality + pyramids built
   bumpRecord('bestStars', stars);                            // achievements: flawless build, build counts, levels reached
-  const hazardMul = stars>=5 ? 0.4 : stars>=4 ? 0.65 : stars>=3 ? 1.0 : stars>=2 ? 1.35 : 1.7;   // fewer hazards on a clean build
-  S.climbCoinMul = stars>=5 ? 2 : stars>=4 ? 1.6 : stars>=3 ? 1.2 : stars>=2 ? 1.0 : 0.7;        // richer coins on a clean build
+  const hazardMul = 1.0;   // build quality no longer thins out hazards — the climb's difficulty is the same however you built
+  S.climbCoinMul = stars>=5 ? 2 : stars>=4 ? 1.6 : stars>=3 ? 1.2 : stars>=2 ? 1.0 : 0.7;        // a clean build still pays richer coins
   const tiles = climbPath();   // steep, direct step-by-step climb up the front face
   // HAZARD: sandstorm stretches — fog closes in, harder to read the path ahead
   const storms = [];
