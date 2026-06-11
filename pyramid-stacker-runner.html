@@ -418,8 +418,8 @@
      menu/scene behind never bleeds through while the opaque panel is appearing) */
   .panel:not(.hidden) { animation:panelRise .26s ease-out; }
   @keyframes panelRise { 0%{ transform:translateY(11px); } 100%{ transform:translateY(0); } }
-  #appVersion { position:absolute; left:0; right:0; bottom:max(16px,env(safe-area-inset-bottom));
-    text-align:center; font-family:'Space Mono',monospace; font-size:10px; letter-spacing:2px; color:#cdb083; opacity:.45; pointer-events:none; }
+  #appVersion { position:absolute; left:0; right:0; bottom:max(10px,env(safe-area-inset-bottom));
+    text-align:center; font-family:'Space Mono',monospace; font-size:10px; letter-spacing:2px; color:#cdb083; opacity:.45; pointer-events:auto; cursor:pointer; padding:12px 0; }
   .backBtn { pointer-events:auto; position:fixed; left:16px; top:max(16px,env(safe-area-inset-top));
     font-family:'Space Mono',monospace; font-size:12px; letter-spacing:2px; color:#f6e9d2;
     background:rgba(20,12,28,.6); border:1px solid rgba(243,200,120,.4); border-radius:18px; padding:9px 14px; cursor:pointer; }
@@ -794,7 +794,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.219 · 2026.06.11</div>
+  <div id="appVersion">v1.220 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -982,7 +982,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.219';
+const APP_VERSION = '1.220';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
