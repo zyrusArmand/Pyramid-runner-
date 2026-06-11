@@ -461,12 +461,18 @@
   #storm { position:fixed; inset:0; z-index:4; pointer-events:none; opacity:0; transition:opacity .4s;
     background:linear-gradient(180deg, rgba(206,158,86,.4), rgba(150,100,50,.12)); }
 
-  /* contextual tutorial hint */
-  #hint { position:fixed; left:50%; bottom:calc(max(26px,env(safe-area-inset-bottom)) + 50px); transform:translateX(-50%);
-    z-index:6; pointer-events:none; font-family:'Space Mono',monospace; font-size:12px; letter-spacing:1px;
-    color:#fff; background:rgba(20,12,28,.72); padding:10px 18px; border-radius:22px; border:1px solid rgba(243,200,120,.4);
-    text-align:center; max-width:84vw; opacity:0; transition:opacity .3s; box-shadow:0 4px 18px rgba(0,0,0,.4); }
-  #hint.show { opacity:1; }
+  /* contextual tutorial hint — a warm frosted-glass pill that blends with the sand/gold palette */
+  #hint { position:fixed; left:50%; bottom:calc(max(26px,env(safe-area-inset-bottom)) + 50px); transform:translateX(-50%) translateY(8px);
+    z-index:6; pointer-events:none; font-family:'Space Mono',monospace; font-size:12px; letter-spacing:1.2px; line-height:1.55;
+    color:#fbeccb;
+    background:linear-gradient(180deg, rgba(52,34,20,.80), rgba(28,16,26,.86));
+    -webkit-backdrop-filter:blur(9px) saturate(1.1); backdrop-filter:blur(9px) saturate(1.1);
+    padding:11px 20px; border-radius:16px; border:1px solid rgba(243,200,120,.42);
+    text-align:center; max-width:80vw;
+    box-shadow:0 8px 26px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,224,160,.22), inset 0 0 22px rgba(255,180,90,.06);
+    opacity:0; transition:opacity .35s ease, transform .35s ease; }
+  #hint.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  #hint .hk { color:#ffd47a; font-weight:700; letter-spacing:1.5px; }
 
   /* local leaderboard on the start screen */
   /* leaderboard lifetime-stats grid */
@@ -814,7 +820,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.238 · 2026.06.11</div>
+  <div id="appVersion">v1.239 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1002,7 +1008,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.238';
+const APP_VERSION = '1.239';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4478,7 +4484,10 @@ function doubleCoins(){
   }, 'double');
 }
 function showHint(text, ms){
-  const h = $('hint'); h.textContent = text; h.classList.add('show');
+  const h = $('hint');
+  const safe = String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  h.innerHTML = safe.replace(/\b(TAP|SWIPE|SLIDE|JUMP|DODGE|PERFECT|LEFT|RIGHT|UP|DOWN|INTO|HOLD|DRAG)\b/g, '<b class="hk">$1</b>');   // gold action keywords
+  h.classList.add('show');
   clearTimeout(showHint._t); if (ms) showHint._t = setTimeout(()=>h.classList.remove('show'), ms);
 }
 
