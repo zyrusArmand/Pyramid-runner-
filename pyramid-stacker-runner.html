@@ -794,7 +794,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.236 · 2026.06.11</div>
+  <div id="appVersion">v1.237 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -982,7 +982,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.236';
+const APP_VERSION = '1.237';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1749,12 +1749,12 @@ const sky = new THREE.Mesh(skyGeo, skyMat); scene.add(sky);
 let hazeBand = null;
 try {
   const hc = document.createElement('canvas'); hc.width = 8; hc.height = 128; const hx = hc.getContext && hc.getContext('2d');
-  if (hx){ const hg = hx.createLinearGradient(0,0,0,128);
-    hg.addColorStop(0,'rgba(255,255,255,0)'); hg.addColorStop(0.62,'rgba(255,255,255,0.55)'); hg.addColorStop(1,'rgba(255,255,255,0.9)');
+  if (hx){ const hg = hx.createLinearGradient(0,0,0,128);   // a THIN soft band (fades out both top and bottom) so it only glows at the horizon line, never washes the scene
+    hg.addColorStop(0,'rgba(255,255,255,0)'); hg.addColorStop(0.5,'rgba(255,255,255,0.85)'); hg.addColorStop(1,'rgba(255,255,255,0)');
     hx.fillStyle = hg; hx.fillRect(0,0,8,128);
-    hazeBand = new THREE.Mesh(new THREE.CylinderGeometry(80,80,17,44,1,true),
-      new THREE.MeshBasicMaterial({ map:new THREE.CanvasTexture(hc), color:0xd9b88a, transparent:true, opacity:0.55, side:THREE.BackSide, depthWrite:false, fog:false }));
-    hazeBand.position.y = 2; hazeBand.__env = true; scene.add(hazeBand);
+    hazeBand = new THREE.Mesh(new THREE.CylinderGeometry(80,80,8,44,1,true),
+      new THREE.MeshBasicMaterial({ map:new THREE.CanvasTexture(hc), color:0xd9b88a, transparent:true, opacity:0.20, side:THREE.BackSide, depthWrite:false, fog:false }));
+    hazeBand.position.y = 1.4; hazeBand.__env = true; scene.add(hazeBand);
   }
 } catch(e){ hazeBand = null; }
 
@@ -1876,7 +1876,7 @@ const GodrayShader = {
     uLight:    { value: null },                         // assigned a THREE.Vector2 when the pass is built (browser only)
     uColor:    { value: new THREE.Color(0xffe6b0) },
     uOn:       { value: 0.0 },
-    uIntensity:{ value: 0.95 },
+    uIntensity:{ value: 0.7 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
@@ -1932,7 +1932,7 @@ try {
     if (composer.setPixelRatio) composer.setPixelRatio(renderer.getPixelRatio());
     composer.addPass(new THREE.RenderPass(scene, camera));
     if (THREE.UnrealBloomPass)                                      // selective glow: only the sun, gold & emissives bloom
-      composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(Math.max(2, innerWidth*0.5), Math.max(2, innerHeight*0.5)), 0.32, 0.5, 0.86));
+      composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(Math.max(2, innerWidth*0.5), Math.max(2, innerHeight*0.5)), 0.26, 0.5, 0.90));
     godrayPass = new THREE.ShaderPass(GodrayShader);
     godrayPass.uniforms.uLight.value = new THREE.Vector2(0.5, 0.78);
     composer.addPass(godrayPass);   // sun shafts
