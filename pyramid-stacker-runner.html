@@ -794,7 +794,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.223 · 2026.06.11</div>
+  <div id="appVersion">v1.224 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -982,7 +982,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.223';
+const APP_VERSION = '1.224';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -3313,55 +3313,93 @@ const HZ_BUILD = {
     g.add(wallL); g.add(wallR); t.ob.wallL = wallL; t.ob.wallR = wallR;
     g.position.set(t.pos.x, t.pos.y, t.pos.z); scene.add(g); t.obMesh = g;
   },
-  // dart/shuriken/comet volley — fires across ONE telegraphed lane on a timer; dodge out before it looses
+  // dart/shuriken/comet volley — a wall launcher fires darts across ONE telegraphed lane on a timer; dodge out before it looses
   volley(t, s){
-    const L = hzRndLane(), side = L > 0 ? -1 : 1;
+    const L = hzRndLane(), side = L > 0 ? -1 : 1, bx = side*0.44;
     t.ob = { type:'lane', lane:99, L, side, phase:RND()*6.28, spd:0.0024 + RND()*0.0018 };
     const g = new THREE.Group();
-    const emit = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.09,0.08), hzMat(s.c2 || 0x6a5230, { roughness:0.8, metalness:0.2, emissive:s.em || 0x201000 }));
-    emit.position.set(side*0.42, 0.08, 0); emit.castShadow = true; g.add(emit); t.ob.teleMat = emit.material;
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.14,0.14), hzMat(s.c2 || 0x6a5230, { roughness:0.85, metalness:0.25 }));
+    plate.position.set(side*0.49, 0.085, 0); plate.castShadow = true; g.add(plate);
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.036,0.12,12), hzMat(0x2a2018, { roughness:0.6, metalness:0.55 }));
+    barrel.rotation.z = Math.PI/2; barrel.position.set(bx, 0.085, 0); barrel.castShadow = true; g.add(barrel);
+    const apMat = new THREE.MeshStandardMaterial({ color:s.c1 || 0xffd070, emissive:s.em || 0x401800, emissiveIntensity:1.2, transparent:true, opacity:0.9, roughness:0.4 });
+    const ap = new THREE.Mesh(new THREE.CylinderGeometry(0.022,0.022,0.012,12), apMat); ap.rotation.z = Math.PI/2; ap.position.set(bx - side*0.06, 0.085, 0); g.add(ap); t.ob.teleMat = apMat;
+    const flashMat = new THREE.MeshStandardMaterial({ color:0xffe6a0, emissive:s.em2 || 0xffaa30, emissiveIntensity:2, transparent:true, opacity:0, roughness:0.5, depthWrite:false, blending:THREE.AdditiveBlending });
+    const flash = new THREE.Mesh(new THREE.ConeGeometry(0.05,0.11,10), flashMat); flash.rotation.z = side*Math.PI/2; flash.position.set(bx - side*0.08, 0.085, 0); g.add(flash); t.ob.flashMat = flashMat;
     const dartMat = hzMat(s.c1 || 0xcfd6dc, { metalness:0.7, roughness:0.3, emissive:s.em || 0x201000 });
+    const tipMat = hzMat(0xf0f4f8, { metalness:0.85, roughness:0.2 });
+    const trailMat = new THREE.MeshStandardMaterial({ color:s.c1 || 0xcfd6dc, emissive:s.c1 || 0x9ab0c0, emissiveIntensity:1, transparent:true, opacity:0.4, depthWrite:false, blending:THREE.AdditiveBlending });
     const darts = [];
-    for (let k = 0; k < 3; k++){ const d = new THREE.Mesh(new THREE.ConeGeometry(0.014,0.07,6), dartMat); d.rotation.z = side*Math.PI/2; d.position.set(side*0.42, 0.08 + (k-1)*0.022, 0); d.visible = false; g.add(d); darts.push(d); }
+    for (let k = 0; k < 3; k++){
+      const dart = new THREE.Group();
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.006,0.006,0.07,6), dartMat); shaft.rotation.z = Math.PI/2; dart.add(shaft);
+      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.014,0.032,7), tipMat); tip.rotation.z = side*Math.PI/2; tip.position.x = -side*0.05; dart.add(tip);
+      const trail = new THREE.Mesh(new THREE.BoxGeometry(0.11,0.006,0.006), trailMat); trail.position.x = side*0.06; dart.add(trail);
+      dart.position.set(bx, 0.085 + (k-1)*0.026, 0); dart.visible = false; g.add(dart); darts.push(dart);
+    }
     t.ob.darts = darts;
     g.position.set(t.pos.x, t.pos.y, t.pos.z); scene.add(g); t.obMesh = g;
   },
-  // pop-up spikes — snap up from a lane on a timer; dodge aside or JUMP them while up
+  // pop-up spikes — snap up out of a floor socket on a timer; dodge aside or JUMP them while up
   popup(t, s){
     const L = hzRndLane();
-    const mat = hzMat(s.c1 || 0x88e0c0, { emissive:s.em || 0x103028, metalness:0.4, roughness:0.4, flatShading:true });
+    const mat = hzMat(s.c1 || 0x88e0c0, { emissive:s.em || 0x103028, metalness:0.45, roughness:0.4, flatShading:true });
     t.ob = { type:'lane', lane:99, L, jumpable:true, phase:RND()*6.28, spd:0.0026 + RND()*0.002, mat };
-    const g = new THREE.Group(), inner = new THREE.Group();
-    for (const [sx,sz] of [[-0.05,0],[0,0.02],[0.05,0]]){ const sp = new THREE.Mesh(new THREE.ConeGeometry(0.024,0.14,s.sides || 5), mat); sp.position.set(sx,0.07,sz); sp.castShadow = true; inner.add(sp); }
-    inner.scale.y = 0.05; g.add(inner); t.ob.inner = inner;
+    const g = new THREE.Group();
+    const socket = new THREE.Mesh(new THREE.BoxGeometry(0.19,0.03,0.11), hzMat(0x3a3a30, { roughness:0.9, metalness:0.1 })); socket.position.y = 0.015; socket.castShadow = true; g.add(socket);
+    const rim = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.012,0.12), hzMat(s.c2 || 0x6a6a52, { metalness:0.3, roughness:0.6 })); rim.position.y = 0.03; g.add(rim);
+    const inner = new THREE.Group();
+    [-0.06,-0.02,0.02,0.06].forEach((sx,i) => { const sh = (i===1||i===2) ? 0.16 : 0.12; const sp = new THREE.Mesh(new THREE.ConeGeometry(0.023, sh, s.sides || 5), mat); sp.position.set(sx, sh/2, (i%2 ? 0.018 : -0.012)); sp.castShadow = true; inner.add(sp); });
+    inner.position.y = 0.03; inner.scale.y = 0.05; g.add(inner); t.ob.inner = inner;
     g.position.set(t.pos.x + L*HZL, t.pos.y, t.pos.z); scene.add(g); t.obMesh = g;
   },
-  // spinning rotor/pulsar — only one lane is open at a time, and it rotates; dodge to the gap
+  // spinning rotor/pulsar — a raised turbine whirls and only one lane is open at a time; a glowing ring marks the gap
   spinner(t, s){
     t.ob = { type:'crush', closed:true, safeLane:0, phase:RND()*6.28, spd:0.0016 + RND()*0.0012 };
-    const g = new THREE.Group(), rotor = new THREE.Group(); rotor.position.y = 0.12;
-    const armMat = hzMat(s.c1 || 0xb06ad0, { metalness:0.6, roughness:0.35, emissive:s.em || 0x200a30 });
-    for (let k = 0; k < 3; k++){ const arm = new THREE.Mesh(new THREE.BoxGeometry(0.34,0.03,0.05), armMat); arm.rotation.y = k*2.094; arm.castShadow = true; rotor.add(arm); }
-    rotor.add(new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.07,10), hzMat(s.c2 || 0x4a3a5a, { metalness:0.5, roughness:0.5 })));
-    g.add(rotor); t.ob.rotor = rotor;
-    g.position.set(t.pos.x, t.pos.y, t.pos.z); scene.add(g); t.obMesh = g;
-  },
-  // laser/holy beam — snaps on across the WHOLE path on a timer; SLIDE under it while it's firing
-  beam(t, s){
-    const beamMat = new THREE.MeshStandardMaterial({ color:s.c1 || 0x66e0ff, emissive:s.em || 0x2090c0, emissiveIntensity:1.6, transparent:true, opacity:0, roughness:0.4 });
-    t.ob = { type:'beamT', on:false, phase:RND()*6.28, spd:0.0024 + RND()*0.0016, beamMat };
     const g = new THREE.Group();
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.62,0.03,0.03), beamMat); bar.position.y = 0.13; g.add(bar);
-    const postMat = hzMat(s.c2 || 0x33424a, { metalness:0.5, roughness:0.5, emissive:s.em || 0x081018 });
-    [-0.3,0.3].forEach(px => { const p = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.18,0.04), postMat); p.position.set(px,0.09,0); p.castShadow = true; g.add(p); });
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.024,0.17,8), hzMat(s.c2 || 0x4a3a5a, { metalness:0.5, roughness:0.5 })); post.position.y = 0.085; g.add(post);
+    const rotor = new THREE.Group(); rotor.position.y = 0.18;
+    const bladeMat = hzMat(s.c1 || 0xb06ad0, { metalness:0.7, roughness:0.3, emissive:s.em || 0x200a30, emissiveIntensity:0.8 });
+    const edgeMat = new THREE.MeshStandardMaterial({ color:s.c1 || 0xd09aff, emissive:s.c1 || 0xb06ad0, emissiveIntensity:1.5, roughness:0.3, metalness:0.5 });
+    for (let k = 0; k < 3; k++){
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.36,0.025,0.07), bladeMat); blade.rotation.y = k*2.094; blade.castShadow = true;
+      const tip = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.034,0.08), edgeMat); tip.position.set(0.175,0,0); blade.add(tip);
+      rotor.add(blade);
+    }
+    rotor.add(new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.08,12), hzMat(s.c2 || 0x4a3a5a, { metalness:0.6, roughness:0.4, emissive:s.em || 0x200a30 })));
+    g.add(rotor); t.ob.rotor = rotor;
+    const gapMat = new THREE.MeshStandardMaterial({ color:0x66ffcc, emissive:0x33ffaa, emissiveIntensity:1.4, transparent:true, opacity:0.7, depthWrite:false, blending:THREE.AdditiveBlending });
+    const gap = new THREE.Mesh(new THREE.RingGeometry(0.05,0.085,20), gapMat); gap.rotation.x = -Math.PI/2; gap.position.y = 0.014; g.add(gap); t.ob.gapMark = gap; t.ob.gapMat = gapMat;
     g.position.set(t.pos.x, t.pos.y, t.pos.z); scene.add(g); t.obMesh = g;
   },
-  // ice slick — no damage, but you CAN'T change lanes for a beat after crossing it; line up early
+  // laser/holy beam — a bright core inside a soft glow snaps on across the WHOLE path on a timer; SLIDE under it while it fires
+  beam(t, s){
+    const coreMat = new THREE.MeshStandardMaterial({ color:0xffffff, emissive:s.c1 || 0x66e0ff, emissiveIntensity:2.2, transparent:true, opacity:0, roughness:0.3, depthWrite:false });
+    const glowMat = new THREE.MeshStandardMaterial({ color:s.c1 || 0x66e0ff, emissive:s.em || 0x2090c0, emissiveIntensity:1.4, transparent:true, opacity:0, roughness:0.5, depthWrite:false, blending:THREE.AdditiveBlending });
+    const apMat = new THREE.MeshStandardMaterial({ color:s.c1 || 0x66e0ff, emissive:s.c1 || 0x66e0ff, emissiveIntensity:1.2, transparent:true, opacity:0.5, roughness:0.4 });
+    t.ob = { type:'beamT', on:false, phase:RND()*6.28, spd:0.0024 + RND()*0.0016, beamMat:coreMat, glowMat, apMat };
+    const g = new THREE.Group();
+    const glow = new THREE.Mesh(new THREE.BoxGeometry(0.62,0.07,0.07), glowMat); glow.position.y = 0.13; g.add(glow);
+    const core = new THREE.Mesh(new THREE.BoxGeometry(0.62,0.022,0.022), coreMat); core.position.y = 0.13; g.add(core);
+    const postMat = hzMat(s.c2 || 0x33424a, { metalness:0.6, roughness:0.4, emissive:s.em || 0x081018 });
+    [-0.31,0.31].forEach(px => {
+      const p = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.2,0.06), postMat); p.position.set(px,0.1,0); p.castShadow = true; g.add(p);
+      const ap = new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.018,0.03,10), apMat); ap.rotation.z = Math.PI/2; ap.position.set(px - Math.sign(px)*0.03, 0.13, 0); g.add(ap);
+    });
+    g.position.set(t.pos.x, t.pos.y, t.pos.z); scene.add(g); t.obMesh = g;
+  },
+  // ice slick — a glossy frozen slab (no damage), but you CAN'T change lanes for a beat after crossing it; line up early
   lock(t, s){
-    const mat = new THREE.MeshStandardMaterial({ color:s.c1 || 0xbfe6ff, emissive:s.em || 0x16384a, transparent:true, opacity:0.5, roughness:0.12, metalness:0.3 });
+    const mat = new THREE.MeshStandardMaterial({ color:s.c1 || 0xbfe6ff, emissive:s.em || 0x16384a, transparent:true, opacity:0.55, roughness:0.08, metalness:0.4 });
     t.ob = { type:'lock', mat };
     const g = new THREE.Group();
-    const patch = new THREE.Mesh(new THREE.BoxGeometry(0.62,0.012,0.2), mat); patch.position.y = 0.012; g.add(patch);
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(0.62,0.014,0.2), mat); slab.position.y = 0.011; g.add(slab);
+    const rim = new THREE.Mesh(new THREE.BoxGeometry(0.64,0.008,0.22), new THREE.MeshStandardMaterial({ color:0xffffff, emissive:0x335066, transparent:true, opacity:0.3, roughness:0.4 })); rim.position.y = 0.006; g.add(rim);
+    const crackMat = new THREE.MeshStandardMaterial({ color:0xffffff, emissive:0xcfe8ff, emissiveIntensity:0.8, transparent:true, opacity:0.7 });
+    [[0,0,0.5,0.0],[-0.12,0.04,0.2,0.6],[0.1,-0.05,0.18,-0.5],[0.18,0.05,0.16,0.9]].forEach(([cx,cz,len,rot]) => {
+      const cr = new THREE.Mesh(new THREE.BoxGeometry(len,0.004,0.006), crackMat); cr.position.set(cx,0.019,cz); cr.rotation.y = rot; g.add(cr); });
+    const sheenMat = new THREE.MeshStandardMaterial({ color:0xffffff, emissive:0xffffff, emissiveIntensity:0.6, transparent:true, opacity:0.2, depthWrite:false, blending:THREE.AdditiveBlending });
+    const sheen = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.004,0.2), sheenMat); sheen.position.set(-0.25,0.02,0); g.add(sheen); t.ob.sheen = sheen; t.ob.sheenMat = sheenMat;
     g.position.set(t.pos.x, t.pos.y, t.pos.z); scene.add(g); t.obMesh = g;
   },
 };
@@ -3428,8 +3466,9 @@ const HZ_ANIM = {
     let fire = false, tele;
     if (cyc < 0.62){ tele = cyc/0.62; } else if (cyc < 0.78){ fire = true; tele = 1; } else tele = 0;
     if (ob.teleMat) ob.teleMat.emissive.setRGB(0.4*tele*(0.6+0.4*pulse), 0.12*tele, 0);
+    if (ob.flashMat) ob.flashMat.opacity = fire ? Math.max(0, 1 - (cyc-0.62)/0.09)*0.9 : 0;   // muzzle flash on the loose
     const targetX = ob.L*HZL;
-    if (ob.darts) ob.darts.forEach((d, k) => { if (fire){ d.visible = true; const k2 = Math.min(1, (cyc-0.62)/0.16 + k*0.12); d.position.x = ob.side*0.42 + (targetX - ob.side*0.42)*k2; } else d.visible = false; });
+    if (ob.darts) ob.darts.forEach((d, k) => { if (fire){ d.visible = true; const k2 = Math.min(1, (cyc-0.62)/0.16 + k*0.12); d.position.x = ob.side*0.44 + (targetX - ob.side*0.44)*k2; } else d.visible = false; });
     ob.lane = fire ? ob.L : 99;
   },
   popup(ob, t, near, pulse){
@@ -3445,15 +3484,22 @@ const HZ_ANIM = {
     if (ob.rotor) ob.rotor.rotation.y += dt * 2.4;
     const seq = [-1, 0, 1, 0], cyc = ((performance.now()*ob.spd + ob.phase) % 6.2832) / 6.2832;
     ob.safeLane = seq[Math.floor(cyc*seq.length) % seq.length];
+    if (ob.gapMark) ob.gapMark.position.x = ob.safeLane*HZL;        // glowing ring marks the open lane
+    if (ob.gapMat){ ob.gapMat.opacity = 0.45 + 0.4*pulse; ob.gapMat.emissiveIntensity = 1.0 + 0.8*pulse; }
   },
   beam(ob, t){
     const cyc = ((performance.now()*ob.spd + ob.phase) % 6.2832) / 6.2832;
     let on = false, op = 0.05;
-    if (cyc < 0.5){ op = 0.05; } else if (cyc < 0.62){ op = 0.1 + 0.4*Math.abs(Math.sin(performance.now()*0.05)); } else { on = true; op = 0.9; }
-    if (ob.beamMat) ob.beamMat.opacity = on ? 0.9 : Math.max(0.04, op);
+    if (cyc < 0.5){ op = 0.04; } else if (cyc < 0.62){ op = 0.1 + 0.4*Math.abs(Math.sin(performance.now()*0.05)); } else { on = true; op = 0.92; }   // warm-up flicker, then fire
+    if (ob.beamMat) ob.beamMat.opacity = on ? 0.95 : Math.max(0.03, op*0.5);
+    if (ob.glowMat) ob.glowMat.opacity = on ? 0.6 : Math.max(0, op*0.35);
+    if (ob.apMat) ob.apMat.emissiveIntensity = on ? 2.2 : (0.6 + op*1.5);
     ob.on = on;
   },
-  lock(ob, t, near, pulse){ if (ob.mat) ob.mat.opacity = 0.4 + 0.2*pulse; },
+  lock(ob, t, near, pulse){
+    if (ob.mat) ob.mat.opacity = 0.45 + 0.18*pulse;
+    if (ob.sheen){ const sw = (performance.now()*0.0006) % 1; ob.sheen.position.x = -0.28 + sw*0.56; if (ob.sheenMat) ob.sheenMat.opacity = 0.1 + 0.18*Math.sin(sw*Math.PI); }   // specular sheen glides across the ice
+  },
 };
 
 // hazard registry: id → mechanic + era-specific skin + codex card text
