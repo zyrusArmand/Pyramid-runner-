@@ -235,8 +235,10 @@
   #homeSettings svg { width:22px; height:22px; }
   #homeSettings:active { transform:rotate(40deg) scale(.92); }
   /* settings panel rows */
-  #settingsList { width:min(360px,88vw); display:flex; flex-direction:column; gap:12px; }
-  .setRow { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:14px 16px; border-radius:14px;
+  #settingsList { width:min(360px,88vw); display:flex; flex-direction:column; gap:12px;
+    overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
+    max-height:calc(100dvh - 230px); padding:2px 2px 6px; }
+  .setRow { flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; gap:14px; padding:14px 16px; border-radius:14px;
     background:rgba(255,255,255,.045); border:1px solid rgba(243,200,120,.18); }
   .setName { display:flex; flex-direction:column; gap:3px; font-size:13px; letter-spacing:2px; color:#f0e3c8; text-align:left; }
   .setHint { font-size:10px; letter-spacing:1px; color:#cdb083; opacity:.65; text-transform:none; }
@@ -792,7 +794,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.218 · 2026.06.10</div>
+  <div id="appVersion">v1.219 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -980,7 +982,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.218';
+const APP_VERSION = '1.219';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
