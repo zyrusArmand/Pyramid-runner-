@@ -794,7 +794,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.220 · 2026.06.11</div>
+  <div id="appVersion">v1.221 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -982,7 +982,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.220';
+const APP_VERSION = '1.221';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1700,7 +1700,7 @@ const FEATURES = [
   { key:'shield',  level:4, type:'power', power:'shield', title:'🛡 SHIELD',     desc:'Collect the green SHIELD to survive ONE hit. Grab it whenever you can — it can save a run.' },
   { key:'hammer',  level:5, type:'hazard', title:'⚒ SWINGING HAMMERS',  desc:'Stone hammers slam down onto ONE lane on a timer. Watch the swing and dodge to another lane.' },
   { key:'magnet',  level:6, type:'power', power:'magnet', title:'⚡ COIN MAGNET', desc:'The blue COIN MAGNET vacuums up nearby coins for a few seconds. Steer near a cluster to sweep them in.' },
-  { key:'lintel',  level:8, type:'hazard', title:'⌐ LOW LINTELS',       desc:'A carved gate spans the whole path at head height. Swipe DOWN to SLIDE under it — you can’t lane-dodge it.' },
+  { key:'lintel',  level:8, type:'hazard', title:'⌐ LANE LINTELS',      desc:'Small carved gates block a lane. SLIDE under the tall arches, JUMP the low blocks — or just DODGE to an open lane. There’s always a way through.' },
   { key:'slow',    level:11, type:'power', power:'slow',  title:'⏱ SLOW-MO',     desc:'The purple SLOW-MO briefly slows everything down so you can thread a tricky stretch of hazards.' },
   { key:'flame',   level:13, type:'hazard', title:'♨ FLAME JETS',       desc:'Fire erupts from a lane on a timer. Time your run to pass while the flame is down.' },
 ];
@@ -3237,19 +3237,36 @@ function loadRunDressing(){
       trap.position.set(t.pos.x, t.pos.y, t.pos.z);
       scene.add(trap); t.obMesh = trap;
     } else if (kind === 'lintel'){
-      // LOW LINTEL: a carved stone gate across the whole path at head height — SLIDE under it (can't be lane-dodged)
-      t.ob = { type:'beam' };
-      const beam = new THREE.Group();
+      // PER-LANE LINTELS: small carved gates that each block ONE lane (occasionally two at high levels), always
+      // leaving an open lane to dodge into. HIGH lintels sit at head height → SLIDE under; LOW lintels are
+      // knee-high → JUMP over. So every lintel can be beaten three ways: dodge, jump, or slide.
       const stoneMat = new THREE.MeshStandardMaterial({ color:0xb59a64, roughness:0.85, metalness:0.04 });
       const goldTrim = new THREE.MeshStandardMaterial({ color:0xe0b24a, metalness:0.72, roughness:0.32, emissive:0x2a1c00 });
-      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.07, 0.085), stoneMat);
-      bar.position.y = 0.095; bar.castShadow = true; beam.add(bar);
-      const trim = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.022, 0.092), goldTrim);   // gold inlay band
-      trim.position.y = 0.095; beam.add(trim);
-      [-0.28, 0.28].forEach(px => { const post = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.14, 0.06), stoneMat);
-        post.position.set(px, 0.05, 0); post.castShadow = true; beam.add(post); });
-      beam.position.set(t.pos.x, t.pos.y, t.pos.z);
-      scene.add(beam); t.obMesh = beam;
+      const lanes = [-1, 0, 1];                                   // shuffle the lanes, then block the first 1–2
+      for (let a = lanes.length - 1; a > 0; a--){ const b = Math.floor(RND()*(a+1)); const tmp = lanes[a]; lanes[a] = lanes[b]; lanes[b] = tmp; }
+      const canDouble = gameLevel >= 14 && DDA.obstacleW() >= 1 && RND() < 0.28;   // two-lane blocks only ramp in later
+      const blockN = canDouble ? 2 : 1;
+      const gates = [], grp = new THREE.Group();
+      for (let gi = 0; gi < blockN; gi++){
+        const L = lanes[gi], x = L * LANE, duck = RND() < 0.55;   // duck = HIGH arch (slide); else LOW block (jump)
+        gates.push({ lane:L, duck });
+        if (duck){
+          const bar = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.05, 0.08), stoneMat);
+          bar.position.set(x, 0.155, 0); bar.castShadow = true; grp.add(bar);
+          const trim = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.016, 0.086), goldTrim);
+          trim.position.set(x, 0.155, 0); grp.add(trim);
+          [-0.075, 0.075].forEach(px => { const post = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.13, 0.05), stoneMat);
+            post.position.set(x + px, 0.075, 0); post.castShadow = true; grp.add(post); });
+        } else {
+          const block = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.07, 0.1), stoneMat);
+          block.position.set(x, 0.045, 0); block.castShadow = true; grp.add(block);
+          const cap = new THREE.Mesh(new THREE.BoxGeometry(0.186, 0.016, 0.106), goldTrim);
+          cap.position.set(x, 0.085, 0); grp.add(cap);
+        }
+      }
+      t.ob = { type:'gate', gates };
+      grp.position.set(t.pos.x, t.pos.y, t.pos.z);
+      scene.add(grp); t.obMesh = grp;
     } else {
       // FLAME JET: a two-layer flame over a stone brazier, erupting from one lane on a timer — pass when it's down
       const L = rndLane();
@@ -3628,8 +3645,11 @@ function updateRun(dt){
     }
     const ob = r.tiles[r.idx].ob;
     if (r.invuln <= 0 && ob){
-      if (ob.type==='beam' && !r.sliding){ runCrash(); return; }       // must slide under
+      if (ob.type==='beam' && !r.sliding){ runCrash(); return; }       // full-width gate (legacy): must slide under
       if (ob.type==='lane' && r.lane===ob.lane){ runCrash(); return; }  // must dodge to another lane
+      if (ob.type==='gate'){                                            // per-lane lintels: slide HIGH ones, jump LOW ones, or dodge
+        for (const g of ob.gates){ if (r.lane===g.lane && !(g.duck ? r.sliding : r.jumping)){ runCrash(); return; } }
+      }
     }
     collectCoin(r.tiles[r.idx], r);
     collectPower(r.tiles[r.idx], r);
