@@ -583,6 +583,27 @@
   .relicName { font-family:'Cinzel',serif; font-size:13.5px; letter-spacing:1.2px; color:#ffe6a8; margin-bottom:6px; }
   .relicDesc { font-family:'Space Mono',monospace; font-size:10.5px; line-height:1.45; color:#e8dcc6; letter-spacing:.3px; }
   .relicHave { margin-top:8px; font-size:9.5px; letter-spacing:1px; color:#ffb45e; opacity:.85; min-height:11px; }
+  /* ---- daily challenge ---- */
+  #homeDaily { display:flex; align-items:center; gap:9px; margin:11px auto 2px; padding:9px 16px; border-radius:14px; cursor:pointer;
+    background:linear-gradient(180deg, rgba(58,40,22,.72), rgba(30,18,30,.8)); border:1px solid rgba(243,200,120,.4);
+    -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); box-shadow:inset 0 1px 0 rgba(255,224,160,.18); max-width:300px; width:80%;
+    font-family:'Space Mono',monospace; transition:transform .12s; }
+  #homeDaily:active { transform:scale(.96); }
+  #homeDaily .hdIcon { color:#ffd24a; font-size:15px; }
+  #homeDaily .hdText { color:#ffe6a8; font-size:11.5px; letter-spacing:2px; font-weight:700; }
+  #homeDaily .hdMeta { margin-left:auto; color:#e8d8be; font-size:10px; letter-spacing:1px; opacity:.72; }
+  #dailyClock { text-align:center; font-family:'Space Mono',monospace; font-size:13px; letter-spacing:2px; color:#ffd24a; margin:-2px 0 16px; }
+  #dailyHero { text-align:center; margin-bottom:14px; }
+  #dailyHero .dailyBig { font-family:'Cinzel',serif; font-size:48px; color:#ffe6a8; line-height:1; text-shadow:0 2px 16px rgba(0,0,0,.5); }
+  #dailyHero .dailySmall { font-family:'Space Mono',monospace; font-size:11px; letter-spacing:2px; color:#e8d8be; opacity:.65; margin-top:5px; }
+  #dailyShare { text-align:center; margin:12px auto 2px; color:#ffb45e; font-family:'Space Mono',monospace; font-size:12px; letter-spacing:1.5px; cursor:pointer; }
+  #dailyShare:active { opacity:.6; }
+  .dailyHistTitle { text-align:center; font-family:'Space Mono',monospace; font-size:11px; letter-spacing:2px; color:#e8d8be; opacity:.55; margin:20px 0 6px; }
+  #dailyHist { width:100%; max-width:360px; margin:0 auto; }
+  .dailyRow { display:flex; justify-content:space-between; padding:8px 18px; font-family:'Space Mono',monospace; font-size:12px; color:#f0e6d2; border-bottom:1px solid rgba(255,255,255,.07); }
+  .dailyRow.today { color:#ffd24a; }
+  .dailyRow .dr-d { opacity:.72; letter-spacing:1px; }
+  .dailyRow .dr-s { font-weight:700; }
 </style>
 </head>
 <body>
@@ -718,6 +739,7 @@
     <div class="title homeTitle">PYRAMID<br>STACKER</div>
     <div class="tagline">BUILD&nbsp;IT&nbsp;·&nbsp;CLIMB&nbsp;IT</div>
     <div class="cta hero" id="homePlay">PLAY</div>
+    <div id="homeDaily"><span class="hdIcon">◈</span><span class="hdText">DAILY CHALLENGE</span><span class="hdMeta" id="homeDailyMeta">resets in —</span></div>
     <div class="homeRow iconRow">
       <div class="iconCol" id="homeMapBtn" title="Journey Map"><div class="iconCircle"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4z"/><path d="M9 4v13"/><path d="M15 6.5v13"/></svg></div><div class="iconCap">MAP</div></div>
       <div class="iconCol" id="homeLevels" title="Level Select"><div class="iconCircle"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg></div><div class="iconCap">LEVELS</div></div>
@@ -784,6 +806,20 @@
   <div class="backBtn" id="levelsBack">◀ BACK</div>
 </div>
 
+<div class="overlay hidden panel" id="dailyPanel">
+  <div class="panelTitle">DAILY CHALLENGE</div>
+  <div id="dailyClock">resets in —</div>
+  <div id="dailyHero">
+    <div class="dailyBig" id="dailyBest">0</div>
+    <div class="dailySmall">YOUR BEST TODAY · SAME CLIMB FOR EVERYONE</div>
+  </div>
+  <div class="cta hero" id="dailyPlayBtn">PLAY TODAY'S CLIMB</div>
+  <div id="dailyShare">◈ SHARE MY SCORE</div>
+  <div class="dailyHistTitle">LAST 7 DAYS</div>
+  <div id="dailyHist"></div>
+  <div class="backBtn" id="dailyBack">◀ BACK</div>
+</div>
+
 <div class="overlay hidden panel" id="shopPanel">
   <div class="panelTitle">SHOP</div>
   <div class="shopCoins"><span class="coinIcon"></span><span id="shopCoins">0</span><span class="coinLbl"></span></div>
@@ -840,7 +876,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.241 · 2026.06.11</div>
+  <div id="appVersion">v1.242 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1028,7 +1064,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.241';
+const APP_VERSION = '1.242';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4771,7 +4807,7 @@ function showStart(){            // the main "home" menu (cover art + PLAY / LEA
   S.phase = null; S.gameOver = false;
   $('overScreen').classList.add('hidden');
   $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden'); $('profilePanel').classList.add('hidden');
-  $('mapPanel').classList.add('hidden'); $('levelsPanel').classList.add('hidden'); WorldMap.close();
+  $('mapPanel').classList.add('hidden'); $('levelsPanel').classList.add('hidden'); $('dailyPanel').classList.add('hidden'); WorldMap.close();
   $('nextLevelWrap').classList.remove('show'); $('introOverlay').classList.remove('show');
   $('startScreen').classList.remove('hidden');
   $('coinHud').classList.add('hidden'); $('combo').classList.remove('show'); $('vignette').style.opacity='0';
@@ -4784,6 +4820,8 @@ function showStart(){            // the main "home" menu (cover art + PLAY / LEA
   renderHome();
 }
 function renderHome(){
+  dailyMode = false;                                  // home is always normal-mode context; the Daily Challenge panel launches daily explicitly
+  try { startDailyClock(); } catch(e){}               // keep the home Daily countdown ticking
   if (typeof coverPyramid !== 'undefined' && coverPyramid && atMenu) coverPyramid.visible = true;   // menu centrepiece
   // home stat chips were removed — guard in case any of these elements aren't present
   { const e=$('bestScore');  if (e) e.textContent = bestScore; }
@@ -5058,6 +5096,34 @@ function renderLevels(){
     c.addEventListener('pointerdown', ev => { ev.stopPropagation(); ev.preventDefault(); startLevel(parseInt(c.getAttribute('data-lv'), 10)); }));
 }
 function startLevel(n){ dailyMode = false; $('levelsPanel').classList.add('hidden'); startGame(n); }
+// DAILY CHALLENGE — the same seeded climb for everyone, resets at local midnight
+let _dailyClockIv = 0;
+function dailyResetMs(){ const d = new Date(), m = new Date(d); m.setHours(24,0,0,0); return m - d; }
+function fmtCountdown(ms){ const s = Math.max(0, Math.floor(ms/1000)), h = Math.floor(s/3600), m = Math.floor((s%3600)/60), ss = s%60;
+  return (h<10?'0':'')+h+':'+(m<10?'0':'')+m+':'+(ss<10?'0':'')+ss; }
+function startDailyClock(){
+  clearInterval(_dailyClockIv);
+  const upd = () => { const t = 'resets in ' + fmtCountdown(dailyResetMs());
+    const c = $('dailyClock'); if (c) c.textContent = t; const hm = $('homeDailyMeta'); if (hm) hm.textContent = t; };
+  upd(); _dailyClockIv = setInterval(upd, 1000);
+}
+function dayLabel(off){ const d = new Date(); d.setDate(d.getDate()-off);
+  try { return d.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' }); } catch(e){ return dayKey(off); } }
+function showDaily(){ $('startScreen').classList.add('hidden'); $('dailyPanel').classList.remove('hidden'); renderDaily(); startDailyClock(); }
+function renderDaily(){
+  const be = $('dailyBest'); if (be) be.textContent = (Store.get('daily_'+todayKey(), 0) || 0).toLocaleString();
+  let html = '';
+  for (let i=0;i<7;i++){ const sc = Store.get('daily_'+dayKey(i), 0) || 0;
+    html += '<div class="dailyRow'+(i===0?' today':'')+'"><span class="dr-d">'+(i===0?'TODAY':dayLabel(i))+'</span><span class="dr-s">'+(sc>0?sc.toLocaleString():'—')+'</span></div>'; }
+  const h = $('dailyHist'); if (h) h.innerHTML = html;
+}
+function playDaily(){ dailyMode = true; $('dailyPanel').classList.add('hidden'); clearInterval(_dailyClockIv); startGame(); }
+function shareDaily(){
+  const best = Store.get('daily_'+todayKey(), 0) || 0;
+  const txt = best > 0 ? ('I scored ' + best.toLocaleString() + ' in today\'s PYRAMID STACKER Daily Challenge ◈ — same climb for everyone. Beat me!')
+                       : 'Take on today\'s PYRAMID STACKER Daily Challenge ◈ — same seeded climb for everyone!';
+  try { if (navigator.share) navigator.share({ text: txt }); else if (navigator.clipboard) { navigator.clipboard.writeText(txt); showHint('COPIED — paste it to a friend', 2200); } } catch(e){}
+}
 function showShop(tab){ if (tab) shopTab = tab; $('howtoPanel').classList.add('hidden'); selChar = curChar; selStone = curStone; $('startScreen').classList.add('hidden'); $('shopPanel').classList.remove('hidden'); renderShop(); }
 function showGoals(){ goalsNew = false; $('startScreen').classList.add('hidden'); $('goalsPanel').classList.remove('hidden'); renderGoals(); }
 function showSettings(){ $('startScreen').classList.add('hidden'); $('settingsPanel').classList.remove('hidden'); renderSettings(); }
@@ -5070,7 +5136,7 @@ function howTab(which){
   $('howTabAbout').classList.toggle('sel', !play);
 }
 function closeHow(){ $('howtoPanel').classList.add('hidden'); Store.set('how', 1); }
-function backHome(){ charPrevOn = false; WorldMap.close(); $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden'); $('goalsPanel').classList.add('hidden'); $('settingsPanel').classList.add('hidden'); $('profilePanel').classList.add('hidden'); $('mapPanel').classList.add('hidden'); $('levelsPanel').classList.add('hidden'); $('startScreen').classList.remove('hidden'); renderHome(); }
+function backHome(){ charPrevOn = false; WorldMap.close(); $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden'); $('goalsPanel').classList.add('hidden'); $('settingsPanel').classList.add('hidden'); $('profilePanel').classList.add('hidden'); $('mapPanel').classList.add('hidden'); $('levelsPanel').classList.add('hidden'); $('dailyPanel').classList.add('hidden'); $('startScreen').classList.remove('hidden'); renderHome(); }
 
 // ---------- JOURNEY MAP: a bird's-eye 3D tour of the 8 eras, marking where you are ----------
 const WorldMap = (function(){
@@ -5368,6 +5434,10 @@ btn('homeGoalsBtn',  showGoals);
 btn('homeMapBtn',    showMap);
 btn('homeLevels',    showLevels);
 btn('levelsBack',    backHome);
+btn('homeDaily',     showDaily);
+btn('dailyPlayBtn',  playDaily);
+btn('dailyShare',    shareDaily);
+btn('dailyBack',     backHome);
 btn('mapBack',       backHome);
 btn('homeSettings',  showSettings);
 btn('homeHelp',      showHow);
