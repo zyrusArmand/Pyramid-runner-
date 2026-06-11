@@ -568,6 +568,21 @@
   .lvlCell.boss { background:rgba(255,90,60,.16); border-color:rgba(255,120,90,.45); color:#ffd0c4; }
   .lvlCell.cur { box-shadow:0 0 0 2px #ffd24a inset; color:#fff; }
   .lvlCell.locked { opacity:.26; pointer-events:none; font-size:13px; }
+  /* ---- roguelike relic picker ---- */
+  #relicPicker { display:none; position:fixed; inset:0; z-index:12; flex-direction:column; align-items:center; justify-content:center;
+    background:radial-gradient(ellipse at 50% 38%, rgba(24,14,8,.58), rgba(8,5,12,.9)); -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px); }
+  #relicPicker.show { display:flex; animation:nlFade .35s ease-out; }
+  #relicTitle { font-family:'Cinzel',serif; font-size:23px; letter-spacing:3px; color:#ffd24a; text-shadow:0 2px 14px rgba(0,0,0,.6); }
+  #relicSub { font-family:'Space Mono',monospace; font-size:11px; letter-spacing:2px; color:#e8d8be; opacity:.65; margin:3px 0 22px; }
+  #relicCards { display:flex; gap:11px; padding:0 14px; width:100%; max-width:520px; justify-content:center; }
+  .relicCard { flex:1; max-width:152px; background:linear-gradient(180deg, rgba(54,36,22,.94), rgba(30,18,30,.95));
+    border:1px solid rgba(243,200,120,.4); border-radius:18px; padding:18px 11px 14px; text-align:center; cursor:pointer;
+    box-shadow:0 10px 30px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,224,160,.2); transition:transform .12s ease, border-color .15s; }
+  .relicCard:active { transform:scale(.94); border-color:rgba(255,210,74,.9); }
+  .relicIcon { font-size:38px; line-height:1; margin-bottom:9px; filter:drop-shadow(0 3px 8px rgba(0,0,0,.5)); }
+  .relicName { font-family:'Cinzel',serif; font-size:13.5px; letter-spacing:1.2px; color:#ffe6a8; margin-bottom:6px; }
+  .relicDesc { font-family:'Space Mono',monospace; font-size:10.5px; line-height:1.45; color:#e8dcc6; letter-spacing:.3px; }
+  .relicHave { margin-top:8px; font-size:9.5px; letter-spacing:1px; color:#ffb45e; opacity:.85; min-height:11px; }
 </style>
 </head>
 <body>
@@ -623,6 +638,11 @@
 <div id="nextLevelWrap">
   <div id="nextLevelTitle">PYRAMID CONQUERED</div>
   <div class="cta hero" id="nextLevelBtn">NEXT LEVEL</div>
+</div>
+<div id="relicPicker">
+  <div id="relicTitle">CHOOSE A RELIC</div>
+  <div id="relicSub">one blessing for the climb ahead</div>
+  <div id="relicCards"></div>
 </div>
 <div id="featureIntro">
   <div id="fiKicker">NEW THIS CLIMB</div>
@@ -820,7 +840,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.240 · 2026.06.11</div>
+  <div id="appVersion">v1.241 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1008,7 +1028,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.240';
+const APP_VERSION = '1.241';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1708,6 +1728,23 @@ const DDA = {
   obstacleW(){ return Math.max(0.4, 1 + (this.s()-0.5)*0.7); },  // more run obstacles when sharp, fewer when struggling
 };
 function perfectThreshold(){ return TIER_PERFECT * DDA.perfectW(); }   // the live PERFECT cutoff
+
+// ---------- roguelike RELICS: between every level you pick 1 of 3 blessings; they STACK through the session ----------
+let runRelics = [];   // ids picked this session (reset on a fresh start from the menu)
+const RELICS = {
+  coin:    { icon:'💰', name:'TOMB HOARD',    desc:'+25% Deben from every source' },
+  magnet:  { icon:'🧲', name:'LODESTONE',     desc:'Begin each climb with the coin magnet' },
+  shield:  { icon:'🛡', name:'AEGIS',         desc:'Begin each climb with a shield' },
+  slowhaz: { icon:'⏳', name:'SANDS OF TIME', desc:'Hazards move 12% slower' },
+  slowmo:  { icon:'🌀', name:'STILLNESS',     desc:'Begin each climb in slow-motion' },
+  save:    { icon:'🪲', name:'SCARAB CHARM',  desc:'+1 free revive each run' },
+};
+const RELIC_IDS = Object.keys(RELICS);
+function relicEffects(){
+  const c = {}; runRelics.forEach(id => c[id] = (c[id]||0) + 1);
+  return { coinMul: Math.pow(1.25, c.coin||0), magnet: (c.magnet||0) > 0, shield: c.shield||0,
+           slowmo: (c.slowmo||0) > 0, save: c.save||0, hazSpeed: Math.pow(0.88, c.slowhaz||0) };
+}
 
 // ---------- level progression: each pyramid you finish bumps the level and ups the pace ----------
 let gameLevel = 1;
@@ -3846,8 +3883,9 @@ function loadRunDressing(){
     const kinds = guaranteed.slice(0, chosen.length);
     while (kinds.length < chosen.length) kinds.push(runHaz[Math.floor(RND()*runHaz.length)]);
     for (let a = kinds.length - 1; a > 0; a--){ const b = Math.floor(RND()*(a+1)); const tmp = kinds[a]; kinds[a] = kinds[b]; kinds[b] = tmp; }
+    const hazSpeed = relicEffects().hazSpeed;             // 'Sands of Time' relic slows every hazard
     const seen = {};
-    chosen.forEach((i, k) => { if (!seen[i]){ seen[i] = 1; buildHazard(kinds[k], tiles[i]); } });   // dedupe any stride collisions
+    chosen.forEach((i, k) => { if (!seen[i]){ seen[i] = 1; buildHazard(kinds[k], tiles[i]); if (hazSpeed !== 1 && tiles[i].ob && tiles[i].ob.spd) tiles[i].ob.spd *= hazSpeed; } });   // dedupe any stride collisions
   }
   // coins: a glinting trail of pickups spread ACROSS the lanes (steer into a coin's lane to grab it).
   // A few hover over gaps (centred), rewarding a well-timed jump (collect-while-airborne pays a bonus).
@@ -4025,15 +4063,16 @@ function startRun(){
   sh.rotation.x = -Math.PI/2; scene.add(sh); S.shadow = sh;
 
   const perks = charPerks(curChar);                     // FAIR perks: coins + survivability only
+  const rel = relicEffects();                            // stacked roguelike relics this session
   S.run = { tiles, idx:0, t:0, speed:4.0, jumping:false, jumpT:0, jumpDur:0.42, jumpH:0.42,
             falling:false, fallV:0, yOff:0, startDelay:0.6, awaitStart:true,
             lane:0, laneX:0, sliding:false, slideT:0, slideDur:0.5,
             rolling:false, rollT:0, rollDur:0.5, rollDir:1, rollCD:0,
             magnet:0, shield:0, slow:0, bubble:null, hazardMul, dressed:false,
             gMult:1, gMultT:0, gMultMax:1,                      // golden-block score multiplier (+ peak reached this run)
-            perkShield: perks.shieldCharges, perkMagnet: perks.startMagnet, perkSlow: perks.startSlow,
+            perkShield: perks.shieldCharges + rel.shield, perkMagnet: perks.startMagnet || rel.magnet, perkSlow: perks.startSlow || rel.slowmo,
             perkReflex: perks.nearMissSlow, reflexCD: 0,
-            freeSaves: perks.freeSaves, coinMul: perks.coinMul,
+            freeSaves: perks.freeSaves + rel.save, coinMul: perks.coinMul * rel.coinMul,
             storms, revives:0, usedAdRevive:false, invuln:0, dead:false, deathReason:'fell' };
   // NB: obstacles / coins / power-ups / lane guides are NOT created yet — only when the climb starts
   // (loadRunDressing in beginClimb), so the rating screen shows a clean pyramid with nothing moving on it.
@@ -4629,12 +4668,13 @@ function buzz(pattern){ try { if (navigator.vibrate) navigator.vibrate(pattern);
 function startGame(atLevel){
   charPrevOn = false;
   _runPostedScore = -1;                          // fresh run → allow posting its scores again
+  runRelics = [];                                // a fresh session starts with no relics — they build up as you clear levels
   // atLevel set → restart that exact level (retry / in-game restart); otherwise CONTINUE from saved progress
   gameLevel = dailyMode ? 1 : Math.max(1, atLevel || resumeLevel);
   Analytics.track('play', { level: gameLevel, meta:{ daily: !!dailyMode, char: curChar } });
   applyBiome(gameLevel);                        // biome for the level you're resuming at
   checkDailyStreak();                          // first game of the day → streak bump + bonus coins
-  $('ratingOverlay').classList.remove('show'); $('nextLevelWrap').classList.remove('show'); $('introOverlay').classList.remove('show'); $('featureIntro').classList.remove('show'); $('multHud').classList.add('hidden');
+  $('ratingOverlay').classList.remove('show'); $('nextLevelWrap').classList.remove('show'); $('relicPicker').classList.remove('show'); $('introOverlay').classList.remove('show'); $('featureIntro').classList.remove('show'); $('multHud').classList.add('hidden');
   resetState();
   [...scene.children].forEach(o => { if (o.__env || o===ground || o===sky) return; if (o.isMesh) scene.remove(o); if (o.isGroup) scene.remove(o); });
   if (typeof coverPyramid !== 'undefined' && coverPyramid) coverPyramid.visible = false;   // hide the menu centrepiece during play
@@ -4656,7 +4696,30 @@ function startGame(atLevel){
 }
 
 // reached the summit → start the NEXT pyramid: keep score/coins, bump the level, everything a bit faster
-// tapped NEXT LEVEL after the victory celebration → build the next pyramid
+// tapped NEXT LEVEL → offer a relic choice (non-daily), then build the next pyramid
+function onNextLevel(){
+  $('nextLevelWrap').classList.remove('show');
+  if (!dailyMode) showRelicPicker(); else nextLevel();
+}
+function showRelicPicker(){
+  const wrap = $('relicCards'); if (!wrap){ nextLevel(); return; }
+  const pool = RELIC_IDS.slice();
+  for (let a = pool.length-1; a > 0; a--){ const b = Math.floor(RND()*(a+1)); const t = pool[a]; pool[a] = pool[b]; pool[b] = t; }
+  const choices = pool.slice(0, 3);
+  const counts = {}; runRelics.forEach(id => counts[id] = (counts[id]||0) + 1);
+  wrap.innerHTML = choices.map(id => { const r = RELICS[id], have = counts[id]||0;
+    return '<div class="relicCard" data-relic="'+id+'"><div class="relicIcon">'+r.icon+'</div><div class="relicName">'+r.name+'</div><div class="relicDesc">'+r.desc+'</div><div class="relicHave">'+(have>0?('OWNED ×'+have):'')+'</div></div>'; }).join('');
+  if (wrap.querySelectorAll) wrap.querySelectorAll('.relicCard').forEach(c =>
+    c.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); pickRelic(c.getAttribute('data-relic')); }));
+  $('relicPicker').classList.add('show');
+}
+function pickRelic(id){
+  if (RELICS[id]) runRelics.push(id);
+  $('relicPicker').classList.remove('show');
+  const r = RELICS[id]; if (r) showHint(r.icon + ' ' + r.name + ' CLAIMED', 2200);
+  nextLevel();
+}
+// build the next pyramid
 function nextLevel(){
   $('nextLevelWrap').classList.remove('show');
   Analytics.track('level_complete', { level: gameLevel, value: S.score||0 });
@@ -5371,7 +5434,7 @@ btn('restartNo',     hideRestartConfirm);
 btn('climbBtn',      beginClimb);        // start the climb from the rating screen
 btn('introBtn',      beginBuild);        // start building from the between-level intro card
 btn('introOverlay',  beginBuild);        // …or tap anywhere on the card
-btn('nextLevelBtn',  nextLevel);         // advance after the victory celebration
+btn('nextLevelBtn',  onNextLevel);       // advance after the victory celebration (offers a relic first)
 function goMenu(){ if (!atMenu) postScore(true); endRevivePrompt(); $('adModal').classList.add('hidden'); showStart(); }   // quit to main menu mid-game → still post your score
 // restart confirmation — pause the game while the player decides
 function showRestartConfirm(){ if (atMenu || S.gameOver) return; S.paused = true;
