@@ -794,7 +794,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.233 · 2026.06.11</div>
+  <div id="appVersion">v1.234 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -982,7 +982,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.233';
+const APP_VERSION = '1.234';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1863,7 +1863,7 @@ const GodrayShader = {
     uLight:    { value: null },                         // assigned a THREE.Vector2 when the pass is built (browser only)
     uColor:    { value: new THREE.Color(0xffe6b0) },
     uOn:       { value: 0.0 },
-    uIntensity:{ value: 0.85 },
+    uIntensity:{ value: 1.25 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
@@ -1947,6 +1947,17 @@ function noiseTex(size, grain, blotch){
 }
 const STONE_BUMP = noiseTex(128, 52, 16);
 const SAND_BUMP  = noiseTex(128, 30, 10); if (SAND_BUMP) SAND_BUMP.repeat.set(20,20);
+// large soft tonal variation for the ground so the big sand expanse isn't a flat gradient (multiplies the era's ground colour)
+function macroTex(){
+  try {
+    const s=256, c=document.createElement('canvas'); c.width=c.height=s; const x=c.getContext&&c.getContext('2d'); if(!x) return null;
+    x.fillStyle='#dadada'; x.fillRect(0,0,s,s);
+    for(let i=0;i<20;i++){ const r=s*0.12+Math.random()*s*0.30, gx=Math.random()*s, gy=Math.random()*s, v=Math.random()<0.5?188:246;
+      const g=x.createRadialGradient(gx,gy,0,gx,gy,r); g.addColorStop(0,`rgba(${v},${v},${v},0.45)`); g.addColorStop(1,'rgba(0,0,0,0)'); x.fillStyle=g; x.fillRect(0,0,s,s); }
+    const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(2.5,2.5); return t;
+  } catch(e){ return null; }
+}
+const SAND_MACRO = macroTex();
 // ---- richer sandstone for Egypt blocks: a near-neutral detail map (tinted by each block's colour)
 // plus a strong relief/bump heightmap (sediment bands + pitting + erosion). Harness-safe (guarded). ----
 let _sandstone;
@@ -2031,7 +2042,7 @@ function applyEraBlockTex(mat){
 
 // ---------- richer desert ground + rolling horizon dunes ----------
 const ground = new THREE.Mesh(new THREE.CircleGeometry(64,56),
-  new THREE.MeshStandardMaterial({ color:0x6b4a32, roughness:1, bumpMap:SAND_BUMP||undefined, bumpScale:0.11 }));
+  new THREE.MeshStandardMaterial({ color:0x6b4a32, roughness:1, map:SAND_MACRO||undefined, bumpMap:SAND_BUMP||undefined, bumpScale:0.11 }));
 ground.rotation.x = -Math.PI/2; ground.position.y = -0.5; ground.receiveShadow = true;
 scene.add(ground);
 // a soft sand mound the pyramid is bedded into, so its base sits IN the ground instead of floating above it.
@@ -2040,6 +2051,16 @@ const baseMoundMat = new THREE.MeshStandardMaterial({ color:0xc9a96a, roughness:
 const baseMound = new THREE.Mesh(new THREE.SphereGeometry(12, 30, 18), baseMoundMat);
 baseMound.scale.set(1, 0.07, 1); baseMound.position.y = -1.11;   // top ≈ -0.27 → sand sits just below the first course / placement outline
 baseMound.receiveShadow = true; baseMound.__env = true; scene.add(baseMound);
+// soft contact-shadow / ambient-occlusion disc that beds the pyramid (and central props) into the sand so nothing floats
+try {
+  const s=256, c=document.createElement('canvas'); c.width=c.height=s; const x=c.getContext&&c.getContext('2d');
+  if (x){ const g=x.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);
+    g.addColorStop(0,'rgba(0,0,0,0.5)'); g.addColorStop(0.5,'rgba(0,0,0,0.24)'); g.addColorStop(1,'rgba(0,0,0,0)');
+    x.fillStyle=g; x.fillRect(0,0,s,s);
+    const ao=new THREE.Mesh(new THREE.PlaneGeometry(17,17), new THREE.MeshBasicMaterial({ map:new THREE.CanvasTexture(c), transparent:true, depthWrite:false, opacity:0.85 }));
+    ao.rotation.x=-Math.PI/2; ao.position.y=-0.482; ao.__env=true; scene.add(ao);
+  }
+} catch(e){}
 
 // ---------- drifting atmospheric motes (dust / pollen / snow / embers / stars) — a soft volume that follows the camera ----------
 const MOTES = {   // [colour, drift dir (+up / -down), opacity] per era
@@ -2058,7 +2079,7 @@ try {
   const cv = document.createElement('canvas'); cv.width = cv.height = 32; const cg = cv.getContext('2d');
   const rg = cg.createRadialGradient(16,16,0,16,16,16); rg.addColorStop(0,'rgba(255,255,255,1)'); rg.addColorStop(1,'rgba(255,255,255,0)');
   cg.fillStyle = rg; cg.fillRect(0,0,32,32);
-  const mat = new THREE.PointsMaterial({ size:0.16, map:new THREE.CanvasTexture(cv), color:0xffe6b0, transparent:true, opacity:0.4, depthWrite:false, blending:THREE.AdditiveBlending, sizeAttenuation:true });
+  const mat = new THREE.PointsMaterial({ size:0.22, map:new THREE.CanvasTexture(cv), color:0xffe6b0, transparent:true, opacity:0.4, depthWrite:false, blending:THREE.AdditiveBlending, sizeAttenuation:true });
   motes = new THREE.Points(geo, mat); motes.__env = true; motes.frustumCulled = false; scene.add(motes);
 } catch(e){ motes = null; }
 function updateMotes(dt){
