@@ -794,7 +794,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.229 · 2026.06.11</div>
+  <div id="appVersion">v1.230 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -982,7 +982,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.229';
+const APP_VERSION = '1.230';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -3646,12 +3646,13 @@ function loadRunDressing(){
       if ((tiles[i-1] && (tiles[i-1].gap || tiles[i-1].weak)) || (tiles[i-2] && (tiles[i-2].gap || tiles[i-2].weak))) continue;   // leave landing room after a jump
       if (i - last >= 3){ slotsIdx.push(i); last = i; }
     }
-    const density = obstacleDensity(gameLevel) * (isGuardianLevel(gameLevel) ? 1.5 : 1);   // guardian climbs run hotter
-    const effDensity = density * DDA.obstacleW() * hazardMul;            // level density × adaptive skill weighting (build quality no longer factors in)
-    // how many obstacles to actually place: density-driven, but never empty — a floor of 2 (early) / 3 (later), and always
-    // enough room for every freshly-unlocked hazard.
-    let target = Math.round(slotsIdx.length * 3 * effDensity);           // ×3 → slotsIdx is already 1-per-3-tiles
-    target = Math.max(target, Math.min(slotsIdx.length, gameLevel <= 5 ? 2 : 3), fresh.length);
+    // COUNT is high and the VARIETY is low: fill a big fraction of the available (≥3-spaced) slots with the few
+    // featured kinds, so a run that drew "hammers + boulder" is packed with hammers and boulders the whole way up.
+    // Ramps from ~70% of slots early to nearly packed later; adaptive weighting can pack it tighter but never thins it out.
+    const band = Math.floor((Math.max(1, gameLevel) - 1) / 5);
+    const fill = Math.min(1, Math.min(0.95, 0.70 + band*0.05) * Math.max(0.9, DDA.obstacleW() * (isGuardianLevel(gameLevel) ? 1.15 : 1)));
+    let target = Math.round(slotsIdx.length * fill);
+    target = Math.max(target, fresh.length, Math.min(slotsIdx.length, gameLevel <= 2 ? 4 : 5));
     target = Math.min(target, slotsIdx.length);
     // choose `target` slots spread across the climb
     const chosen = [];
