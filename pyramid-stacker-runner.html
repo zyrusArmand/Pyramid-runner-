@@ -794,7 +794,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.235 · 2026.06.11</div>
+  <div id="appVersion">v1.236 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -982,7 +982,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.235';
+const APP_VERSION = '1.236';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1876,7 +1876,7 @@ const GodrayShader = {
     uLight:    { value: null },                         // assigned a THREE.Vector2 when the pass is built (browser only)
     uColor:    { value: new THREE.Color(0xffe6b0) },
     uOn:       { value: 0.0 },
-    uIntensity:{ value: 1.25 },
+    uIntensity:{ value: 0.95 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
@@ -1889,7 +1889,7 @@ const GodrayShader = {
       for (int i = 0; i < 20; i++){
         uv -= delta;
         vec3 s = texture2D(tDiffuse, uv).rgb;
-        accum += max(0.0, dot(s, vec3(0.299, 0.587, 0.114)) - 0.6) * decay;   // only bright pixels stream into rays
+        accum += max(0.0, dot(s, vec3(0.299, 0.587, 0.114)) - 0.82) * decay;   // only the VERY bright (sun/gold) stream into rays → elegant shafts, not a ground blob
         decay *= 0.93;
       }
       vec3 rays = uColor * accum * (uIntensity / 20.0) * uOn;
@@ -1964,10 +1964,10 @@ const SAND_BUMP  = noiseTex(128, 30, 10); if (SAND_BUMP) SAND_BUMP.repeat.set(20
 function macroTex(){
   try {
     const s=256, c=document.createElement('canvas'); c.width=c.height=s; const x=c.getContext&&c.getContext('2d'); if(!x) return null;
-    x.fillStyle='#dadada'; x.fillRect(0,0,s,s);
-    for(let i=0;i<20;i++){ const r=s*0.12+Math.random()*s*0.30, gx=Math.random()*s, gy=Math.random()*s, v=Math.random()<0.5?188:246;
-      const g=x.createRadialGradient(gx,gy,0,gx,gy,r); g.addColorStop(0,`rgba(${v},${v},${v},0.45)`); g.addColorStop(1,'rgba(0,0,0,0)'); x.fillStyle=g; x.fillRect(0,0,s,s); }
-    const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(2.5,2.5); return t;
+    x.fillStyle='#c6c6c6'; x.fillRect(0,0,s,s);
+    for(let i=0;i<26;i++){ const r=s*0.14+Math.random()*s*0.34, gx=Math.random()*s, gy=Math.random()*s, v=Math.random()<0.5?132:252;   // stronger light/dark patches → readable dune tonal variation
+      const g=x.createRadialGradient(gx,gy,0,gx,gy,r); g.addColorStop(0,`rgba(${v},${v},${v},0.55)`); g.addColorStop(1,'rgba(0,0,0,0)'); x.fillStyle=g; x.fillRect(0,0,s,s); }
+    const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(2.0,2.0); return t;
   } catch(e){ return null; }
 }
 const SAND_MACRO = macroTex();
@@ -2580,8 +2580,9 @@ function buildBackdrop(era, level){
     // near-camera FOREGROUND life: low sand ripples + small pebbles across the front of the frame so it isn't empty.
     // Kept in FRONT of the pyramid (+z, toward the camera) and very low (flat mounds / pebbles) so they never block it.
     const fgCol = era.dune || 0xc9a96a;
+    for (let i=0;i<10;i++) dDune((Math.random()-0.5)*20, 3+Math.random()*5, 0.6+Math.random()*0.8, fgCol);   // immediate foreground (fills the empty bottom band)
     for (let i=0;i<16;i++) dDune((Math.random()-0.5)*24, 6+Math.random()*9, 0.5+Math.random()*0.7, fgCol);
-    for (let i=0;i<12;i++) dRock((Math.random()-0.5)*22, 7+Math.random()*8, 0.22+Math.random()*0.4, fgCol);
+    for (let i=0;i<14;i++) dRock((Math.random()-0.5)*22, 4+Math.random()*11, 0.22+Math.random()*0.4, fgCol);
   } catch(e){ /* backdrop is best-effort */ }
   finally { Math.random = _realRandom; }                 // restore real randomness for gameplay
 }
