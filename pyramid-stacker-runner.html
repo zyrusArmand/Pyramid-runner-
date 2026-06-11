@@ -794,7 +794,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.221 · 2026.06.11</div>
+  <div id="appVersion">v1.222 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -982,7 +982,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.221';
+const APP_VERSION = '1.222';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1703,6 +1703,10 @@ const FEATURES = [
   { key:'lintel',  level:8, type:'hazard', title:'⌐ LANE LINTELS',      desc:'Small carved gates block a lane. SLIDE under the tall arches, JUMP the low blocks — or just DODGE to an open lane. There’s always a way through.' },
   { key:'slow',    level:11, type:'power', power:'slow',  title:'⏱ SLOW-MO',     desc:'The purple SLOW-MO briefly slows everything down so you can thread a tricky stretch of hazards.' },
   { key:'flame',   level:13, type:'hazard', title:'♨ FLAME JETS',       desc:'Fire erupts from a lane on a timer. Time your run to pass while the flame is down.' },
+  { key:'boulder', level:18, type:'hazard', title:'🪨 ROLLING BOULDERS', desc:'A great stone barrels down a lane toward you. DODGE to another lane — or JUMP it.' },
+  { key:'pendulum',level:24, type:'hazard', title:'🗡 PENDULUM BLADES',  desc:'A blade sweeps side to side across the lanes. DODGE to where it isn’t, or SLIDE under it as it passes.' },
+  { key:'faller',  level:28, type:'hazard', title:'🧱 FALLING BLOCKS',   desc:'A shadow marks where a block will crash down. DODGE out of the marked lane before it lands.' },
+  { key:'crusher', level:34, type:'hazard', title:'🚪 CLOSING WALLS',    desc:'Grinding walls seal every lane but one. Read the open gap and DODGE into it.' },
 ];
 function hazardsUnlocked(level){ return FEATURES.filter(f => f.type==='hazard' && level >= f.level).map(f => f.key); }
 function powersUnlocked(level){ return FEATURES.filter(f => f.type==='power' && level >= f.level).map(f => f.power); }
@@ -3267,6 +3271,55 @@ function loadRunDressing(){
       t.ob = { type:'gate', gates };
       grp.position.set(t.pos.x, t.pos.y, t.pos.z);
       scene.add(grp); t.obMesh = grp;
+    } else if (kind === 'boulder'){
+      // ROLLING BOULDER: a great faceted stone barrelling down ONE lane — DODGE to another lane, or JUMP it
+      const L = rndLane();
+      t.ob = { type:'lane', lane:L, jumpable:true, boulder:true, phase:RND()*6.28, spd:0.004 + RND()*0.002 };
+      const rockMat = new THREE.MeshStandardMaterial({ color:0x9c8763, roughness:0.95, metalness:0.03, flatShading:true });
+      const ball = new THREE.Mesh(new THREE.DodecahedronGeometry(0.085, 0), rockMat);
+      ball.castShadow = true;
+      const grp = new THREE.Group(); grp.add(ball); t.ob.ball = ball;
+      grp.position.set(t.pos.x + L*LANE, t.pos.y + 0.085, t.pos.z);
+      scene.add(grp); t.obMesh = grp;
+    } else if (kind === 'pendulum'){
+      // PENDULUM BLADE: a blade swings side-to-side across the lanes — DODGE to a clear lane, or SLIDE under it as it passes
+      t.ob = { type:'lane', lane:99, slidable:true, pendulum:true, phase:RND()*6.28, spd:0.0022 + RND()*0.0016 };
+      const grp = new THREE.Group();
+      const armMat = new THREE.MeshStandardMaterial({ color:0x4a3a26, roughness:0.8, metalness:0.1 });
+      const bladeMat = new THREE.MeshStandardMaterial({ color:0xcfd6dc, metalness:0.85, roughness:0.25, emissive:0x10141a });
+      const pivot = new THREE.Group(); pivot.position.y = 0.42;
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.01,0.01,0.34,8), armMat);
+      arm.position.y = -0.17; pivot.add(arm);
+      const blade = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.02,3), bladeMat);   // triangular blade
+      blade.rotation.x = Math.PI/2; blade.position.y = -0.34; blade.castShadow = true; pivot.add(blade);
+      grp.add(pivot); t.ob.pivot = pivot;
+      grp.position.set(t.pos.x, t.pos.y, t.pos.z);
+      scene.add(grp); t.obMesh = grp;
+    } else if (kind === 'faller'){
+      // FALLING BLOCK: a heavy block that crashes onto ONE lane on a timer; a shadow telegraphs — DODGE clear before it lands
+      const L = rndLane();
+      t.ob = { type:'lane', lane:99, faller:true, L, phase:RND()*6.28, spd:0.0026 + RND()*0.0016 };
+      const grp = new THREE.Group();
+      const blkMat = new THREE.MeshStandardMaterial({ color:0x8a7350, roughness:0.9, metalness:0.04 });
+      const block = new THREE.Mesh(new THREE.BoxGeometry(0.17,0.16,0.12), blkMat);
+      block.castShadow = true; block.position.y = 0.58; grp.add(block); t.ob.block = block;
+      const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.08, 16),
+        new THREE.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:0.0, depthWrite:false }));
+      shadow.rotation.x = -Math.PI/2; shadow.position.y = 0.012; grp.add(shadow); t.ob.shadow = shadow;
+      grp.position.set(t.pos.x + L*LANE, t.pos.y, t.pos.z);
+      scene.add(grp); t.obMesh = grp;
+    } else if (kind === 'crusher'){
+      // CLOSING WALLS: two walls grind inward, sealing every lane but one — read the open gap and DODGE into it
+      const G = rndLane(), gx = G*LANE;
+      t.ob = { type:'crush', closed:false, safeLane:G, gx, phase:RND()*6.28, spd:0.0018 + RND()*0.0012 };
+      const grp = new THREE.Group();
+      const wMat = new THREE.MeshStandardMaterial({ color:0x7a6748, roughness:0.92, metalness:0.05 });
+      const wallL = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.18, 0.1), wMat); wallL.castShadow = true;
+      const wallR = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.18, 0.1), wMat); wallR.castShadow = true;
+      wallL.position.set(gx - 0.45, 0.09, 0); wallR.position.set(gx + 0.45, 0.09, 0);
+      grp.add(wallL); grp.add(wallR); t.ob.wallL = wallL; t.ob.wallR = wallR;
+      grp.position.set(t.pos.x, t.pos.y, t.pos.z);
+      scene.add(grp); t.obMesh = grp;
     } else {
       // FLAME JET: a two-layer flame over a stone brazier, erupting from one lane on a timer — pass when it's down
       const L = rndLane();
@@ -3646,10 +3699,12 @@ function updateRun(dt){
     const ob = r.tiles[r.idx].ob;
     if (r.invuln <= 0 && ob){
       if (ob.type==='beam' && !r.sliding){ runCrash(); return; }       // full-width gate (legacy): must slide under
-      if (ob.type==='lane' && r.lane===ob.lane){ runCrash(); return; }  // must dodge to another lane
+      if (ob.type==='lane' && r.lane===ob.lane &&                       // dodge to another lane — some can also be jumped (boulder) or slid under (pendulum)
+          !(ob.jumpable && r.jumping) && !(ob.slidable && r.sliding)){ runCrash(); return; }
       if (ob.type==='gate'){                                            // per-lane lintels: slide HIGH ones, jump LOW ones, or dodge
         for (const g of ob.gates){ if (r.lane===g.lane && !(g.duck ? r.sliding : r.jumping)){ runCrash(); return; } }
       }
+      if (ob.type==='crush' && ob.closed && r.lane !== ob.safeLane){ runCrash(); return; }   // closing walls: be in the open gap
     }
     collectCoin(r.tiles[r.idx], r);
     collectPower(r.tiles[r.idx], r);
@@ -4947,6 +5002,42 @@ function animate(){
       if (t.ob.mat) t.ob.mat.opacity = up ? 0.88 : 0;
       if (t.ob.mat2) t.ob.mat2.opacity = up ? 0.92 : 0;
       t.ob.lane = up ? t.ob.L : 99;
+    }
+    // ROLLING BOULDER: spins and rocks down its lane (lane stays deadly — dodge or jump)
+    if (t.ob && t.ob.boulder && t.obMesh){
+      if (t.ob.ball) t.ob.ball.rotation.x += dt * 7;
+      const b = Math.sin(performance.now()*t.ob.spd + t.ob.phase);
+      t.obMesh.position.z = t.pos.z + b*0.045;                          // rocks toward / away a touch
+      t.obMesh.position.y = t.pos.y + 0.085 + Math.abs(Math.cos(performance.now()*t.ob.spd*1.4 + t.ob.phase))*0.012;
+    }
+    // PENDULUM BLADE: swings across the lanes; the deadly lane is wherever the blade currently hangs
+    if (t.ob && t.ob.pendulum && t.ob.pivot){
+      const ang = 0.72 * Math.sin(performance.now()*t.ob.spd + t.ob.phase);
+      t.ob.pivot.rotation.z = ang;
+      const bx = Math.sin(ang) * 0.34;
+      t.ob.lane = bx > 0.1 ? 1 : (bx < -0.1 ? -1 : 0);
+    }
+    // FALLING BLOCK: hovers up (telegraphing with a shadow), then slams onto its lane, then lifts back up
+    if (t.ob && t.ob.faller && t.ob.block){
+      const cyc = ((performance.now()*t.ob.spd + t.ob.phase) % 6.2832) / 6.2832;   // 0..1
+      let y, down = false, tele;
+      if (cyc < 0.7){ y = 0.5; tele = cyc/0.7; down = false; }                      // up high, shadow building
+      else if (cyc < 0.8){ const k = (cyc-0.7)/0.1; y = 0.5*(1-k); tele = 1; down = k > 0.6; }   // SLAM down
+      else { const k = (cyc-0.8)/0.2; y = 0.5*k; tele = 1-k; down = false; }        // lift back up
+      t.ob.block.position.y = 0.1 + y;
+      if (t.ob.shadow) t.ob.shadow.material.opacity = 0.08 + 0.5*tele;
+      if (down && !t.ob.thudded && near){ spawnDust(new THREE.Vector3(t.pos.x + t.ob.L*LANE_W, t.pos.y, t.pos.z), 0xe8d8c0, 6, 1.5, 1); Sound.drop(); shake(0.12); t.ob.thudded = true; }
+      else if (!down && t.ob.thudded && cyc < 0.7){ t.ob.thudded = false; }
+      t.ob.lane = down ? t.ob.L : 99;
+    }
+    // CLOSING WALLS: two walls grind inward to seal every lane but the gap, then retract
+    if (t.ob && t.ob.type==='crush' && t.ob.wallL){
+      const cyc = ((performance.now()*t.ob.spd + t.ob.phase) % 6.2832) / 6.2832;    // 0..1
+      const close = cyc < 0.5 ? cyc/0.5 : 1-(cyc-0.5)/0.5;                            // 0 open .. 1 shut .. 0
+      const e = close*close*(3-2*close);                                             // smoothstep
+      t.ob.wallL.position.x = t.ob.gx - (0.45 - e*0.20);
+      t.ob.wallR.position.x = t.ob.gx + (0.45 - e*0.20);
+      t.ob.closed = e > 0.78;
     }
   });
 
