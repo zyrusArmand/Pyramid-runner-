@@ -787,9 +787,17 @@
     <div class="setRow"><div class="setName">DAILY CHALLENGE<span class="setHint" id="dailyHint">same seeded pyramid for everyone today</span></div><div id="dailyBtn">OFF</div></div>
     <div class="setRow"><div class="setName">PROGRESS<span class="setHint" id="progHint">continue from your highest level</span></div><div id="resetProgBtn">RESET</div></div>
     <div class="setRow"><div class="setName">JUMP TO ERA<span class="setHint" id="eraJumpHint">tap to set where your next run begins</span></div><div id="eraJumpBtn">EGYPT</div></div>
+    <div class="setRow"><div class="setName">CLOUD SAVE<span class="setHint" id="cloudHint">sync progress, coins & characters across devices</span></div><div id="cloudBtn">OFF</div></div>
+    <div class="setRow" id="cloudCodeRow" style="display:none"><div class="setName">SYNC CODE<span class="setHint" id="cloudCodeHint">enter this on another device to restore</span></div><div id="cloudCodeVal" style="font-family:'Space Mono',monospace;letter-spacing:1px;color:#f3d99a;font-size:13px;text-align:right"></div></div>
+    <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.217 · 2026.06.10</div>
+  <div id="appVersion">v1.218 · 2026.06.10</div>
+</div>
+<div class="overlay hidden panel" id="ownerPanel">
+  <div class="panelTitle">ANALYTICS</div>
+  <div id="ownerBody" style="width:100%;max-width:520px;overflow-y:auto;padding:0 4px 80px;font-size:13px;line-height:1.5;color:#e8dcc4">loading…</div>
+  <div class="backBtn" id="ownerBack">◀ BACK</div>
 </div>
 
 <div class="overlay hidden" id="howtoPanel">
@@ -969,6 +977,97 @@ const RemoteBoard = {
       if (!r.ok){ try { console.warn('account save failed', r.status, await r.text()); } catch(e){} }
       return r.ok;
     } catch(e){ console.warn('account save error', e); return false; }
+  }
+};
+// ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
+const APP_VERSION = '1.218';
+// a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
+// new device that device adopts the same id → one player, correctly counted across devices.
+let playerId = Store.get('pid', null);
+if (!playerId){ playerId = 'p_' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); Store.set('pid', playerId); }
+
+// Fire-and-forget product analytics. Every event is a row in public.events. Players can INSERT but NOT read
+// (row-level security); only YOU can read aggregates, via the password-checked analytics() RPC. See SQL below.
+const Analytics = {
+  enabled(){ return RemoteBoard.enabled() && typeof fetch !== 'undefined'; },
+  track(type, fields){
+    if (!this.enabled() || !type) return;
+    try {
+      const f = fields || {};
+      const row = { player: playerId, type: type, app_v: APP_VERSION,
+        level: (f.level==null?null:f.level), value: (f.value==null?null:f.value), meta: (f.meta||null) };
+      RemoteBoard._fetch('/rest/v1/events', { method:'POST',
+        headers: RemoteBoard._h({ 'Content-Type':'application/json', Prefer:'return=minimal' }),
+        body: JSON.stringify(row) }).then(()=>{}).catch(()=>{});
+    } catch(e){}
+  },
+  _opened: false,
+  open(){                                                  // once per launch → drives installs / DAU / retention
+    if (this._opened) return; this._opened = true;
+    try {
+      if (!Store.get('installed_at', 0)){ Store.set('installed_at', Date.now()); this.track('install', { level: 1 }); }
+      Store.set('last_open', Date.now());
+      this.track('open', { level: resumeLevel });
+    } catch(e){}
+  }
+};
+// real-money in-app purchase hook (STUB). Wire this to your store SDK's success callback (StoreKit / Google
+// Play Billing / RevenueCat) when you add a paid store; it already logs to analytics + can grant coins.
+function recordIAP(productId, priceUsd, grantCoins){
+  Analytics.track('iap', { value: priceUsd||0, meta: { product: productId||'unknown' } });
+  if (grantCoins){ bank += grantCoins; Store.set('coins', bank); try { updateCoinHud(true); } catch(e){} CloudSave.queue(); }
+}
+
+// Cross-device cloud save: the whole local save is pushed to public.saves under a short CODE + PIN; entering
+// the same code+PIN on another device restores it. All access goes through SECURITY DEFINER RPCs that check
+// the PIN server-side (see SQL), so no one can read a save without the PIN.
+const CloudSave = {
+  enabled(){ return RemoteBoard.enabled() && typeof fetch !== 'undefined'; },
+  sync(){ return Store.get('sync', null); },
+  snapshot(){
+    const data = {};
+    try { for (let i=0;i<localStorage.length;i++){ const k = localStorage.key(i);
+      if (k && k.indexOf('pyr_')===0){ try { data[k.slice(4)] = JSON.parse(localStorage.getItem(k)); } catch(e){} } } } catch(e){}
+    return { v:1, t:Date.now(), pid:playerId, data };
+  },
+  applySnapshot(blob){
+    if (!blob || !blob.data) return false;
+    try { Object.keys(blob.data).forEach(k => Store.set(k, blob.data[k])); } catch(e){ return false; }
+    return true;
+  },
+  enable(){                                                // turn cloud save ON for this device → make a code+PIN
+    let s = this.sync();
+    if (!s || !s.code){
+      const code = (Math.random().toString(36).slice(2,5) + Math.random().toString(36).slice(2,5)).toUpperCase();
+      const pin  = String(1000 + Math.floor(Math.random()*9000));
+      s = { code, pin }; Store.set('sync', s);
+    }
+    this.push();
+    return s;
+  },
+  async push(){
+    const s = this.sync(); if (!this.enabled() || !s || !s.code) return false;
+    try {
+      const r = await RemoteBoard._fetch('/rest/v1/rpc/cloud_save', { method:'POST',
+        headers: RemoteBoard._h({ 'Content-Type':'application/json' }),
+        body: JSON.stringify({ p_code:s.code, p_pin:s.pin, p_data:this.snapshot() }) });
+      return r.ok;
+    } catch(e){ return false; }
+  },
+  // debounced auto-push so frequent changes don't spam the network
+  queue(){ const s = this.sync(); if (!s) return; clearTimeout(this._t); this._t = setTimeout(()=>{ this.push(); }, 4000); },
+  async restore(code, pin){
+    if (!this.enabled()) return { error:'offline' };
+    try {
+      const r = await RemoteBoard._fetch('/rest/v1/rpc/cloud_load', { method:'POST',
+        headers: RemoteBoard._h({ 'Content-Type':'application/json' }),
+        body: JSON.stringify({ p_code:String(code||'').toUpperCase().trim(), p_pin:String(pin||'').trim() }) });
+      if (!r.ok) return { error:'http' };
+      const j = await r.json();
+      if (j && j.error) return { error:j.error };
+      if (j && j.data){ this.applySnapshot(j.data); Store.set('sync', { code:String(code).toUpperCase().trim(), pin:String(pin).trim() }); return { ok:true }; }
+      return { error:'empty' };
+    } catch(e){ return { error:'network' }; }
   }
 };
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -2847,6 +2946,8 @@ function blockPlaced(mesh, instability, capstone, len, consumed, bonus){
   // tally placement quality for the end-of-pyramid star rating
   S.buildQual += (tier==='PERFECT' ? 1 : tier==='GREAT' ? 0.75 : tier==='GOOD' ? 0.5 : 0.15); S.buildCount++;
   if (tier !== 'PERFECT') S.allPerfect = false;   // 5★ "WONDER" requires EVERY block perfect
+  // analytics: count placement tiers for this run (sent in one summary event at game end)
+  S.tally = S.tally || { PERFECT:0, GREAT:0, GOOD:0, MISS:0 }; S.tally[tier] = (S.tally[tier]||0) + 1;
 
   if (tier === 'PERFECT'){
     // exact hit ONLY — the full reaction: emoji pop + phone buzz + chime + sparkle
@@ -3703,7 +3804,7 @@ function offerRevive(reason, cost){
 function endRevivePrompt(){ const r=S.run; if (r && r.reviveTimer){ clearInterval(r.reviveTimer); r.reviveTimer=null; } $('reviveScreen').classList.add('hidden'); }
 function giveUp(){ endRevivePrompt(); beginDeathFall(); }
 function reviveWithCoins(){ const cost = reviveCost(); if (bank < cost) return; bank -= cost; Store.set('coins', bank); endRevivePrompt(); performRevive(); }
-function reviveWithAd(){ const r=S.run; if (!r || r.usedAdRevive) return; endRevivePrompt(); runAd(()=>{ r.usedAdRevive = true; performRevive(); }); }
+function reviveWithAd(){ const r=S.run; if (!r || r.usedAdRevive) return; endRevivePrompt(); runAd(()=>{ r.usedAdRevive = true; performRevive(); }, 'revive'); }
 function performRevive(){
   const r = S.run, g = S.runner; if (!r) return;
   r.revives++;
@@ -3721,7 +3822,8 @@ function performRevive(){
 }
 
 // simulated rewarded-ad modal — swap the body for a real ad SDK (AdMob / IronSource) later
-function runAd(done){
+function runAd(done, kind){
+  Analytics.track('ad', { level: (typeof gameLevel!=='undefined'?gameLevel:1), meta:{ kind: kind||'reward' } });
   const m = $('adModal'); m.classList.remove('hidden');
   let c = 3; $('adCount').textContent = c;
   const iv = setInterval(()=>{ c--; if (c<=0){ clearInterval(iv); m.classList.add('hidden'); done && done(); } else $('adCount').textContent = c; }, 1000);
@@ -3783,10 +3885,10 @@ function shareScore(){
 function doubleCoins(){
   if (S.coinsDoubled || S.coins <= 0) return;
   runAd(()=>{
-    S.coinsDoubled = true; bank += S.coins; Store.set('coins', bank);   // add a second copy of the run's coins
+    S.coinsDoubled = true; bank += S.coins; Store.set('coins', bank); CloudSave.queue();   // add a second copy of the run's coins
     $('finalReward').innerHTML = `★ DEBEN DOUBLED! &nbsp;·&nbsp; +${S.coins*2} this run &nbsp;·&nbsp; bank ◎${bank}`;
     $('dblBtn').style.display = 'none'; Sound.buy();
-  });
+  }, 'double');
 }
 function showHint(text, ms){
   const h = $('hint'); h.textContent = text; h.classList.add('show');
@@ -3928,6 +4030,7 @@ function startGame(atLevel){
   _runPostedScore = -1;                          // fresh run → allow posting its scores again
   // atLevel set → restart that exact level (retry / in-game restart); otherwise CONTINUE from saved progress
   gameLevel = dailyMode ? 1 : Math.max(1, atLevel || resumeLevel);
+  Analytics.track('play', { level: gameLevel, meta:{ daily: !!dailyMode, char: curChar } });
   applyBiome(gameLevel);                        // biome for the level you're resuming at
   checkDailyStreak();                          // first game of the day → streak bump + bonus coins
   $('ratingOverlay').classList.remove('show'); $('nextLevelWrap').classList.remove('show'); $('introOverlay').classList.remove('show'); $('featureIntro').classList.remove('show'); $('multHud').classList.add('hidden');
@@ -3955,8 +4058,9 @@ function startGame(atLevel){
 // tapped NEXT LEVEL after the victory celebration → build the next pyramid
 function nextLevel(){
   $('nextLevelWrap').classList.remove('show');
+  Analytics.track('level_complete', { level: gameLevel, value: S.score||0 });
   gameLevel++;
-  if (!dailyMode && gameLevel > resumeLevel){ resumeLevel = gameLevel; Store.set('resumeLevel', resumeLevel); }  // SAVE progress
+  if (!dailyMode && gameLevel > resumeLevel){ resumeLevel = gameLevel; Store.set('resumeLevel', resumeLevel); CloudSave.queue(); }  // SAVE progress (+ cloud)
   applyBiome(gameLevel);                                   // shift the biome (sky / fog / light) for the new level
   missionEvent('level', gameLevel);                        // goal: reach a level
   DDA.note(0.85);                                          // finishing a pyramid means you're playing well
@@ -4043,6 +4147,88 @@ function renderSettings(){
   const sn = $('setNameInput'); if (sn) sn.value = playerName || '';
   const ej = $('eraJumpBtn'), eh = $('eraJumpHint');
   if (ej){ const e = eraFor(resumeLevel); ej.textContent = e.name; if (eh) eh.textContent = 'next run begins at Level ' + resumeLevel + ' (' + e.name + ')'; }
+  // cloud save state
+  const cb = $('cloudBtn'), sync = CloudSave.sync(), ccr = $('cloudCodeRow'), ccv = $('cloudCodeVal');
+  if (cb){ const on = !!(sync && sync.code); cb.textContent = on ? 'ON' : 'OFF'; cb.classList.toggle('on', on);
+    if (ccr) ccr.style.display = on ? '' : 'none';
+    if (on && ccv) ccv.textContent = sync.code + ' · PIN ' + sync.pin; }
+}
+// turn cloud save on (make/show a code+PIN) or off (stop syncing this device)
+function toggleCloud(){
+  if (!CloudSave.enabled()){ showPop('NO CONNECTION'); return; }
+  const sync = CloudSave.sync();
+  if (sync && sync.code){
+    if (window.confirm && !window.confirm('Turn cloud save OFF on this device? Your code '+sync.code+' still keeps your last sync in the cloud.')) return;
+    Store.set('sync', null);
+  } else {
+    const s = CloudSave.enable();
+    showPop('CLOUD SAVE ON');
+    setTimeout(()=>{ try { window.alert && window.alert('Cloud save ON.\n\nSYNC CODE: '+s.code+'\nPIN: '+s.pin+'\n\nWrite these down. On another device, open Settings → RESTORE FROM A CODE and enter them to load everything.'); } catch(e){} }, 60);
+  }
+  renderSettings();
+}
+async function restoreCloud(){
+  if (!CloudSave.enabled()){ showPop('NO CONNECTION'); return; }
+  let code='', pin='';
+  try { code = window.prompt && window.prompt('Enter your SYNC CODE (from the other device):',''); } catch(e){}
+  if (!code) return;
+  try { pin = window.prompt && window.prompt('Enter the 4-digit PIN:',''); } catch(e){}
+  if (!pin) return;
+  showPop('RESTORING…');
+  const res = await CloudSave.restore(code, pin);
+  if (res && res.ok){ try { window.alert && window.alert('Save restored! Reloading…'); } catch(e){} setTimeout(()=>{ try { location.reload(); } catch(e){} }, 200); }
+  else { const m = res && res.error==='badpin' ? 'WRONG PIN' : res && res.error==='notfound' ? 'CODE NOT FOUND' : 'RESTORE FAILED'; showPop(m); }
+}
+// ---------- OWNER-ONLY ANALYTICS DASHBOARD ----------
+// opened by tapping the version label 5× in Settings, then a password (verified server-side in the analytics() RPC)
+let _verTaps = 0, _verTapT = 0;
+function ownerTap(){
+  const now = Date.now(); if (now - _verTapT > 1500) _verTaps = 0; _verTapT = now; _verTaps++;
+  if (_verTaps >= 5){ _verTaps = 0; openOwner(); }
+}
+async function openOwner(){
+  let pass=''; try { pass = window.prompt && window.prompt('Owner password:',''); } catch(e){}
+  if (!pass) return;
+  $('settingsPanel').classList.add('hidden'); $('ownerPanel').classList.remove('hidden');
+  const body = $('ownerBody'); body.textContent = 'loading…';
+  if (!RemoteBoard.enabled() || typeof fetch==='undefined'){ body.textContent = 'offline'; return; }
+  try {
+    const r = await RemoteBoard._fetch('/rest/v1/rpc/analytics', { method:'POST',
+      headers: RemoteBoard._h({ 'Content-Type':'application/json' }), body: JSON.stringify({ p_pass: pass }) });
+    if (!r.ok){ body.textContent = 'request failed (HTTP ' + r.status + ') — did you run the SQL?'; return; }
+    const j = await r.json();
+    if (j && j.error){ body.textContent = j.error==='denied' ? '✗ wrong password' : ('error: ' + j.error); return; }
+    renderOwner(j);
+  } catch(e){ body.textContent = 'network error'; }
+}
+function renderOwner(d){
+  d = d || {};
+  const n = v => (v==null ? '—' : (typeof v==='number' ? v.toLocaleString() : v));
+  const card = (label, val, sub) => '<div style="display:inline-block;width:48%;box-sizing:border-box;margin:0 1% 8px;padding:10px 12px;background:rgba(243,200,120,.07);border:1px solid rgba(243,200,120,.2);border-radius:10px;vertical-align:top">'
+    + '<div style="font-size:20px;color:#ffe6b0;font-weight:700">'+n(val)+'</div><div style="font-size:10px;letter-spacing:1px;opacity:.6;text-transform:uppercase">'+label+'</div>'+(sub?'<div style="font-size:10px;opacity:.5;margin-top:2px">'+sub+'</div>':'')+'</div>';
+  const sect = t => '<div style="font-size:11px;letter-spacing:2px;color:#f3d99a;opacity:.8;margin:14px 2px 6px;text-transform:uppercase">'+t+'</div>';
+  const p = d.placements || {};
+  const totalPl = (p.perfect||0)+(p.great||0)+(p.good||0)+(p.miss||0);
+  const pct = x => totalPl ? Math.round(100*(x||0)/totalPl)+'%' : '—';
+  let h = '';
+  h += sect('Audience');
+  h += card('Installs', d.installs) + card('Players (all-time)', d.players);
+  h += card('DAU (24h)', d.dau) + card('WAU (7d)', d.wau);
+  h += card('MAU (30d)', d.mau) + card('Returning', d.returning, '2+ active days');
+  h += sect('Engagement');
+  h += card('Sessions', d.sessions) + card('Plays', d.plays);
+  h += card('Levels cleared', d.levels_cleared) + card('Wins', d.wins);
+  h += card('Deaths', d.deaths) + card('Avg level reached', d.avg_level);
+  h += sect('Monetization');
+  h += card('Ads watched', d.ads) + card('Purchases', d.purchases);
+  h += card('Coins spent', d.coins_spent) + card('IAP revenue', d.iap_revenue!=null?('$'+d.iap_revenue):null);
+  h += sect('Placement accuracy ('+n(totalPl)+')');
+  h += card('Perfect', p.perfect, pct(p.perfect)) + card('Great', p.great, pct(p.great));
+  h += card('Good', p.good, pct(p.good)) + card('Miss', p.miss, pct(p.miss));
+  if (d.deaths_by_reason){ h += sect('Top death reasons');
+    h += '<div style="padding:4px 8px">' + Object.keys(d.deaths_by_reason).map(k=>'• '+escapeHtml(k)+': '+n(d.deaths_by_reason[k])).join('<br>') + '</div>'; }
+  h += '<div style="opacity:.4;font-size:10px;margin-top:16px">snapshot · app v'+escapeHtml(APP_VERSION)+'</div>';
+  $('ownerBody').innerHTML = h;
 }
 // cycle the next run's starting ERA (each era begins every 10 levels). Sets the continue point.
 function cycleEra(){
@@ -4391,7 +4577,8 @@ function purchaseSel(){
     if (st==='lock-era'){ showPop('REACH LEVEL ' + eraEnterLevel(it.era) + ' FIRST'); return; }
     if (st==='lock-boss'){ showPop('REACH LEVEL ' + it.unlock + ' FIRST'); return; }
   }
-  if (bank >= it.cost){ bank -= it.cost; Store.set('coins', bank); own.push(key); Store.set(ownedKey, own); Sound.buy(); showPop('UNLOCKED — TAP EQUIP'); if (isChar) checkAchievements(); }
+  if (bank >= it.cost){ bank -= it.cost; Store.set('coins', bank); own.push(key); Store.set(ownedKey, own); Sound.buy(); showPop('UNLOCKED — TAP EQUIP'); if (isChar) checkAchievements();
+    Analytics.track('purchase', { value: it.cost, meta:{ kind:isChar?'char':'stone', item:key, currency:'coins' } }); CloudSave.queue(); }
   else { Sound.blip(150,0.16,'sawtooth',0.14); showPop('NEED MORE DEBEN'); }
   renderShop();
 }
@@ -4426,6 +4613,10 @@ function endGame(won, how){
   setSpeedFx(0);
   S.gameOver = true; S.won = won; S.phase = 'over';
   DDA.note(won ? 0.9 : (how==='collapsed' ? 0.15 : 0.3));   // run outcome feeds the adaptive skill estimate
+  // ---- analytics: run outcome + this run's placement quality ----
+  Analytics.track(won ? 'win' : 'death', { level: gameLevel, value: S.score||0, meta:{ reason: how||'', height: Math.round((S.peakY||0)*10)/10 } });
+  if (S.tally){ Analytics.track('placements', { level: gameLevel, meta: S.tally }); }
+  CloudSave.queue();
   $('reviveScreen').classList.add('hidden'); $('menuBtn').style.display = 'none'; $('restartBtn').style.display='none';
   $('hud').style.display = 'none'; $('coinHud').classList.add('hidden'); $('multHud').classList.add('hidden'); $('featureIntro').classList.remove('show');
   // coins were already banked as they were collected; just save records here
@@ -4505,6 +4696,10 @@ btn('shopEquipBtn',  equipSel);
 btn('dailyBtn',      ()=>{ dailyMode = !dailyMode; renderSettings(); });
 btn('resetProgBtn',  resetProgress);   // wipe saved level progress → back to Level 1
 btn('eraJumpBtn',    cycleEra);        // preview: jump the next run to another era
+btn('cloudBtn',      toggleCloud);     // cloud save on/off
+btn('cloudRestoreBtn', restoreCloud);  // pull a save from another device
+btn('ownerBack',     ()=>{ $('ownerPanel').classList.add('hidden'); $('settingsPanel').classList.remove('hidden'); });
+btn('appVersion',    ownerTap);        // tap 5× → owner analytics dashboard
 btn('homeProfile',   showProfile);
 btn('profileBack',   backHome);
 btn('acctCreate',    createAccount);
@@ -4751,6 +4946,7 @@ $('hud').style.display = 'none';          // hidden until a game starts, so the 
 $('meterWrap').style.opacity = '0';
 renderHome();          // populate best scores & coin bank on the home screen
 if (!Store.get('how', 0)) showHow();   // first-ever launch → show the how-to-play card once
+try { Analytics.open(); } catch(e){}   // log the session (installs / DAU / retention)
 animate();
 requestAnimationFrame(()=>{ const l=$('loader'); if (l){ l.classList.add('hidden'); setTimeout(()=>l.style.display='none', 600); } });   // reveal once ready
 
