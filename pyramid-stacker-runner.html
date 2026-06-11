@@ -820,7 +820,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.239 · 2026.06.11</div>
+  <div id="appVersion">v1.240 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1008,7 +1008,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.239';
+const APP_VERSION = '1.240';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1228,26 +1228,27 @@ function charStatus(key){
 // ---- character perks (FAIR: coins + survivability only, never score) ----
 // each era boss gets one signature ability; mid-tiers get a small starting edge
 const BOSS_ABILITY = {
-  egypt:  { freeSaves:1,    text:'Soul of Anubis — revive once per run' },
-  aztec:  { startMagnet:1,  text:'Feathered Serpent — start each climb with the magnet' },
-  greek:  { shieldCharges:2,text:'Wrath of Ares — begin every climb with 2 shields' },
-  norse:  { freeSaves:1,    text:'Berserker Rage — shrug off one fatal hit per run' },
-  nippon: { shieldCharges:2,text:'Oni Fury — begin every climb with 2 shields' },
-  alien:  { startMagnet:1,  text:'Hive Mind — start each climb with the magnet' },
-  cosmos: { startSlow:1,    text:'Time Dilation — begin every climb in slow-motion' },
-  heaven: { freeSaves:1,    text:'Divine Grace — revive once per run' },
+  egypt:  { freeSaves:1,                     text:'Soul of Anubis — revive once per run' },
+  aztec:  { startMagnet:1,                   text:'Feathered Serpent — start each climb with the coin magnet' },
+  greek:  { shieldCharges:2,                 text:'Wrath of Ares — begin every climb with 2 shields' },
+  norse:  { shieldCharges:1, nearMissSlow:1, text:'Berserker Reflex — a shield, and time slows when you dodge by a hair' },
+  nippon: { nearMissSlow:1,                  text:'Oni Reflex — katana-quick; time slows on every near miss' },
+  alien:  { startMagnet:1, startSlow:1,      text:'Hive Mind — start with the magnet AND in slow-motion' },
+  cosmos: { startSlow:1,                     text:'Time Dilation — begin every climb in slow-motion' },
+  heaven: { freeSaves:1, shieldCharges:1,    text:'Divine Grace — revive once per run, and start with a shield' },
 };
 function charPerks(key){
   const it = CHARACTERS[key] || {};
   const tier = (typeof it.tier === 'number') ? it.tier : 0;
   const p = { coinMul: 1 + [0.12,0.20,0.32,0.45][tier],
               shieldCharges: tier>=1 ? 1 : 0,
-              freeSaves: 0, startMagnet: 0, startSlow: 0 };
+              freeSaves: 0, startMagnet: 0, startSlow: 0, nearMissSlow: 0 };
   if (tier===3 && it.era && BOSS_ABILITY[it.era]){
     const b = BOSS_ABILITY[it.era];
     if (b.freeSaves)     p.freeSaves     += b.freeSaves;
     if (b.startMagnet)   p.startMagnet    = 1;
     if (b.startSlow)     p.startSlow      = 1;
+    if (b.nearMissSlow)  p.nearMissSlow   = 1;
     if (b.shieldCharges) p.shieldCharges  = Math.max(p.shieldCharges, b.shieldCharges);
   }
   return p;
@@ -4031,6 +4032,7 @@ function startRun(){
             magnet:0, shield:0, slow:0, bubble:null, hazardMul, dressed:false,
             gMult:1, gMultT:0, gMultMax:1,                      // golden-block score multiplier (+ peak reached this run)
             perkShield: perks.shieldCharges, perkMagnet: perks.startMagnet, perkSlow: perks.startSlow,
+            perkReflex: perks.nearMissSlow, reflexCD: 0,
             freeSaves: perks.freeSaves, coinMul: perks.coinMul,
             storms, revives:0, usedAdRevive:false, invuln:0, dead:false, deathReason:'fell' };
   // NB: obstacles / coins / power-ups / lane guides are NOT created yet — only when the climb starts
@@ -4181,6 +4183,7 @@ function updateRun(dt){
   }
   if (r.invuln > 0) r.invuln -= dt;                // brief grace after a revive
   if (r.laneLock > 0) r.laneLock -= dt;            // ice-slick lane freeze ebbing away
+  if (r.reflexCD > 0) r.reflexCD -= dt;            // near-miss slow-mo cooldown
 
   // advance along the path — the climb steadily quickens to keep the pressure on
   r.speed = (3.1 + Math.min(r.idx * 0.028, 2.3)) * DDA.runSpeed() * levelSpeed();   // adaptive + faster each level
@@ -4222,6 +4225,8 @@ function updateRun(dt){
       if (ob.type==='crush' && ob.closed && r.lane !== ob.safeLane){ runCrash(); return; }   // closing walls / rotor: be in the open gap
     }
     if (ob && ob.type==='lock'){ r.laneLock = Math.max(r.laneLock || 0, 0.7); }   // ice slick: no damage, but lane-changes freeze briefly
+    // REFLEX ability (some characters): squeaking past a hazard in the very next lane briefly slows time
+    if (r.perkReflex && r.reflexCD <= 0 && ob && ob.type==='lane' && ob.lane !== 99 && Math.abs(ob.lane - r.lane) === 1){ slowmo(); r.reflexCD = 1.5; }
     collectCoin(r.tiles[r.idx], r);
     collectPower(r.tiles[r.idx], r);
     collectGold(r.tiles[r.idx], r);
