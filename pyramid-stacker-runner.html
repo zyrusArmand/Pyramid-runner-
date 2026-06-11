@@ -794,7 +794,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.222 · 2026.06.11</div>
+  <div id="appVersion">v1.223 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -982,7 +982,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.222';
+const APP_VERSION = '1.223';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1696,19 +1696,22 @@ function levelSpeed(){ return 1 + Math.floor((gameLevel-1)/5)*0.1; }
 const FEATURES = [
   { key:'welcome', level:1, type:'intro',  title:'⛏ REACH THE PEAK',    desc:'Climb the pyramid you built! Swipe LEFT / RIGHT to change lane, swipe UP or TAP to jump a gap, swipe DOWN to slide. Grab coins and reach the capstone to clear the level.' },
   { key:'golden',  level:2, type:'reward', title:'✦ GOLDEN BLOCKS',     desc:'Grab the floating gold blocks to build a SCORE MULTIPLIER. Chain them quickly to push it to ×5 — let a few seconds pass without one and it resets.' },
-  { key:'spike',   level:3, type:'hazard', title:'△ SPIKE TRAPS',       desc:'A row of bronze spikes blocks a lane. Swipe LEFT / RIGHT into a clear lane to slip past.' },
   { key:'shield',  level:4, type:'power', power:'shield', title:'🛡 SHIELD',     desc:'Collect the green SHIELD to survive ONE hit. Grab it whenever you can — it can save a run.' },
-  { key:'hammer',  level:5, type:'hazard', title:'⚒ SWINGING HAMMERS',  desc:'Stone hammers slam down onto ONE lane on a timer. Watch the swing and dodge to another lane.' },
   { key:'magnet',  level:6, type:'power', power:'magnet', title:'⚡ COIN MAGNET', desc:'The blue COIN MAGNET vacuums up nearby coins for a few seconds. Steer near a cluster to sweep them in.' },
-  { key:'lintel',  level:8, type:'hazard', title:'⌐ LANE LINTELS',      desc:'Small carved gates block a lane. SLIDE under the tall arches, JUMP the low blocks — or just DODGE to an open lane. There’s always a way through.' },
   { key:'slow',    level:11, type:'power', power:'slow',  title:'⏱ SLOW-MO',     desc:'The purple SLOW-MO briefly slows everything down so you can thread a tricky stretch of hazards.' },
-  { key:'flame',   level:13, type:'hazard', title:'♨ FLAME JETS',       desc:'Fire erupts from a lane on a timer. Time your run to pass while the flame is down.' },
-  { key:'boulder', level:18, type:'hazard', title:'🪨 ROLLING BOULDERS', desc:'A great stone barrels down a lane toward you. DODGE to another lane — or JUMP it.' },
-  { key:'pendulum',level:24, type:'hazard', title:'🗡 PENDULUM BLADES',  desc:'A blade sweeps side to side across the lanes. DODGE to where it isn’t, or SLIDE under it as it passes.' },
-  { key:'faller',  level:28, type:'hazard', title:'🧱 FALLING BLOCKS',   desc:'A shadow marks where a block will crash down. DODGE out of the marked lane before it lands.' },
-  { key:'crusher', level:34, type:'hazard', title:'🚪 CLOSING WALLS',    desc:'Grinding walls seal every lane but one. Read the open gap and DODGE into it.' },
 ];
-function hazardsUnlocked(level){ return FEATURES.filter(f => f.type==='hazard' && level >= f.level).map(f => f.key); }
+// Each ERA has its own ordered set of hazards (defined in the hazard engine, below). The set is introduced gradually —
+// 2 hazards at the era's first level, then +1 per level up to a full set of five by mid-era — and resets when the next era begins.
+function eraLevelOf(level){ return ((Math.max(1, level) - 1) % 10) + 1; }
+function eraHazSet(level){ const e = eraFor(level); return (typeof ERA_SET !== 'undefined' && ERA_SET[e.key]) ? ERA_SET[e.key] : []; }
+function hazardsUnlocked(level){
+  const set = eraHazSet(level); if (!set.length) return [];
+  const el = eraLevelOf(level);
+  const n = Math.min(set.length, el >= 5 ? 5 : el + 1);   // 2 hazards at an era's first level, then +1 per level up to a full set of 5
+  return set.slice(0, n);
+}
+// distinct hazard TYPES that actually appear in a single climb (keeps any one run readable): 2–3 early in an era, 3–5 in its back half
+function hazardVariety(level){ const el = eraLevelOf(level); const lo = el <= 5 ? 2 : 3, hi = el <= 5 ? 3 : 5; return lo + Math.floor(RND() * (hi - lo + 1)); }
 function powersUnlocked(level){ return FEATURES.filter(f => f.type==='power' && level >= f.level).map(f => f.power); }
 function goldenUnlocked(level){ return level >= 2; }
 // how busy a climb gets: flat within each 5-level band, stepping up one band at a time (hazards still gated by unlock)
@@ -3190,15 +3193,366 @@ function makeGlyph(ch){
   } catch(e){ return null; }
 }
 
+// ============================ HAZARD ENGINE ============================
+// Data-driven hazards: a small library of MECHANICS (behaviours), each wearing an era-specific SKIN. A registry (HZ)
+// maps every hazard id → { mech, skin, title, desc }; ERA_SET lists each era's ordered roster. buildHazard() spawns one
+// and animHazard() ticks it. This keeps the eight eras' ~40 hazards consistent and cheap to extend.
+const HZL = LANE_W;
+const hzRndLane = () => [-1, 0, 1][Math.floor(RND() * 3)];
+function hzMat(c, o){ return new THREE.MeshStandardMaterial(Object.assign({ color:c, roughness:0.8, metalness:0.06 }, o || {})); }
+
+const HZ_BUILD = {
+  // sliding spikes — drift lane↔lane; dodge into the clear lane
+  slider(t, s){
+    const mat = hzMat(s.c1 || 0xd9bd72, { emissive:s.em || 0x241808, metalness:s.metal ?? 0.72, roughness:0.3 });
+    t.ob = { type:'lane', lane:0, phase:RND()*6.28, spd:0.0016 + RND()*0.003, yOff:0, mat };
+    const g = new THREE.Group();
+    for (const [sx,sz,sh] of [[-0.06,-0.01,0.12],[-0.02,0.02,0.16],[0.02,0.02,0.16],[0.06,-0.01,0.12]]){
+      const sp = new THREE.Mesh(new THREE.ConeGeometry(0.022, sh, s.sides || 6), mat);
+      sp.rotation.x = 0.92; sp.position.set(sx, 0.018, sz); sp.castShadow = true; g.add(sp);
+    }
+    g.position.set(t.pos.x, t.pos.y, t.pos.z); scene.add(g); t.obMesh = g;
+  },
+  // static spikes/shards — one lane permanently blocked; dodge
+  block(t, s){
+    const L = hzRndLane();
+    const mat = hzMat(s.c1 || 0x9fb4c8, { emissive:s.em || 0x101820, metalness:s.metal ?? 0.5, roughness:s.rough ?? 0.35, flatShading:true });
+    t.ob = { type:'lane', lane:L, mat };
+    const g = new THREE.Group();
+    for (const [sx,sz,sh] of [[-0.05,0,0.13],[0,0.01,0.18],[0.05,0,0.13]]){
+      const sp = new THREE.Mesh(new THREE.ConeGeometry(0.026, sh, s.sides || 5), mat);
+      sp.position.set(sx, sh/2, sz); sp.castShadow = true; g.add(sp);
+    }
+    g.position.set(t.pos.x + L*HZL, t.pos.y, t.pos.z); scene.add(g); t.obMesh = g;
+  },
+  // side hammer/idol — swings down to slam ONE lane on a timer; dodge while it's down
+  slam(t, s){
+    const side = RND()<0.5 ? -1 : 1, L = hzRndLane();
+    const Larm = Math.max(0.26, 0.5 - side*L*HZL), aMax = 1.45;
+    t.ob = { type:'lane', lane:99, side, L, aMax, phase:RND()*6.28, spd:0.0022 + RND()*0.0024, slam:false };
+    const g = new THREE.Group();
+    const headMat = hzMat(s.c1 || 0xe0b24a, { metalness:0.78, roughness:0.3 });
+    const armMat  = hzMat(s.c2 || 0x5e4126, { roughness:0.85, metalness:0.05 });
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.014,0.018,Larm,10), armMat); arm.position.y = Larm/2; arm.castShadow = true; g.add(arm);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.14,0.1,0.11), headMat); head.position.y = Larm; head.castShadow = true; g.add(head);
+    g.position.set(t.pos.x + side*0.5, t.pos.y, t.pos.z); scene.add(g); t.obMesh = g;
+  },
+  // per-lane gate — SLIDE the high arches, JUMP the low blocks, or dodge
+  gate(t, s){
+    const stone = hzMat(s.c1 || 0xb59a64, { roughness:0.85, metalness:0.04 });
+    const trimM = hzMat(s.c2 || 0xe0b24a, { metalness:0.72, roughness:0.32, emissive:s.em || 0x2a1c00 });
+    const lanes = [-1,0,1];
+    for (let a = 2; a > 0; a--){ const b = Math.floor(RND()*(a+1)); const tmp = lanes[a]; lanes[a] = lanes[b]; lanes[b] = tmp; }
+    const canDouble = gameLevel >= 14 && DDA.obstacleW() >= 1 && RND() < 0.28, blockN = canDouble ? 2 : 1;
+    const gates = [], g = new THREE.Group();
+    for (let gi = 0; gi < blockN; gi++){
+      const L = lanes[gi], x = L*HZL, duck = RND() < 0.55; gates.push({ lane:L, duck });
+      if (duck){
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.05,0.08), stone); bar.position.set(x,0.155,0); bar.castShadow = true; g.add(bar);
+        const tr = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.016,0.086), trimM); tr.position.set(x,0.155,0); g.add(tr);
+        [-0.075,0.075].forEach(px => { const p = new THREE.Mesh(new THREE.BoxGeometry(0.035,0.13,0.05), stone); p.position.set(x+px,0.075,0); p.castShadow = true; g.add(p); });
+      } else {
+        const bl = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.07,0.1), stone); bl.position.set(x,0.045,0); bl.castShadow = true; g.add(bl);
+        const cap = new THREE.Mesh(new THREE.BoxGeometry(0.186,0.016,0.106), trimM); cap.position.set(x,0.085,0); g.add(cap);
+      }
+    }
+    t.ob = { type:'gate', gates }; g.position.set(t.pos.x, t.pos.y, t.pos.z); scene.add(g); t.obMesh = g;
+  },
+  // flame/plasma jet — erupts from a lane on a timer; pass while it's down
+  erupt(t, s){
+    const fmat  = hzMat(s.c1 || 0xff7a1e, { emissive:s.em  || 0xff5400, emissiveIntensity:1.4, transparent:true, opacity:0.88, roughness:0.6 });
+    const fmat2 = hzMat(s.c2 || 0xffe06a, { emissive:s.em2 || 0xffc000, emissiveIntensity:1.9, transparent:true, opacity:0.92, roughness:0.5 });
+    const L = hzRndLane();
+    t.ob = { type:'lane', lane:99, L, phase:RND()*6.28, spd:0.003 + RND()*0.0035, mat:fmat, mat2:fmat2 };
+    const g = new THREE.Group();
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.058,0.05,12), hzMat(s.c3 || 0x4a3a26, { roughness:0.9, metalness:0.1 })); base.castShadow = true; g.add(base);
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.055,0.22,10), fmat); cone.position.y = 0.15; g.add(cone); t.ob.coneMesh = cone;
+    const core = new THREE.Mesh(new THREE.ConeGeometry(0.03,0.15,10), fmat2); core.position.y = 0.13; g.add(core); t.ob.coreMesh = core;
+    g.position.set(t.pos.x + L*HZL, t.pos.y, t.pos.z); scene.add(g); t.obMesh = g;
+  },
+  // rolling boulder/asteroid — barrels down a lane; dodge or JUMP
+  roll(t, s){
+    const L = hzRndLane();
+    t.ob = { type:'lane', lane:L, jumpable:true, phase:RND()*6.28, spd:0.004 + RND()*0.002 };
+    const ball = new THREE.Mesh(new THREE.DodecahedronGeometry(0.085, 0), hzMat(s.c1 || 0x9c8763, { roughness:0.95, metalness:0.03, flatShading:true, emissive:s.em || 0x000000 }));
+    ball.castShadow = true;
+    const g = new THREE.Group(); g.add(ball); t.ob.ball = ball;
+    g.position.set(t.pos.x + L*HZL, t.pos.y + 0.085, t.pos.z); scene.add(g); t.obMesh = g;
+  },
+  // swinging blade/scythe/wing — sweeps across the lanes; dodge clear or SLIDE under
+  sweep(t, s){
+    t.ob = { type:'lane', lane:99, slidable:true, phase:RND()*6.28, spd:0.0022 + RND()*0.0016 };
+    const g = new THREE.Group();
+    const armMat = hzMat(s.c2 || 0x4a3a26, { roughness:0.8, metalness:0.1 });
+    const bladeMat = hzMat(s.c1 || 0xcfd6dc, { metalness:0.85, roughness:0.25, emissive:s.em || 0x10141a });
+    const pivot = new THREE.Group(); pivot.position.y = 0.42;
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.01,0.01,0.34,8), armMat); arm.position.y = -0.17; pivot.add(arm);
+    const blade = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.02,3), bladeMat); blade.rotation.x = Math.PI/2; blade.position.y = -0.34; blade.castShadow = true; pivot.add(blade);
+    g.add(pivot); t.ob.pivot = pivot; g.position.set(t.pos.x, t.pos.y, t.pos.z); scene.add(g); t.obMesh = g;
+  },
+  // falling block/idol/meteor — shadow telegraphs, then it slams a lane; dodge clear
+  fall(t, s){
+    const L = hzRndLane();
+    t.ob = { type:'lane', lane:99, L, phase:RND()*6.28, spd:0.0026 + RND()*0.0016 };
+    const g = new THREE.Group();
+    const block = new THREE.Mesh(new THREE.BoxGeometry(0.17,0.16,0.12), hzMat(s.c1 || 0x8a7350, { roughness:0.9, metalness:0.04, emissive:s.em || 0x000000 }));
+    block.castShadow = true; block.position.y = 0.58; g.add(block); t.ob.block = block;
+    const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.08,16), new THREE.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:0, depthWrite:false }));
+    shadow.rotation.x = -Math.PI/2; shadow.position.y = 0.012; g.add(shadow); t.ob.shadow = shadow;
+    g.position.set(t.pos.x + L*HZL, t.pos.y, t.pos.z); scene.add(g); t.obMesh = g;
+  },
+  // closing walls/columns — grind shut leaving one gap; be in the open lane
+  walls(t, s){
+    const G = hzRndLane(), gx = G*HZL;
+    t.ob = { type:'crush', closed:false, safeLane:G, gx, phase:RND()*6.28, spd:0.0018 + RND()*0.0012 };
+    const g = new THREE.Group();
+    const wMat = hzMat(s.c1 || 0x7a6748, { roughness:0.92, metalness:0.05, emissive:s.em || 0x000000 });
+    const wallL = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.18,0.1), wMat); wallL.castShadow = true;
+    const wallR = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.18,0.1), wMat); wallR.castShadow = true;
+    wallL.position.set(gx-0.45,0.09,0); wallR.position.set(gx+0.45,0.09,0);
+    g.add(wallL); g.add(wallR); t.ob.wallL = wallL; t.ob.wallR = wallR;
+    g.position.set(t.pos.x, t.pos.y, t.pos.z); scene.add(g); t.obMesh = g;
+  },
+  // dart/shuriken/comet volley — fires across ONE telegraphed lane on a timer; dodge out before it looses
+  volley(t, s){
+    const L = hzRndLane(), side = L > 0 ? -1 : 1;
+    t.ob = { type:'lane', lane:99, L, side, phase:RND()*6.28, spd:0.0024 + RND()*0.0018 };
+    const g = new THREE.Group();
+    const emit = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.09,0.08), hzMat(s.c2 || 0x6a5230, { roughness:0.8, metalness:0.2, emissive:s.em || 0x201000 }));
+    emit.position.set(side*0.42, 0.08, 0); emit.castShadow = true; g.add(emit); t.ob.teleMat = emit.material;
+    const dartMat = hzMat(s.c1 || 0xcfd6dc, { metalness:0.7, roughness:0.3, emissive:s.em || 0x201000 });
+    const darts = [];
+    for (let k = 0; k < 3; k++){ const d = new THREE.Mesh(new THREE.ConeGeometry(0.014,0.07,6), dartMat); d.rotation.z = side*Math.PI/2; d.position.set(side*0.42, 0.08 + (k-1)*0.022, 0); d.visible = false; g.add(d); darts.push(d); }
+    t.ob.darts = darts;
+    g.position.set(t.pos.x, t.pos.y, t.pos.z); scene.add(g); t.obMesh = g;
+  },
+  // pop-up spikes — snap up from a lane on a timer; dodge aside or JUMP them while up
+  popup(t, s){
+    const L = hzRndLane();
+    const mat = hzMat(s.c1 || 0x88e0c0, { emissive:s.em || 0x103028, metalness:0.4, roughness:0.4, flatShading:true });
+    t.ob = { type:'lane', lane:99, L, jumpable:true, phase:RND()*6.28, spd:0.0026 + RND()*0.002, mat };
+    const g = new THREE.Group(), inner = new THREE.Group();
+    for (const [sx,sz] of [[-0.05,0],[0,0.02],[0.05,0]]){ const sp = new THREE.Mesh(new THREE.ConeGeometry(0.024,0.14,s.sides || 5), mat); sp.position.set(sx,0.07,sz); sp.castShadow = true; inner.add(sp); }
+    inner.scale.y = 0.05; g.add(inner); t.ob.inner = inner;
+    g.position.set(t.pos.x + L*HZL, t.pos.y, t.pos.z); scene.add(g); t.obMesh = g;
+  },
+  // spinning rotor/pulsar — only one lane is open at a time, and it rotates; dodge to the gap
+  spinner(t, s){
+    t.ob = { type:'crush', closed:true, safeLane:0, phase:RND()*6.28, spd:0.0016 + RND()*0.0012 };
+    const g = new THREE.Group(), rotor = new THREE.Group(); rotor.position.y = 0.12;
+    const armMat = hzMat(s.c1 || 0xb06ad0, { metalness:0.6, roughness:0.35, emissive:s.em || 0x200a30 });
+    for (let k = 0; k < 3; k++){ const arm = new THREE.Mesh(new THREE.BoxGeometry(0.34,0.03,0.05), armMat); arm.rotation.y = k*2.094; arm.castShadow = true; rotor.add(arm); }
+    rotor.add(new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.07,10), hzMat(s.c2 || 0x4a3a5a, { metalness:0.5, roughness:0.5 })));
+    g.add(rotor); t.ob.rotor = rotor;
+    g.position.set(t.pos.x, t.pos.y, t.pos.z); scene.add(g); t.obMesh = g;
+  },
+  // laser/holy beam — snaps on across the WHOLE path on a timer; SLIDE under it while it's firing
+  beam(t, s){
+    const beamMat = new THREE.MeshStandardMaterial({ color:s.c1 || 0x66e0ff, emissive:s.em || 0x2090c0, emissiveIntensity:1.6, transparent:true, opacity:0, roughness:0.4 });
+    t.ob = { type:'beamT', on:false, phase:RND()*6.28, spd:0.0024 + RND()*0.0016, beamMat };
+    const g = new THREE.Group();
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.62,0.03,0.03), beamMat); bar.position.y = 0.13; g.add(bar);
+    const postMat = hzMat(s.c2 || 0x33424a, { metalness:0.5, roughness:0.5, emissive:s.em || 0x081018 });
+    [-0.3,0.3].forEach(px => { const p = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.18,0.04), postMat); p.position.set(px,0.09,0); p.castShadow = true; g.add(p); });
+    g.position.set(t.pos.x, t.pos.y, t.pos.z); scene.add(g); t.obMesh = g;
+  },
+  // ice slick — no damage, but you CAN'T change lanes for a beat after crossing it; line up early
+  lock(t, s){
+    const mat = new THREE.MeshStandardMaterial({ color:s.c1 || 0xbfe6ff, emissive:s.em || 0x16384a, transparent:true, opacity:0.5, roughness:0.12, metalness:0.3 });
+    t.ob = { type:'lock', mat };
+    const g = new THREE.Group();
+    const patch = new THREE.Mesh(new THREE.BoxGeometry(0.62,0.012,0.2), mat); patch.position.y = 0.012; g.add(patch);
+    g.position.set(t.pos.x, t.pos.y, t.pos.z); scene.add(g); t.obMesh = g;
+  },
+};
+
+const HZ_ANIM = {
+  slider(ob, t, near, pulse){
+    const f = Math.sin(performance.now()*(ob.spd||0.0024) + ob.phase);
+    ob.lane = f > 0.33 ? 1 : (f < -0.33 ? -1 : 0);
+    t.obMesh.position.set(t.pos.x + f*HZL, t.pos.y + (ob.yOff||0), t.pos.z);
+    if (ob.mat){ const danger = near && ob.lane === S.run.lane; ob.mat.emissive.setRGB(danger ? 0.5+0.4*pulse : 0.16, danger ? 0.04 : 0.08, 0); }
+  },
+  block(ob, t, near, pulse){
+    if (ob.mat){ const danger = near && ob.lane === S.run.lane; ob.mat.emissive.setRGB(danger ? 0.5*pulse : 0.05, danger ? 0.08 : 0.07, danger ? 0.04 : 0.11); }
+  },
+  slam(ob, t, near){
+    const aMax = ob.aMax || 1.45, s = aMax * (0.5 - 0.5*Math.cos(performance.now()*(ob.spd||0.003) + ob.phase));
+    t.obMesh.rotation.z = ob.side * s;
+    const down = s > aMax*0.72; ob.lane = down ? ob.L : 99;
+    const slammed = s > aMax*0.9;
+    if (slammed && !ob.slam){ ob.slam = true; if (near){ spawnDust(new THREE.Vector3(t.pos.x + ob.L*HZL, t.pos.y-0.03, t.pos.z), 0xe8d8c0, 7, 1.6, 1); Sound.drop(); shake(0.16); } }
+    else if (!slammed && ob.slam && s < aMax*0.65){ ob.slam = false; }
+  },
+  erupt(ob, t){
+    const s = Math.sin(performance.now()*(ob.spd||0.003) + ob.phase);
+    const up = s > 0.1, flick = 1 + 0.12*Math.sin(performance.now()*0.03 + ob.phase), hgt = up ? (0.35 + 0.65*s)*flick : 0;
+    if (ob.coneMesh){ ob.coneMesh.scale.set(1, Math.max(0.04, hgt), 1); ob.coneMesh.visible = up; }
+    if (ob.coreMesh){ ob.coreMesh.scale.set(1, Math.max(0.04, hgt*0.92), 1); ob.coreMesh.visible = up; }
+    if (ob.mat) ob.mat.opacity = up ? 0.88 : 0;
+    if (ob.mat2) ob.mat2.opacity = up ? 0.92 : 0;
+    ob.lane = up ? ob.L : 99;
+  },
+  roll(ob, t, near, pulse, dt){
+    if (ob.ball) ob.ball.rotation.x += dt * 7;
+    const b = Math.sin(performance.now()*ob.spd + ob.phase);
+    t.obMesh.position.z = t.pos.z + b*0.045;
+    t.obMesh.position.y = t.pos.y + 0.085 + Math.abs(Math.cos(performance.now()*ob.spd*1.4 + ob.phase))*0.012;
+  },
+  sweep(ob, t){
+    const ang = 0.72 * Math.sin(performance.now()*ob.spd + ob.phase);
+    if (ob.pivot) ob.pivot.rotation.z = ang;
+    const bx = Math.sin(ang) * 0.34; ob.lane = bx > 0.1 ? 1 : (bx < -0.1 ? -1 : 0);
+  },
+  fall(ob, t, near){
+    const cyc = ((performance.now()*ob.spd + ob.phase) % 6.2832) / 6.2832;
+    let y, down = false, tele;
+    if (cyc < 0.7){ y = 0.5; tele = cyc/0.7; }
+    else if (cyc < 0.8){ const k = (cyc-0.7)/0.1; y = 0.5*(1-k); tele = 1; down = k > 0.6; }
+    else { const k = (cyc-0.8)/0.2; y = 0.5*k; tele = 1-k; }
+    if (ob.block) ob.block.position.y = 0.1 + y;
+    if (ob.shadow) ob.shadow.material.opacity = 0.08 + 0.5*tele;
+    if (down && !ob.thudded && near){ spawnDust(new THREE.Vector3(t.pos.x + ob.L*HZL, t.pos.y, t.pos.z), 0xe8d8c0, 6, 1.5, 1); Sound.drop(); shake(0.12); ob.thudded = true; }
+    else if (!down && ob.thudded && cyc < 0.7){ ob.thudded = false; }
+    ob.lane = down ? ob.L : 99;
+  },
+  walls(ob, t){
+    const cyc = ((performance.now()*ob.spd + ob.phase) % 6.2832) / 6.2832;
+    const close = cyc < 0.5 ? cyc/0.5 : 1-(cyc-0.5)/0.5, e = close*close*(3-2*close);
+    if (ob.wallL) ob.wallL.position.x = ob.gx - (0.45 - e*0.20);
+    if (ob.wallR) ob.wallR.position.x = ob.gx + (0.45 - e*0.20);
+    ob.closed = e > 0.78;
+  },
+  volley(ob, t, near, pulse){
+    const cyc = ((performance.now()*ob.spd + ob.phase) % 6.2832) / 6.2832;
+    let fire = false, tele;
+    if (cyc < 0.62){ tele = cyc/0.62; } else if (cyc < 0.78){ fire = true; tele = 1; } else tele = 0;
+    if (ob.teleMat) ob.teleMat.emissive.setRGB(0.4*tele*(0.6+0.4*pulse), 0.12*tele, 0);
+    const targetX = ob.L*HZL;
+    if (ob.darts) ob.darts.forEach((d, k) => { if (fire){ d.visible = true; const k2 = Math.min(1, (cyc-0.62)/0.16 + k*0.12); d.position.x = ob.side*0.42 + (targetX - ob.side*0.42)*k2; } else d.visible = false; });
+    ob.lane = fire ? ob.L : 99;
+  },
+  popup(ob, t, near, pulse){
+    const cyc = ((performance.now()*ob.spd + ob.phase) % 6.2832) / 6.2832;
+    let up = false, h;
+    if (cyc < 0.45){ h = 0.05; } else if (cyc < 0.6){ const k = (cyc-0.45)/0.15; h = 0.05 + 0.95*k; up = k > 0.5; }
+    else if (cyc < 0.85){ h = 1; up = true; } else { const k = (cyc-0.85)/0.15; h = 1 - 0.95*k; }
+    if (ob.inner) ob.inner.scale.y = Math.max(0.05, h);
+    if (ob.mat){ const danger = near && up && ob.L === S.run.lane; ob.mat.emissive.setRGB(danger ? 0.5*pulse : 0.06, danger ? 0.1 : 0.18, danger ? 0.05 : 0.15); }
+    ob.lane = up ? ob.L : 99;
+  },
+  spinner(ob, t, near, pulse, dt){
+    if (ob.rotor) ob.rotor.rotation.y += dt * 2.4;
+    const seq = [-1, 0, 1, 0], cyc = ((performance.now()*ob.spd + ob.phase) % 6.2832) / 6.2832;
+    ob.safeLane = seq[Math.floor(cyc*seq.length) % seq.length];
+  },
+  beam(ob, t){
+    const cyc = ((performance.now()*ob.spd + ob.phase) % 6.2832) / 6.2832;
+    let on = false, op = 0.05;
+    if (cyc < 0.5){ op = 0.05; } else if (cyc < 0.62){ op = 0.1 + 0.4*Math.abs(Math.sin(performance.now()*0.05)); } else { on = true; op = 0.9; }
+    if (ob.beamMat) ob.beamMat.opacity = on ? 0.9 : Math.max(0.04, op);
+    ob.on = on;
+  },
+  lock(ob, t, near, pulse){ if (ob.mat) ob.mat.opacity = 0.4 + 0.2*pulse; },
+};
+
+// hazard registry: id → mechanic + era-specific skin + codex card text
+const HZ = {
+  // EGYPT
+  eg_spike:  { mech:'slider', skin:{ c1:0xd9bd72, em:0x241808 },                 title:'△ SPIKE TRAPS',      desc:'Bronze spikes slide between lanes. Swipe into a clear lane to slip past.' },
+  eg_lintel: { mech:'gate',   skin:{ c1:0xb59a64, c2:0xe0b24a, em:0x2a1c00 },    title:'⌐ STONE LINTELS',    desc:'Carved gates block a lane. SLIDE under the tall ones, JUMP the low ones, or DODGE around.' },
+  eg_hammer: { mech:'slam',   skin:{ c1:0xe0b24a, c2:0x5e4126 },                 title:'⚒ KHOPESH HAMMERS',  desc:'Stone hammers slam one lane on a timer. Watch the swing and dodge clear.' },
+  eg_flame:  { mech:'erupt',  skin:{ c1:0xff7a1e, c2:0xffe06a, c3:0x4a3a26 },    title:'♨ FLAME BRAZIERS',   desc:'Fire erupts from a lane on a timer. Pass while the flame is down.' },
+  eg_boulder:{ mech:'roll',   skin:{ c1:0x9c8763 },                              title:'🪨 ROLLING SARCOPHAGI', desc:'A great stone barrels down a lane. DODGE aside, or JUMP it.' },
+  // AZTEC
+  az_spike:  { mech:'block',  skin:{ c1:0x2a2e3a, em:0x140820, metal:0.4, rough:0.3, sides:4 }, title:'◆ OBSIDIAN SPIKES', desc:'Black glass spikes jut from a lane. DODGE to a clear one.' },
+  az_dart:   { mech:'volley', skin:{ c1:0xcfd6dc, c2:0x5e4a2a, em:0x201000 },    title:'➶ BLOW-DART WALLS',  desc:'Darts fire across a marked lane on a timer. DODGE out before they loose.' },
+  az_idol:   { mech:'slam',   skin:{ c1:0x6a8f5a, c2:0x3a2e1e },                 title:'𐂷 JAGUAR IDOLS',     desc:'A stone idol stomps one lane. Time the slam and dodge.' },
+  az_fall:   { mech:'fall',   skin:{ c1:0x7a6a4a, em:0x100800 },                 title:'🗿 FALLING IDOLS',    desc:'A shadow marks where an idol drops. DODGE clear before it lands.' },
+  az_ball:   { mech:'roll',   skin:{ c1:0x8a7a5a },                              title:'🪨 TEMPLE STONE BALL', desc:'A carved ball rolls down a lane. DODGE or JUMP.' },
+  // HELLAS (greek)
+  gr_caltrop:{ mech:'slider', skin:{ c1:0xc9a14a, em:0x1a1004, metal:0.8 },      title:'✶ BRONZE CALTROPS',  desc:'Bronze caltrops slide between lanes. Steer into the clear one.' },
+  gr_arch:   { mech:'gate',   skin:{ c1:0xe8e4da, c2:0xb8b0a0, em:0x101010 },    title:'∏ MARBLE ARCHWAYS',  desc:'Marble arches block a lane. SLIDE, JUMP, or DODGE.' },
+  gr_pendulum:{mech:'sweep',  skin:{ c1:0xcfd6dc, c2:0x4a3a26, em:0x10141a },    title:'🗡 PENDULUM BLADES',  desc:'A blade sweeps the lanes. DODGE clear, or SLIDE under it.' },
+  gr_columns:{ mech:'walls',  skin:{ c1:0xe8e4da, em:0x101010 },                 title:'∥ GRINDING COLUMNS', desc:'Columns grind shut, leaving one gap. Read it and DODGE in.' },
+  gr_statue: { mech:'fall',   skin:{ c1:0xd8d2c4, em:0x101010 },                 title:'🗿 TOPPLING STATUES', desc:'A statue crashes onto a lane. DODGE before it topples.' },
+  // MIDGARD (norse)
+  no_icicle: { mech:'block',  skin:{ c1:0xbfe6ff, em:0x16384a, metal:0.3, rough:0.2, sides:6 }, title:'❄ ICICLE SPIKES', desc:'Icicles spear up from a lane. DODGE to a clear one.' },
+  no_ice:    { mech:'lock',   skin:{ c1:0xbfe6ff, em:0x16384a },                 title:'🧊 ICE SLICKS',       desc:'Slick ice locks your footing — you CAN’T change lanes for a moment. Line up early.' },
+  no_avalanche:{mech:'roll',  skin:{ c1:0xe6eef4 },                              title:'🏔 AVALANCHE BOULDERS', desc:'A snowball thunders down a lane. DODGE or JUMP.' },
+  no_iceblock:{ mech:'fall',  skin:{ c1:0xa9d4ea, em:0x0a2030 },                 title:'🧊 FALLING ICE',      desc:'A block of ice drops on a marked lane. DODGE clear.' },
+  no_glacier:{ mech:'walls',  skin:{ c1:0xa9d4ea, em:0x0a2030 },                 title:'🧊 GLACIER CRUSH',    desc:'Walls of ice grind shut but for one gap. DODGE into it.' },
+  // NIPPON
+  ni_shuriken:{mech:'volley', skin:{ c1:0xcfd6dc, c2:0x2a1a1a, em:0x200000 },    title:'✴ SHURIKEN VOLLEYS', desc:'Shuriken fly across a lane on a timer. DODGE out of the line.' },
+  ni_bamboo: { mech:'popup',  skin:{ c1:0x8ab06a, em:0x142810, sides:4 },        title:'⫯ BAMBOO SPIKES',    desc:'Bamboo spikes snap up from a lane on a timer. DODGE aside, or JUMP them.' },
+  ni_torii:  { mech:'gate',   skin:{ c1:0xc0392b, c2:0x2a1a1a, em:0x200000 },    title:'⛩ TORII GATES',      desc:'Painted gates block a lane. SLIDE, JUMP, or DODGE.' },
+  ni_shoji:  { mech:'walls',  skin:{ c1:0xe8e0d0, em:0x100808 },                 title:'⬓ SHOJI WALLS',      desc:'Paper walls slide shut, leaving one gap. Read it and DODGE.' },
+  ni_bell:   { mech:'slam',   skin:{ c1:0x8a6a2a, c2:0x2a1a1a },                 title:'🔔 TEMPLE BELLS',     desc:'A great bell drops onto one lane. Time it and dodge.' },
+  // XENON (alien)
+  al_laser:  { mech:'beam',   skin:{ c1:0x66e0ff, c2:0x2a2444, em:0x2090c0 },    title:'⊟ LASER GRIDS',      desc:'A beam snaps on across the path. SLIDE under it when it fires.' },
+  al_scythe: { mech:'sweep',  skin:{ c1:0xb06ad0, c2:0x2a2444, em:0x301040 },    title:'⌇ ENERGY SCYTHES',   desc:'A plasma blade sweeps the lanes. DODGE, or SLIDE under.' },
+  al_plasma: { mech:'erupt',  skin:{ c1:0x8a4fff, c2:0x4ad0ff, c3:0x2a2444, em:0x4a10c0, em2:0x1080c0 }, title:'☄ PLASMA VENTS', desc:'Plasma erupts from a lane on a timer. Pass while it’s down.' },
+  al_tractor:{ mech:'walls',  skin:{ c1:0x3a2a5a, em:0x200a30 },                 title:'⊞ TRACTOR WALLS',    desc:'Force-walls clamp shut but for one gap. DODGE into it.' },
+  al_rotor:  { mech:'spinner',skin:{ c1:0xb06ad0, c2:0x4a3a5a, em:0x200a30 },    title:'✺ DRONE ROTORS',     desc:'A rotor spins — only one lane is open at a time. DODGE to the gap.' },
+  // COSMOS
+  co_shard:  { mech:'block',  skin:{ c1:0x8a7ad0, em:0x120e26, metal:0.6, rough:0.3, sides:5 }, title:'✧ CRYSTAL SHARDS', desc:'Star-crystals block a lane. DODGE to a clear one.' },
+  co_meteor: { mech:'fall',   skin:{ c1:0x6a5a4a, em:0x2a1000 },                 title:'☄ METEOR STRIKES',   desc:'A shadow marks the impact. DODGE clear before the meteor lands.' },
+  co_asteroid:{mech:'roll',   skin:{ c1:0x5a5a6a },                              title:'🪨 ROGUE ASTEROIDS', desc:'An asteroid tumbles down a lane. DODGE or JUMP.' },
+  co_comet:  { mech:'volley', skin:{ c1:0x9ad0ff, c2:0x221d3e, em:0x103060 },    title:'✦ COMET VOLLEYS',    desc:'Comets streak across a lane on a timer. DODGE the line.' },
+  co_pulsar: { mech:'spinner',skin:{ c1:0x7ad0ff, c2:0x221d3e, em:0x103060 },    title:'✺ PULSAR ARMS',      desc:'Beams sweep — only one lane is clear. DODGE to the gap.' },
+  // EMPYREAN (heaven)
+  he_spear:  { mech:'block',  skin:{ c1:0xfff0c0, em:0x4a3000, metal:0.7, rough:0.25, sides:6 }, title:'↟ LIGHT SPEARS', desc:'Spears of light bar a lane. DODGE to a clear one.' },
+  he_arch:   { mech:'gate',   skin:{ c1:0xffffff, c2:0xffe0a0, em:0x4a3000 },    title:'∏ RADIANT ARCHES',   desc:'Glowing arches block a lane. SLIDE, JUMP, or DODGE.' },
+  he_wing:   { mech:'sweep',  skin:{ c1:0xfff8e0, c2:0xffe0a0, em:0x4a3000 },    title:'🪽 SERAPH WINGS',     desc:'A wing of light sweeps the lanes. DODGE, or SLIDE under.' },
+  he_pillar: { mech:'fall',   skin:{ c1:0xf0e6d0, em:0x4a3000 },                 title:'🏛 FALLING PILLARS',  desc:'A pillar of light drops on a lane. DODGE before it lands.' },
+  he_ray:    { mech:'beam',   skin:{ c1:0xfff0c0, c2:0x6a5a3a, em:0xc0a040 },    title:'☀ HOLY RAYS',        desc:'A ray sears across the path. SLIDE under it when it fires.' },
+};
+
+// each era's ordered roster (gentle → tough); the first two unlock at the era's first level, then one more per level
+const ERA_SET = {
+  egypt:  ['eg_spike','eg_lintel','eg_hammer','eg_flame','eg_boulder'],
+  aztec:  ['az_spike','az_dart','az_idol','az_fall','az_ball'],
+  greek:  ['gr_caltrop','gr_arch','gr_pendulum','gr_columns','gr_statue'],
+  norse:  ['no_icicle','no_ice','no_avalanche','no_iceblock','no_glacier'],
+  nippon: ['ni_shuriken','ni_bamboo','ni_torii','ni_shoji','ni_bell'],
+  alien:  ['al_laser','al_scythe','al_plasma','al_tractor','al_rotor'],
+  cosmos: ['co_shard','co_meteor','co_asteroid','co_comet','co_pulsar'],
+  heaven: ['he_spear','he_arch','he_wing','he_pillar','he_ray'],
+};
+
+function buildHazard(kind, t){
+  const d = HZ[kind]; if (!d || !HZ_BUILD[d.mech]) return;
+  HZ_BUILD[d.mech](t, d.skin || {});
+  if (t.ob){ t.ob.kind = kind; t.ob.mech = d.mech; }
+}
+function animHazard(t, near, pulse, dt){
+  const ob = t.ob; if (!ob || !ob.mech || !t.obMesh) return;
+  const fn = HZ_ANIM[ob.mech]; if (fn) fn(ob, t, near, pulse, dt);
+}
+
+// register a codex card for every hazard, unlocking at the right absolute level for its era + roster position
+Object.keys(ERA_SET).forEach(ek => {
+  const ei = ERAS.findIndex(e => e.key === ek); if (ei < 0) return;
+  const base = ei*10 + 1;
+  ERA_SET[ek].forEach((id, k) => {
+    const d = HZ[id]; if (!d) return;
+    FEATURES.push({ key:id, level: base + Math.max(0, k-1), type:'hazard', title:d.title, desc:d.desc });
+  });
+});
+FEATURES.sort((a, b) => a.level - b.level);
+
 // Spawn the climb's hazards, coins, power-ups and lane guides. Deferred until the player taps START CLIMB,
 // so none of it appears (or animates / makes sound) behind the rating/preview screen.
 function loadRunDressing(){
   const r = S.run; if (!r || r.dressed) return; r.dressed = true;
   const tiles = r.tiles, hazardMul = r.hazardMul;
   const LANE = LANE_W, rndLane = () => [-1,0,1][Math.floor(RND()*3)];
-  // procedural obstacles: only the hazard TYPES unlocked at this level appear, at a level-scaled density (level 1
-  // has none). The mix is drawn from whatever has been introduced so far, so the climb grows busier as you progress.
+  // procedural obstacles: only this ERA's unlocked hazards appear. The unlocked set grows over the era's first levels,
+  // but a per-run "variety cap" shuffles it and features only a few distinct types this climb so any one run stays readable.
   const haz = hazardsUnlocked(gameLevel);
+  const runHaz = haz.slice();
+  for (let a = runHaz.length - 1; a > 0; a--){ const b = Math.floor(RND()*(a+1)); const tmp = runHaz[a]; runHaz[a] = runHaz[b]; runHaz[b] = tmp; }
+  runHaz.length = Math.min(runHaz.length, hazardVariety(gameLevel));
   const density = obstacleDensity(gameLevel) * (isGuardianLevel(gameLevel) ? 1.5 : 1);   // guardian climbs run hotter
   let lastOb = 2;
   for (let i = 5; haz.length && i < tiles.length - 2; i++){
@@ -3207,136 +3561,8 @@ function loadRunDressing(){
     if ((tiles[i-1] && (tiles[i-1].gap || tiles[i-1].weak)) ||
         (tiles[i-2] && (tiles[i-2].gap || tiles[i-2].weak))) continue;   // leave landing room after a jump
     if (RND() > density * DDA.obstacleW() * hazardMul) continue;   // adaptive + shaped by how well you built the pyramid
-    const kind = haz[Math.floor(RND()*haz.length)];                // pick from the unlocked hazard mix
-    if (kind === 'hammer'){
-      // SIDE HAMMER: pivots off one side and swings down to slam ONE lane. A longer arm reaches a farther
-      // lane (1st / 2nd / 3rd path from that side), a shorter arm the nearest — dodge to a different lane.
-      const side = RND()<0.5 ? -1 : 1;              // mounted on the left or right of the path
-      const L = rndLane();                          // the lane it slams
-      const Larm = Math.max(0.26, 0.5 - side*L*LANE);   // arm length so the head reaches lane L at the bottom of its swing
-      const aMax = 1.45;
-      t.ob = { type:'lane', lane:99, hammer:true, side, L, aMax, phase:RND()*6.28, spd:0.0022 + RND()*0.0024, slam:false };
-      const ham = new THREE.Group();
-      const goldMat = new THREE.MeshStandardMaterial({ color:0xe0b24a, metalness:0.78, roughness:0.3 });
-      const woodMat = new THREE.MeshStandardMaterial({ color:0x5e4126, roughness:0.85, metalness:0.05 });
-      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.014,0.018,Larm,10), woodMat);   // thick wooden handle
-      arm.position.y = Larm/2; arm.castShadow = true; ham.add(arm);
-      const head = new THREE.Mesh(new THREE.BoxGeometry(0.14,0.1,0.11), goldMat);              // chunky gold head
-      head.position.y = Larm; head.castShadow = true; ham.add(head);
-      const band = new THREE.Mesh(new THREE.BoxGeometry(0.045,0.108,0.118),                    // darker striking band
-        new THREE.MeshStandardMaterial({ color:0x8a5a18, metalness:0.7, roughness:0.4 }));
-      band.position.y = Larm; ham.add(band);
-      ham.position.set(t.pos.x + side*0.5, t.pos.y, t.pos.z);             // pivot just outside the lanes, at tread level
-      scene.add(ham); t.obMesh = ham;
-    } else if (kind === 'spike'){
-      // themed temple SPIKE TRAP — a clean row of bright bronze spikes, roots sunk into the stone — slides lane↔lane
-      const spikeMat = new THREE.MeshStandardMaterial({ color:0xd9bd72, emissive:0x241808, metalness:0.75, roughness:0.28 });
-      t.ob = { type:'lane', lane:0, moving:true, phase: RND()*6.28, spd:0.0016 + RND()*0.003, yOff:0, mat:spikeMat };
-      const trap = new THREE.Group();
-      for (const [sx,sz,sh] of [[-0.06,-0.01,0.12],[-0.02,0.02,0.16],[0.02,0.02,0.16],[0.06,-0.01,0.12]]){
-        const sp = new THREE.Mesh(new THREE.ConeGeometry(0.022, sh, 6), spikeMat);
-        sp.rotation.x = 0.92;                              // angled out toward the player
-        sp.position.set(sx, 0.018, sz); sp.castShadow = true; trap.add(sp);
-      }
-      trap.position.set(t.pos.x, t.pos.y, t.pos.z);
-      scene.add(trap); t.obMesh = trap;
-    } else if (kind === 'lintel'){
-      // PER-LANE LINTELS: small carved gates that each block ONE lane (occasionally two at high levels), always
-      // leaving an open lane to dodge into. HIGH lintels sit at head height → SLIDE under; LOW lintels are
-      // knee-high → JUMP over. So every lintel can be beaten three ways: dodge, jump, or slide.
-      const stoneMat = new THREE.MeshStandardMaterial({ color:0xb59a64, roughness:0.85, metalness:0.04 });
-      const goldTrim = new THREE.MeshStandardMaterial({ color:0xe0b24a, metalness:0.72, roughness:0.32, emissive:0x2a1c00 });
-      const lanes = [-1, 0, 1];                                   // shuffle the lanes, then block the first 1–2
-      for (let a = lanes.length - 1; a > 0; a--){ const b = Math.floor(RND()*(a+1)); const tmp = lanes[a]; lanes[a] = lanes[b]; lanes[b] = tmp; }
-      const canDouble = gameLevel >= 14 && DDA.obstacleW() >= 1 && RND() < 0.28;   // two-lane blocks only ramp in later
-      const blockN = canDouble ? 2 : 1;
-      const gates = [], grp = new THREE.Group();
-      for (let gi = 0; gi < blockN; gi++){
-        const L = lanes[gi], x = L * LANE, duck = RND() < 0.55;   // duck = HIGH arch (slide); else LOW block (jump)
-        gates.push({ lane:L, duck });
-        if (duck){
-          const bar = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.05, 0.08), stoneMat);
-          bar.position.set(x, 0.155, 0); bar.castShadow = true; grp.add(bar);
-          const trim = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.016, 0.086), goldTrim);
-          trim.position.set(x, 0.155, 0); grp.add(trim);
-          [-0.075, 0.075].forEach(px => { const post = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.13, 0.05), stoneMat);
-            post.position.set(x + px, 0.075, 0); post.castShadow = true; grp.add(post); });
-        } else {
-          const block = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.07, 0.1), stoneMat);
-          block.position.set(x, 0.045, 0); block.castShadow = true; grp.add(block);
-          const cap = new THREE.Mesh(new THREE.BoxGeometry(0.186, 0.016, 0.106), goldTrim);
-          cap.position.set(x, 0.085, 0); grp.add(cap);
-        }
-      }
-      t.ob = { type:'gate', gates };
-      grp.position.set(t.pos.x, t.pos.y, t.pos.z);
-      scene.add(grp); t.obMesh = grp;
-    } else if (kind === 'boulder'){
-      // ROLLING BOULDER: a great faceted stone barrelling down ONE lane — DODGE to another lane, or JUMP it
-      const L = rndLane();
-      t.ob = { type:'lane', lane:L, jumpable:true, boulder:true, phase:RND()*6.28, spd:0.004 + RND()*0.002 };
-      const rockMat = new THREE.MeshStandardMaterial({ color:0x9c8763, roughness:0.95, metalness:0.03, flatShading:true });
-      const ball = new THREE.Mesh(new THREE.DodecahedronGeometry(0.085, 0), rockMat);
-      ball.castShadow = true;
-      const grp = new THREE.Group(); grp.add(ball); t.ob.ball = ball;
-      grp.position.set(t.pos.x + L*LANE, t.pos.y + 0.085, t.pos.z);
-      scene.add(grp); t.obMesh = grp;
-    } else if (kind === 'pendulum'){
-      // PENDULUM BLADE: a blade swings side-to-side across the lanes — DODGE to a clear lane, or SLIDE under it as it passes
-      t.ob = { type:'lane', lane:99, slidable:true, pendulum:true, phase:RND()*6.28, spd:0.0022 + RND()*0.0016 };
-      const grp = new THREE.Group();
-      const armMat = new THREE.MeshStandardMaterial({ color:0x4a3a26, roughness:0.8, metalness:0.1 });
-      const bladeMat = new THREE.MeshStandardMaterial({ color:0xcfd6dc, metalness:0.85, roughness:0.25, emissive:0x10141a });
-      const pivot = new THREE.Group(); pivot.position.y = 0.42;
-      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.01,0.01,0.34,8), armMat);
-      arm.position.y = -0.17; pivot.add(arm);
-      const blade = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.02,3), bladeMat);   // triangular blade
-      blade.rotation.x = Math.PI/2; blade.position.y = -0.34; blade.castShadow = true; pivot.add(blade);
-      grp.add(pivot); t.ob.pivot = pivot;
-      grp.position.set(t.pos.x, t.pos.y, t.pos.z);
-      scene.add(grp); t.obMesh = grp;
-    } else if (kind === 'faller'){
-      // FALLING BLOCK: a heavy block that crashes onto ONE lane on a timer; a shadow telegraphs — DODGE clear before it lands
-      const L = rndLane();
-      t.ob = { type:'lane', lane:99, faller:true, L, phase:RND()*6.28, spd:0.0026 + RND()*0.0016 };
-      const grp = new THREE.Group();
-      const blkMat = new THREE.MeshStandardMaterial({ color:0x8a7350, roughness:0.9, metalness:0.04 });
-      const block = new THREE.Mesh(new THREE.BoxGeometry(0.17,0.16,0.12), blkMat);
-      block.castShadow = true; block.position.y = 0.58; grp.add(block); t.ob.block = block;
-      const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.08, 16),
-        new THREE.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:0.0, depthWrite:false }));
-      shadow.rotation.x = -Math.PI/2; shadow.position.y = 0.012; grp.add(shadow); t.ob.shadow = shadow;
-      grp.position.set(t.pos.x + L*LANE, t.pos.y, t.pos.z);
-      scene.add(grp); t.obMesh = grp;
-    } else if (kind === 'crusher'){
-      // CLOSING WALLS: two walls grind inward, sealing every lane but one — read the open gap and DODGE into it
-      const G = rndLane(), gx = G*LANE;
-      t.ob = { type:'crush', closed:false, safeLane:G, gx, phase:RND()*6.28, spd:0.0018 + RND()*0.0012 };
-      const grp = new THREE.Group();
-      const wMat = new THREE.MeshStandardMaterial({ color:0x7a6748, roughness:0.92, metalness:0.05 });
-      const wallL = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.18, 0.1), wMat); wallL.castShadow = true;
-      const wallR = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.18, 0.1), wMat); wallR.castShadow = true;
-      wallL.position.set(gx - 0.45, 0.09, 0); wallR.position.set(gx + 0.45, 0.09, 0);
-      grp.add(wallL); grp.add(wallR); t.ob.wallL = wallL; t.ob.wallR = wallR;
-      grp.position.set(t.pos.x, t.pos.y, t.pos.z);
-      scene.add(grp); t.obMesh = grp;
-    } else {
-      // FLAME JET: a two-layer flame over a stone brazier, erupting from one lane on a timer — pass when it's down
-      const L = rndLane();
-      const fmat = new THREE.MeshStandardMaterial({ color:0xff7a1e, emissive:0xff5400, emissiveIntensity:1.4, transparent:true, opacity:0.88, roughness:0.6 });
-      const fmat2 = new THREE.MeshStandardMaterial({ color:0xffe06a, emissive:0xffc000, emissiveIntensity:1.9, transparent:true, opacity:0.92, roughness:0.5 });
-      t.ob = { type:'lane', lane:99, flame:true, L, phase:RND()*6.28, spd:0.003 + RND()*0.0035, mat:fmat, mat2:fmat2 };
-      const jet = new THREE.Group();
-      const brazier = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.058,0.05,12),
-        new THREE.MeshStandardMaterial({ color:0x4a3a26, roughness:0.9, metalness:0.1 }));
-      brazier.position.y = 0.0; brazier.castShadow = true; jet.add(brazier);
-      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.22, 10), fmat);
-      cone.position.y = 0.15; jet.add(cone); t.ob.coneMesh = cone;
-      const core = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.15, 10), fmat2);
-      core.position.y = 0.13; jet.add(core); t.ob.coreMesh = core;
-      jet.position.set(t.pos.x + L*LANE, t.pos.y, t.pos.z);
-      scene.add(jet); t.obMesh = jet;
-    }
+    const kind = runHaz[Math.floor(RND()*runHaz.length)];          // pick from this run’s limited hazard palette
+    buildHazard(kind, t);
     lastOb = i;
   }
   // coins: a glinting trail of pickups spread ACROSS the lanes (steer into a coin's lane to grab it).
@@ -3588,6 +3814,7 @@ function runSlide(){
 }
 function runMove(dir){   // -1 = left, +1 = right (relative to run direction)
   const r = S.run; if (!r || r.falling || r.dead || r.startDelay>0) return;
+  if (r.laneLock > 0){ Sound.step(); return; }   // ice slick: footing frozen, can't change lanes yet
   r.lane = Math.max(-1, Math.min(1, r.lane + dir));
   Sound.step();
 }
@@ -3667,6 +3894,7 @@ function updateRun(dt){
     return;
   }
   if (r.invuln > 0) r.invuln -= dt;                // brief grace after a revive
+  if (r.laneLock > 0) r.laneLock -= dt;            // ice-slick lane freeze ebbing away
 
   // advance along the path — the climb steadily quickens to keep the pressure on
   r.speed = (3.1 + Math.min(r.idx * 0.028, 2.3)) * DDA.runSpeed() * levelSpeed();   // adaptive + faster each level
@@ -3699,13 +3927,15 @@ function updateRun(dt){
     const ob = r.tiles[r.idx].ob;
     if (r.invuln <= 0 && ob){
       if (ob.type==='beam' && !r.sliding){ runCrash(); return; }       // full-width gate (legacy): must slide under
+      if (ob.type==='beamT' && ob.on && !r.sliding){ runCrash(); return; }   // timed laser/holy ray: slide under while it's firing
       if (ob.type==='lane' && r.lane===ob.lane &&                       // dodge to another lane — some can also be jumped (boulder) or slid under (pendulum)
           !(ob.jumpable && r.jumping) && !(ob.slidable && r.sliding)){ runCrash(); return; }
       if (ob.type==='gate'){                                            // per-lane lintels: slide HIGH ones, jump LOW ones, or dodge
         for (const g of ob.gates){ if (r.lane===g.lane && !(g.duck ? r.sliding : r.jumping)){ runCrash(); return; } }
       }
-      if (ob.type==='crush' && ob.closed && r.lane !== ob.safeLane){ runCrash(); return; }   // closing walls: be in the open gap
+      if (ob.type==='crush' && ob.closed && r.lane !== ob.safeLane){ runCrash(); return; }   // closing walls / rotor: be in the open gap
     }
+    if (ob && ob.type==='lock'){ r.laneLock = Math.max(r.laneLock || 0, 0.7); }   // ice slick: no damage, but lane-changes freeze briefly
     collectCoin(r.tiles[r.idx], r);
     collectPower(r.tiles[r.idx], r);
     collectGold(r.tiles[r.idx], r);
@@ -4967,78 +5197,8 @@ function animate(){
     if (t.power && !t.power.got){ t.power.mesh.rotation.y += dt*1.8;
       t.power.mesh.position.y = t.pos.y + 0.15 + 0.025*Math.sin(performance.now()*0.004); }
     const near = S.run && (ti - S.run.idx) >= -1 && (ti - S.run.idx) < 8;   // close enough ahead to matter
-    // spike traps slide lane↔lane (along x) at their own speed — keep the mesh and live hit-lane in sync
-    if (t.ob && t.ob.moving && t.obMesh){
-      const f = Math.sin(performance.now()*(t.ob.spd||0.0024) + t.ob.phase);
-      t.ob.lane = f > 0.33 ? 1 : (f < -0.33 ? -1 : 0);
-      const yo = (t.ob.yOff !== undefined) ? t.ob.yOff : 0.15;
-      t.obMesh.position.set(t.pos.x + f*LANE_W, t.pos.y + yo, t.pos.z);
-      if (t.ob.mat){                                   // telegraph: spikes glint red when they're in YOUR lane just ahead
-        const danger = near && t.ob.lane === S.run.lane;
-        t.ob.mat.emissive.setRGB(danger ? 0.5+0.4*pulse : 0.16, danger ? 0.04 : 0.08, 0);
-      }
-    }
-    // SIDE HAMMER: swings down from its side pivot to slam its target lane L; only deadly while the head is down
-    if (t.ob && t.ob.hammer && t.obMesh){
-      const aMax = t.ob.aMax || 1.45;
-      const s = aMax * (0.5 - 0.5*Math.cos(performance.now()*(t.ob.spd||0.003) + t.ob.phase));   // 0 (up, safe) → aMax (slam)
-      t.obMesh.rotation.z = t.ob.side * s;
-      const down = s > aMax*0.72;                      // head swung inward, low over its lane
-      t.ob.lane = down ? t.ob.L : 99;
-      const slammed = s > aMax*0.9;
-      if (slammed && !t.ob.slam){                      // fire a dust puff + thud once per slam
-        t.ob.slam = true;
-        if (near){ spawnDust(new THREE.Vector3(t.pos.x + t.ob.L*LANE_W, t.pos.y - 0.03, t.pos.z), 0xe8d8c0, 7, 1.6, 1);
-          Sound.drop(); shake(0.16); }
-      } else if (!slammed && t.ob.slam && s < aMax*0.65){ t.ob.slam = false; }
-    }
-    // FLAME JET: erupts on a timer in its lane; only deadly while the flame is up
-    if (t.ob && t.ob.flame && t.obMesh){
-      const s = Math.sin(performance.now()*(t.ob.spd||0.003) + t.ob.phase);   // -1..1
-      const up = s > 0.1, flick = 1 + 0.12*Math.sin(performance.now()*0.03 + t.ob.phase);   // gentle flicker
-      const hgt = up ? (0.35 + 0.65*s) * flick : 0.0;
-      if (t.ob.coneMesh){ t.ob.coneMesh.scale.set(1, Math.max(0.04, hgt), 1); t.ob.coneMesh.visible = up; }
-      if (t.ob.coreMesh){ t.ob.coreMesh.scale.set(1, Math.max(0.04, hgt*0.92), 1); t.ob.coreMesh.visible = up; }
-      if (t.ob.mat) t.ob.mat.opacity = up ? 0.88 : 0;
-      if (t.ob.mat2) t.ob.mat2.opacity = up ? 0.92 : 0;
-      t.ob.lane = up ? t.ob.L : 99;
-    }
-    // ROLLING BOULDER: spins and rocks down its lane (lane stays deadly — dodge or jump)
-    if (t.ob && t.ob.boulder && t.obMesh){
-      if (t.ob.ball) t.ob.ball.rotation.x += dt * 7;
-      const b = Math.sin(performance.now()*t.ob.spd + t.ob.phase);
-      t.obMesh.position.z = t.pos.z + b*0.045;                          // rocks toward / away a touch
-      t.obMesh.position.y = t.pos.y + 0.085 + Math.abs(Math.cos(performance.now()*t.ob.spd*1.4 + t.ob.phase))*0.012;
-    }
-    // PENDULUM BLADE: swings across the lanes; the deadly lane is wherever the blade currently hangs
-    if (t.ob && t.ob.pendulum && t.ob.pivot){
-      const ang = 0.72 * Math.sin(performance.now()*t.ob.spd + t.ob.phase);
-      t.ob.pivot.rotation.z = ang;
-      const bx = Math.sin(ang) * 0.34;
-      t.ob.lane = bx > 0.1 ? 1 : (bx < -0.1 ? -1 : 0);
-    }
-    // FALLING BLOCK: hovers up (telegraphing with a shadow), then slams onto its lane, then lifts back up
-    if (t.ob && t.ob.faller && t.ob.block){
-      const cyc = ((performance.now()*t.ob.spd + t.ob.phase) % 6.2832) / 6.2832;   // 0..1
-      let y, down = false, tele;
-      if (cyc < 0.7){ y = 0.5; tele = cyc/0.7; down = false; }                      // up high, shadow building
-      else if (cyc < 0.8){ const k = (cyc-0.7)/0.1; y = 0.5*(1-k); tele = 1; down = k > 0.6; }   // SLAM down
-      else { const k = (cyc-0.8)/0.2; y = 0.5*k; tele = 1-k; down = false; }        // lift back up
-      t.ob.block.position.y = 0.1 + y;
-      if (t.ob.shadow) t.ob.shadow.material.opacity = 0.08 + 0.5*tele;
-      if (down && !t.ob.thudded && near){ spawnDust(new THREE.Vector3(t.pos.x + t.ob.L*LANE_W, t.pos.y, t.pos.z), 0xe8d8c0, 6, 1.5, 1); Sound.drop(); shake(0.12); t.ob.thudded = true; }
-      else if (!down && t.ob.thudded && cyc < 0.7){ t.ob.thudded = false; }
-      t.ob.lane = down ? t.ob.L : 99;
-    }
-    // CLOSING WALLS: two walls grind inward to seal every lane but the gap, then retract
-    if (t.ob && t.ob.type==='crush' && t.ob.wallL){
-      const cyc = ((performance.now()*t.ob.spd + t.ob.phase) % 6.2832) / 6.2832;    // 0..1
-      const close = cyc < 0.5 ? cyc/0.5 : 1-(cyc-0.5)/0.5;                            // 0 open .. 1 shut .. 0
-      const e = close*close*(3-2*close);                                             // smoothstep
-      t.ob.wallL.position.x = t.ob.gx - (0.45 - e*0.20);
-      t.ob.wallR.position.x = t.ob.gx + (0.45 - e*0.20);
-      t.ob.closed = e > 0.78;
-    }
+    // tick whatever hazard sits on this tile — each mechanic animates itself and reports its live hit-lane
+    animHazard(t, near, pulse, dt);
   });
 
   if (S.phase==='run'){ if (!S.paused) updateRun(sdt); }
