@@ -639,8 +639,9 @@
   #throwBtn { right:calc(max(16px,env(safe-area-inset-right)) + 8px);  bottom:calc(max(26px,env(safe-area-inset-bottom)) + 92px); }
   #throwBtn.cooling { filter:grayscale(.75) brightness(.62); }
   #joy { position:fixed; width:120px; height:120px; border-radius:50%; display:none; z-index:8; pointer-events:none;
-    transform:translate(-50%,-50%); background:radial-gradient(circle, rgba(243,200,120,.14), rgba(20,12,8,.34));
-    border:2px solid rgba(243,200,120,.45); box-shadow:0 4px 16px rgba(0,0,0,.4); }
+    left:calc(max(16px,env(safe-area-inset-left)) + 20px); bottom:calc(max(26px,env(safe-area-inset-bottom)) + 70px);
+    background:radial-gradient(circle, rgba(243,200,120,.13), rgba(20,12,8,.30));
+    border:2px solid rgba(243,200,120,.40); box-shadow:0 4px 16px rgba(0,0,0,.4); }
   #joy.show { display:block; }
   #joyKnob { position:absolute; left:50%; top:50%; width:52px; height:52px; border-radius:50%; transform:translate(-50%,-50%);
     background:radial-gradient(circle at 50% 35%, #e6c478, #b9852f); border:2px solid #f3cf86; box-shadow:0 3px 10px rgba(0,0,0,.45); }
@@ -932,7 +933,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.270 · 2026.06.12</div>
+  <div id="appVersion">v1.271 · 2026.06.12</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1120,7 +1121,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.270';
+const APP_VERSION = '1.271';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4318,9 +4319,9 @@ const PATK = {                                            // player moves: { kin
   throw:  { kind:'throw', arm:'R', dur:0.52, hit:0.45, dmg:20 },
 };
 const PROP_COOLDOWN = 3.4;                                 // seconds before the thrown prop reforms in hand
-const ARENA_R = 0.34, PLAYER_SPD = 0.5, BOSS_SPD = 0.3;    // movement on the flat summit
+const ARENA_R = 0.34, PLAYER_SPD = 0.3, BOSS_SPD = 0.22;   // movement on the flat summit
 const BOSS_RANGE = 0.15, MELEE_P = 0.19, MELEE_B = 0.19;   // contact distances — strikes only land when fighters actually touch
-const CAM_DIST = 0.46, CAM_HEIGHT = 0.27, CAM_LOOK_H = 0.06, CAM_LOOK_AHEAD = 0.10;   // third-person chase cam that trails behind the character
+const CAM_BACK = 0.42, CAM_HEIGHT = 0.30, CAM_LOOK_H = 0.05;   // fixed-orientation follow cam (sits south, looks north & down)
 
 // a small throwable that matches the character (exclusives keep their prop; everyone else hurls pyramid rubble)
 function makeThrowProp(style){
@@ -4353,21 +4354,23 @@ function startFight(){
     pPos: new THREE.Vector3(apex.x - 0.13, apex.y, apex.z),              // free-moving positions on the summit
     bPos: new THREE.Vector3(apex.x + 0.15, apex.y, apex.z),
     pFacing:0, bFacing:0, pStride:0, bStride:0,
-    vel: new THREE.Vector3(0, 0, 0), camYaw:0,                            // smooth movement + trailing camera yaw
+    vel: new THREE.Vector3(0, 0, 0),                                      // smooth (accel/decel) movement
     joy:{ active:false, id:null, vx:0, vz:0 }, punchSide:'R',
     playerMax:100, playerHP:100, bossMax:hp, bossHP:hp,
     pAnim:null, bAnim:null, bossCD:1.7, pFlinch:0, bFlinch:0,
     handProp:null, propThrown:false, propCD:0, proj:null,
   };
   f.pFacing = Math.atan2(f.bPos.x - f.pPos.x, f.bPos.z - f.pPos.z);      // start facing each other
-  f.bFacing = f.pFacing + Math.PI; f.camYaw = f.pFacing;
+  f.bFacing = f.pFacing + Math.PI;
   S.fight = f;
+  if (gd.ring) gd.ring.visible = false;                                  // the looming ground ring is for the climb, not the brawl
   try { f.handProp = makeThrowProp(character().style); if (f.handProp && g.armR && g.armR.elbow) g.armR.elbow.add(f.handProp); } catch(e){}
   $('fpName').textContent = 'YOU';
   $('fbName').textContent = guardianName(gameLevel);
   fightHpHud();
   $('fightHud').classList.add('show');
   $('punchBtn').classList.add('show'); $('kickBtn').classList.add('show'); $('throwBtn').classList.add('show'); $('throwBtn').classList.remove('cooling');
+  $('joy').classList.add('show'); const jk = $('joyKnob'); if (jk){ jk.style.left='50%'; jk.style.top='50%'; }   // fixed joystick, bottom-left
   // clear the climb HUD so nothing crowds the life bars
   setLevelName(false); $('coinHud').classList.add('hidden'); $('multHud').classList.add('hidden'); $('combo').classList.remove('show');
   $('menuBtn').style.display='none'; $('restartBtn').style.display='none';
@@ -4556,25 +4559,22 @@ function updateFight(dt){
   if (f.pFlinch > 0) f.pFlinch -= dt;
   if (f.bFlinch > 0) f.bFlinch -= dt;
 
-  // ---- camera-relative movement with smooth accel/decel (Stumble-Guys feel) ----
-  // basis is taken from the TRAILING camera yaw so "push up" always means "into the screen"
-  const F = { x:Math.sin(f.camYaw), z:Math.cos(f.camYaw) };       // ground-forward (into screen)
-  const Rt = { x:-F.z, z:F.x };                                   // screen-right
+  // ---- movement: the camera is fixed-orientation (south, looking north), so the joystick maps
+  //      straight to the world — push up = away from camera, right = screen-right. No inversion, no swing. ----
   let tvx = 0, tvz = 0;
   if (!f.pAnim && f.pFlinch <= 0 && f.joy && f.joy.active && (f.joy.vx || f.joy.vz)){
-    let mx = Rt.x*f.joy.vx + F.x*(-f.joy.vz), mz = Rt.z*f.joy.vx + F.z*(-f.joy.vz);
+    let mx = f.joy.vx, mz = f.joy.vz;                              // vz<0 (push up) → -z = into the screen
     const ml = Math.hypot(mx, mz);
-    if (ml > 0.001){ const mag = Math.min(1, Math.hypot(f.joy.vx, f.joy.vz)); tvx = mx/ml*mag*PLAYER_SPD; tvz = mz/ml*mag*PLAYER_SPD; }
+    if (ml > 0.001){ const mag = Math.min(1, ml); tvx = mx/ml*mag*PLAYER_SPD; tvz = mz/ml*mag*PLAYER_SPD; }
   }
-  const acc = Math.min(1, dt*9);                                  // ramp the velocity (snappy but not instant)
+  const acc = Math.min(1, dt*8);                                  // ease the velocity (smooth, not instant)
   f.vel.x += (tvx - f.vel.x)*acc; f.vel.z += (tvz - f.vel.z)*acc;
   f.pPos.x += f.vel.x*dt; f.pPos.z += f.vel.z*dt;
   let moveSpd = Math.hypot(f.vel.x, f.vel.z);
   clampArena(f.pPos, apex);
-  if (moveSpd > 0.04) f.pFacing = approachAngle(f.pFacing, Math.atan2(f.vel.x, f.vel.z), dt*12);   // turn to face travel
+  if (moveSpd > 0.03) f.pFacing = approachAngle(f.pFacing, Math.atan2(f.vel.x, f.vel.z), dt*12);   // turn to face travel
   const faceBoss = Math.atan2(f.bPos.x - f.pPos.x, f.bPos.z - f.pPos.z);
-  if (f.pAnim || moveSpd < 0.04) f.pFacing = approachAngle(f.pFacing, faceBoss, dt*8);   // square up to the boss when not running
-  f.camYaw = approachAngle(f.camYaw, f.pFacing, dt*4);                                    // camera eases in behind the character
+  if (f.pAnim || moveSpd < 0.03) f.pFacing = approachAngle(f.pFacing, faceBoss, dt*8);   // square up to the boss when idle
 
   // ---- boss AI: stalk toward the player, stop in range and strike ----
   const tox = f.pPos.x - f.bPos.x, toz = f.pPos.z - f.bPos.z, dP = Math.hypot(tox, toz);
@@ -4586,11 +4586,11 @@ function updateFight(dt){
   }
   clampArena(f.bPos, apex);
 
-  // ---- third-person chase cam: trails behind the character, looks slightly ahead ----
-  const cf = { x:Math.sin(f.camYaw), z:Math.cos(f.camYaw) };
-  const want = new THREE.Vector3(f.pPos.x - cf.x*CAM_DIST, apex.y + CAM_HEIGHT, f.pPos.z - cf.z*CAM_DIST);
+  // ---- fixed-orientation follow cam: sits due south of the framing point, looks north & down (never swings) ----
+  const fx = f.pPos.x*0.62 + f.bPos.x*0.38, fz = f.pPos.z*0.62 + f.bPos.z*0.38;   // frame both, biased to the player
+  const want = new THREE.Vector3(fx, apex.y + CAM_HEIGHT, fz + CAM_BACK);
   camera.position.lerp(want, Math.min(1, dt*5));
-  camera.lookAt(f.pPos.x + cf.x*CAM_LOOK_AHEAD, apex.y + CAM_LOOK_H, f.pPos.z + cf.z*CAM_LOOK_AHEAD);
+  camera.lookAt(fx, apex.y + CAM_LOOK_H, fz);
   applyShake();
 
   // ---- player: place, walk/idle pose, overlay a strike ----
@@ -4621,24 +4621,27 @@ function updateFight(dt){
   if (f.propThrown){ f.propCD -= dt; if (f.propCD <= 0){ f.propThrown = false; if (f.handProp) f.handProp.visible = true; $('throwBtn').classList.remove('cooling'); } }
 }
 
-// ---- virtual joystick (left thumb) drives movement during the fight ----
+// ---- FIXED virtual joystick anchored bottom-left; the knob deflects from the fixed base centre ----
+function joyCenter(){ const j = $('joy'); const r = (j && j.getBoundingClientRect) ? j.getBoundingClientRect() : null;
+  return r ? { x:r.left + r.width/2, y:r.top + r.height/2 } : { x:96, y:(window.innerHeight||780) - 140 }; }
+function fightInJoyZone(x, y){ return x < (window.innerWidth||390)*0.55 && y > (window.innerHeight||780)*0.42; }   // lower-left only
 function fightJoyStart(x, y, id){
   const f = S.fight; if (!f || !f.active) return false;
-  f.joy.active = true; f.joy.id = id; f.joy.ox = x; f.joy.oy = y; f.joy.vx = 0; f.joy.vz = 0;
-  const j = $('joy'); if (j){ j.style.left = x+'px'; j.style.top = y+'px'; j.classList.add('show'); const k = $('joyKnob'); if (k){ k.style.left='50%'; k.style.top='50%'; } }
+  f.joy.active = true; f.joy.id = id;
+  fightJoyMove(x, y, id);                                          // deflect immediately from the fixed base
   return true;
 }
 function fightJoyMove(x, y, id){
   const f = S.fight; if (!f || !f.joy.active || id !== f.joy.id) return;
-  const R = 46; let dx = x - f.joy.ox, dy = y - f.joy.oy; const d = Math.hypot(dx, dy);
+  const c = joyCenter(), R = 50; let dx = x - c.x, dy = y - c.y; const d = Math.hypot(dx, dy);
   if (d > R){ dx = dx/d*R; dy = dy/d*R; }
   f.joy.vx = dx/R; f.joy.vz = dy/R;
-  const k = $('joyKnob'); if (k){ k.style.left = (50 + dx/R*50)+'%'; k.style.top = (50 + dy/R*50)+'%'; }
+  const k = $('joyKnob'); if (k){ k.style.left = (50 + dx/R*46)+'%'; k.style.top = (50 + dy/R*46)+'%'; }
 }
 function fightJoyEnd(id){
   const f = S.fight; if (!f || !f.joy.active || (id != null && id !== f.joy.id)) return;
   f.joy.active = false; f.joy.id = null; f.joy.vx = 0; f.joy.vz = 0;
-  const j = $('joy'); if (j) j.classList.remove('show');
+  const k = $('joyKnob'); if (k){ k.style.left = '50%'; k.style.top = '50%'; }   // recenter; base stays put
 }
 
 function startRun(){
@@ -6271,7 +6274,7 @@ window.addEventListener('pointerdown', e => {
   e.preventDefault(); primeAudio();
   if (atMenu){ return; }                                                   // menu uses its own buttons
   if (S.gameOver || S.paused) return;                                      // over/confirm screens use their own buttons
-  if (S.fight && S.fight.active){ if (e.clientX < innerWidth*0.58) fightJoyStart(e.clientX, e.clientY, e.pointerId); return; }   // PHASE 3: left thumb = move joystick (buttons on the right)
+  if (S.fight && S.fight.active){ if (fightInJoyZone(e.clientX, e.clientY)) fightJoyStart(e.clientX, e.clientY, e.pointerId); return; }   // PHASE 3: bottom-left joystick only
   if (S.phase==='build'){ drop(); return; }
   if (S.phase==='run'){ gStart = { x:e.clientX, y:e.clientY }; }   // wait for swipe direction
 }, { passive:false });
