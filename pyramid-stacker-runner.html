@@ -878,7 +878,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.245 · 2026.06.11</div>
+  <div id="appVersion">v1.246 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1066,7 +1066,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.245';
+const APP_VERSION = '1.246';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1255,6 +1255,10 @@ const CHAR_SPEC = [
 const CHARACTERS = {
   explorer:{ name:'EXPLORER', cost:0, swatch:'#3ad6c5', color:0x3ad6c5, style:'explorer' },
   ferro:   { name:'FERRO',    cost:0, swatch:'#727c8e', color:0x727c8e, style:'ferro', metal:true, account:true },
+  // ---- EXCLUSIVES: not tied to any era, bought outright for 3,333 ----
+  ant:      { name:'THE ANT',      cost:3333, swatch:'#3a2012', color:0x2a1810, skin:0x2a1810, style:'ant',      exclusive:true },
+  frida:    { name:'FRIDA KAHLO',  cost:3333, swatch:'#b8344f', color:0xb8344f, skin:0xd9a066, style:'frida',    exclusive:true },
+  american: { name:'BIG AL',       cost:3333, swatch:'#c0303a', color:0xf0c79a, skin:0xf0c79a, style:'american', exclusive:true },
 };
 CHAR_SPEC.forEach(s => {
   const [era,tier,key,name,color,skin,head,glow,reuse] = s;
@@ -1381,8 +1385,10 @@ function makeRunner(){
   const gold   = () => new THREE.MeshStandardMaterial({ color:0xe8c45a, emissive:0x3a2600, metalness:0.75, roughness:0.28 });
   const blue   = () => new THREE.MeshStandardMaterial({ color:0x2b5bd0, emissive:0x0a1638, metalness:0.3, roughness:0.5 });
   const isEra  = style === 'era';                                  // era characters get bare skin limbs + boots (real-person read)
-  const limbMat = isEra ? skinMat : cMat;
-  const shoeMat = new THREE.MeshStandardMaterial({ color: isEra ? 0x4e3a26 : ch.color, roughness:0.8, metalness: ch.metal?0.5:0.05 });
+  const humanLimbs = isEra || style==='frida' || style==='american';   // real-person skin limbs
+  const slim = style==='frida' ? 0.8 : 1;                          // Frida is skinny
+  const limbMat = humanLimbs ? skinMat : cMat;
+  const shoeMat = new THREE.MeshStandardMaterial({ color: style==='american' ? 0xf0f0f0 : isEra ? 0x4e3a26 : ch.color, roughness:0.8, metalness: ch.metal?0.5:0.05 });
 
   // smooth capsule (cylinder + rounded caps) for a modern limb silhouette
   function capsule(r, len, mat){
@@ -1408,13 +1414,13 @@ function makeRunner(){
 
   // torso: tapered chest → waist (less egg-like) + shoulders + hips
   const torso = new THREE.Mesh(new THREE.SphereGeometry(0.12, 24, 20), cMat);
-  torso.scale.set(0.86, 1.34, 0.72); torso.position.y = 0.38; torso.castShadow = true; g.add(torso);
+  torso.scale.set(0.86*slim, 1.34, 0.72*slim); torso.position.y = 0.38; torso.castShadow = true; g.add(torso);
   const waist = new THREE.Mesh(new THREE.CylinderGeometry(0.082, 0.092, 0.1, 18), cMat);   // cinched midsection breaks up the blob
-  waist.position.y = 0.3; g.add(waist);
+  waist.position.y = 0.3; waist.scale.set(slim, 1, slim); g.add(waist);
   const shoulders = new THREE.Mesh(new THREE.SphereGeometry(0.1, 20, 16), cMat);
-  shoulders.scale.set(1.36, 0.6, 0.82); shoulders.position.y = 0.475; shoulders.castShadow = true; g.add(shoulders);
+  shoulders.scale.set(1.36*slim, 0.6, 0.82*slim); shoulders.position.y = 0.475; shoulders.castShadow = true; g.add(shoulders);
   const pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.1, 20, 16), cMat);
-  pelvis.scale.set(1.06, 0.66, 0.88); pelvis.position.y = 0.27; g.add(pelvis);
+  pelvis.scale.set(1.06*slim, 0.66, 0.88*slim); pelvis.position.y = 0.27; g.add(pelvis);
   // neck + head + face
   const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.04, 0.06, 14), skinMat); neck.position.y = 0.52; g.add(neck);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.1, 28, 24), skinMat);
@@ -1424,10 +1430,10 @@ function makeRunner(){
     eye.scale.set(1, 1.25, 0.55); eye.position.set(s*0.036, 0.6, 0.09); g.add(eye); });
   const nose = new THREE.Mesh(new THREE.SphereGeometry(0.014, 8, 7), skinMat); nose.position.set(0, 0.578, 0.1); g.add(nose);
 
-  g.legL = limb(-0.05, 0.27, 0.042, 0.21, true);
-  g.legR = limb( 0.05, 0.27, 0.042, 0.21, true);
-  g.armL = limb(-0.118, 0.46, 0.03, 0.18, false);
-  g.armR = limb( 0.118, 0.46, 0.03, 0.18, false);
+  g.legL = limb(-0.05, 0.27, 0.042*slim, 0.21, true);
+  g.legR = limb( 0.05, 0.27, 0.042*slim, 0.21, true);
+  g.armL = limb(-0.118, 0.46, 0.03*slim, 0.18, false);
+  g.armR = limb( 0.118, 0.46, 0.03*slim, 0.18, false);
 
   if (style === 'pharaoh'){
     // broad usekh collar
@@ -1581,6 +1587,80 @@ function makeRunner(){
     });
   } else if (style === 'era'){
     buildEraOutfit(g, ch);                         // parametric per-era, per-tier costume
+  } else if (style === 'ant'){
+    // 🐜 THE ANT — dark chitin: three body segments (head · thorax · bulbous gaster), six legs, curved antennae, compound eyes, mandibles
+    const chit = c => new THREE.MeshStandardMaterial({ color:c, emissive:0x0a0603, metalness:0.45, roughness:0.3 });
+    const c1 = 0x3a2012, c2 = 0x22130a;
+    const thorax = new THREE.Mesh(new THREE.SphereGeometry(0.1, 18, 14), chit(c1));
+    thorax.scale.set(0.82, 0.95, 1.05); thorax.position.set(0, 0.42, -0.015); thorax.castShadow = true; g.add(thorax);
+    const petiole = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 10), chit(c2)); petiole.position.set(0, 0.33, -0.1); g.add(petiole);  // narrow node
+    const gaster = new THREE.Mesh(new THREE.SphereGeometry(0.115, 22, 18), chit(c1)); gaster.scale.set(0.92, 0.86, 1.32);
+    gaster.position.set(0, 0.34, -0.24); gaster.castShadow = true; g.add(gaster);                                                          // big abdomen
+    const sheen = new THREE.Mesh(new THREE.SphereGeometry(0.118, 18, 14), chit(c1)); sheen.scale.set(0.55, 1.05, 0.5); sheen.position.set(0, 0.39, 0.06); g.add(sheen);  // glossy back
+    // compound eyes + mandibles
+    [-1,1].forEach(s => {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.04, 16, 14), new THREE.MeshStandardMaterial({ color:0x120a06, metalness:0.25, roughness:0.12 }));
+      eye.scale.set(0.85, 1.25, 0.8); eye.position.set(s*0.07, 0.6, 0.04); eye.castShadow = true; g.add(eye);
+      const md = new THREE.Mesh(new THREE.ConeGeometry(0.013, 0.062, 8), chit(c2)); md.position.set(s*0.026, 0.548, 0.105); md.rotation.set(1.35, 0, s*0.5); g.add(md);
+      // antennae: two bent segments + a club tip
+      const a1 = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.009, 0.12, 8), chit(c2)); a1.position.set(s*0.03, 0.69, 0.04); a1.rotation.set(-0.5, 0, -s*0.22); g.add(a1);
+      const a2 = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.008, 0.11, 8), chit(c2)); a2.position.set(s*0.055, 0.76, 0.13); a2.rotation.set(-1.15, 0, -s*0.22); g.add(a2);
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.013, 8, 8), chit(c1)); knob.position.set(s*0.07, 0.79, 0.2); g.add(knob);
+      // two extra (mid/front) legs per side, bent insect-style
+      [0.05, -0.04].forEach(zz => {
+        const up = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.008, 0.17, 7), chit(c2)); up.position.set(s*0.14, 0.3, zz); up.rotation.set(0.2, 0, s*1.05); up.castShadow = true; g.add(up);
+        const lo = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.006, 0.14, 7), chit(c2)); lo.position.set(s*0.215, 0.18, zz); lo.rotation.set(0.5, 0, s*0.35); g.add(lo);
+      });
+    });
+  } else if (style === 'frida'){
+    // 🌺 FRIDA KAHLO — skinny; dark braided updo with a flower crown, the signature unibrow, gold earrings, a vivid embroidered dress
+    const hairMat = new THREE.MeshStandardMaterial({ color:0x1a1108, roughness:0.72 });
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.106, 20, 16, 0, 6.28, 0, 1.75), hairMat); hair.scale.set(1.05, 1, 1.05); hair.position.set(0, 0.6, -0.004); hair.castShadow = true; g.add(hair);
+    const bun = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 12), hairMat); bun.position.set(0, 0.71, -0.03); g.add(bun);
+    // flower crown
+    [[0,0.73,0.05,0xff2d6f],[-0.07,0.7,0.02,0xff8a3d],[0.07,0.7,0.02,0xffd24a],[0,0.77,-0.04,0xff5fa2]].forEach(([x,y,z,c]) => {
+      const fl = new THREE.Mesh(new THREE.SphereGeometry(0.02, 10, 8), new THREE.MeshStandardMaterial({ color:c, emissive:0x200008, roughness:0.6 })); fl.position.set(x,y,z); g.add(fl);
+      const ctr = new THREE.Mesh(new THREE.SphereGeometry(0.008, 8, 6), new THREE.MeshStandardMaterial({ color:0xffe06a })); ctr.position.set(x, y, z+0.012); g.add(ctr);
+    });
+    const brow = new THREE.Mesh(new THREE.BoxGeometry(0.082, 0.013, 0.012), new THREE.MeshStandardMaterial({ color:0x140d06, roughness:0.7 }));
+    brow.position.set(0, 0.62, 0.092); g.add(brow);                                                            // the iconic unibrow
+    [-1,1].forEach(s => { const er = new THREE.Mesh(new THREE.SphereGeometry(0.013, 8, 8), gold()); er.position.set(s*0.094, 0.565, 0.03); g.add(er); });
+    // embroidered Tehuana dress
+    const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.185, 0.27, 20, 1, true), new THREE.MeshStandardMaterial({ color:0xb8344f, roughness:0.72 }));
+    skirt.position.y = 0.175; skirt.castShadow = true; g.add(skirt);
+    const trim = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.185, 0.04, 20, 1, true), new THREE.MeshStandardMaterial({ color:0xffd24a, roughness:0.6 })); trim.position.y = 0.07; g.add(trim);
+    const shawl = new THREE.Mesh(new THREE.SphereGeometry(0.128, 20, 14, 0, 6.28, 0, 1.35), new THREE.MeshStandardMaterial({ color:0x1f8a6a, roughness:0.72 }));
+    shawl.scale.set(1, 0.7, 0.92); shawl.position.set(0, 0.43, 0); shawl.castShadow = true; g.add(shawl);
+    [[-0.05,0.42,0.108,0xff2d6f],[0.05,0.42,0.108,0xffd24a],[0,0.47,0.105,0xff8a3d]].forEach(([x,y,z,c]) => {
+      const d = new THREE.Mesh(new THREE.SphereGeometry(0.013, 8, 6), new THREE.MeshStandardMaterial({ color:c, roughness:0.6 })); d.position.set(x,y,z); g.add(d); });
+  } else if (style === 'american'){
+    // 🇺🇸 BIG AL — big belly bursting out of a too-small tee (belly button on show), blonde hair, US-flag cap, burger in hand
+    const skinB = new THREE.MeshStandardMaterial({ color:0xf0c79a, roughness:0.6, emissive:0x1a0e04 });
+    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.135, 22, 18), skinB); belly.scale.set(1.04, 0.95, 1.12); belly.position.set(0, 0.3, 0.06); belly.castShadow = true; g.add(belly);
+    const navel = new THREE.Mesh(new THREE.SphereGeometry(0.013, 8, 8), new THREE.MeshStandardMaterial({ color:0xb88a5a, roughness:0.85 })); navel.position.set(0, 0.285, 0.2); g.add(navel);
+    // too-small shirt riding up over the gut
+    const shirtMat = new THREE.MeshStandardMaterial({ color:0xdedede, roughness:0.78 });
+    const shirt = new THREE.Mesh(new THREE.SphereGeometry(0.14, 20, 16), shirtMat); shirt.scale.set(0.96, 0.78, 0.82); shirt.position.set(0, 0.44, 0.015); shirt.castShadow = true; g.add(shirt);
+    const hemUp = new THREE.Mesh(new THREE.CylinderGeometry(0.118, 0.126, 0.045, 20, 1, true), shirtMat); hemUp.position.y = 0.385; g.add(hemUp);   // rolled-up hem
+    const flag = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.01), new THREE.MeshStandardMaterial({ color:0xc0303a, roughness:0.7 })); flag.position.set(0, 0.46, 0.118); g.add(flag);   // graphic tee panel
+    const fblue = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.025, 0.012), new THREE.MeshStandardMaterial({ color:0x2b4a9a, roughness:0.7 })); fblue.position.set(-0.018, 0.472, 0.122); g.add(fblue);
+    // blonde hair
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.103, 20, 14, 0, 6.28, 0, 1.5), new THREE.MeshStandardMaterial({ color:0xe8c24a, roughness:0.7 })); hair.position.set(0, 0.6, -0.004); g.add(hair);
+    // US-flag baseball cap
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.112, 20, 14, 0, 6.28, 0, 1.28), new THREE.MeshStandardMaterial({ color:0xc0303a, roughness:0.7 })); cap.position.set(0, 0.615, 0); cap.castShadow = true; g.add(cap);
+    const capFront = new THREE.Mesh(new THREE.SphereGeometry(0.113, 16, 12, Math.PI*0.66, Math.PI*0.68, 0, 0.95), new THREE.MeshStandardMaterial({ color:0x2b4a9a, roughness:0.7 })); capFront.position.set(0, 0.615, 0); g.add(capFront);
+    [[-0.03,0.645],[0.03,0.645],[0,0.672]].forEach(([x,y]) => { const st = new THREE.Mesh(new THREE.SphereGeometry(0.008, 8, 6), new THREE.MeshStandardMaterial({ color:0xf2f2f2 })); st.position.set(x, y, 0.104); g.add(st); });
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.014, 16, 1, false, 0, Math.PI), new THREE.MeshStandardMaterial({ color:0x9a2630, roughness:0.7 })); brim.rotation.x = -0.12; brim.scale.set(1, 1, 1.35); brim.position.set(0, 0.6, 0.075); g.add(brim);
+    // star-spangled cargo shorts
+    const shorts = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.112, 0.13, 18), new THREE.MeshStandardMaterial({ color:0x36507e, roughness:0.82 })); shorts.position.y = 0.235; shorts.castShadow = true; g.add(shorts);
+    // a giant burger in his right hand
+    const burger = new THREE.Group();
+    const bunT = new THREE.Mesh(new THREE.SphereGeometry(0.046, 14, 10, 0, 6.28, 0, 1.4), new THREE.MeshStandardMaterial({ color:0xe0a44e, roughness:0.7 })); bunT.scale.set(1, 0.62, 1); bunT.position.y = 0.028; burger.add(bunT);
+    const lettuce = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.01, 16), new THREE.MeshStandardMaterial({ color:0x4caa3a, roughness:0.7 })); lettuce.position.y = 0.006; burger.add(lettuce);
+    const cheese = new THREE.Mesh(new THREE.BoxGeometry(0.078, 0.008, 0.078), new THREE.MeshStandardMaterial({ color:0xffc01e, roughness:0.5 })); cheese.rotation.y = 0.6; cheese.position.y = 0.0; burger.add(cheese);
+    const patty = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.018, 16), new THREE.MeshStandardMaterial({ color:0x5a3318, roughness:0.85 })); patty.position.y = -0.012; burger.add(patty);
+    const bunB = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.02, 16), new THREE.MeshStandardMaterial({ color:0xe0a44e, roughness:0.7 })); bunB.position.y = -0.03; burger.add(bunB);
+    burger.scale.set(0.92, 0.92, 0.92); burger.position.set(0.02, -0.205, 0.05); burger.castShadow = true; g.armR.add(burger);
   } else {
     // explorer (and the colour variants): a rounded pack + a soft sun hat
     const pack = new THREE.Mesh(new THREE.SphereGeometry(0.085, 18, 14),
@@ -5284,9 +5364,10 @@ function renderShop(){
     grid.appendChild(el);
   };
   if (isChar){
-    // specials first, then one labelled group per era
-    [['explorer'],['ferro']].forEach(()=>{});
+    // specials first, then the exclusives, then one labelled group per era
     ['explorer','ferro'].forEach(k => mkItem(k, charStatus(k)));
+    { const exHdr = document.createElement('div'); exHdr.className='shopEraHdr'; exHdr.textContent='✦ EXCLUSIVE'; grid.appendChild(exHdr); }
+    ['ant','frida','american'].forEach(k => mkItem(k, charStatus(k)));
     ERA_ORDER.forEach(era => {
       const eo = ERAS.find(e=>e.key===era), keys = CHAR_SPEC.filter(s=>s[0]===era).map(s=>s[2]);
       const hdr = document.createElement('div'); hdr.className='shopEraHdr'; hdr.textContent = eo ? eo.name : era.toUpperCase();
