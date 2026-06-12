@@ -614,6 +614,32 @@
   #emoteBtn svg { width:30px; height:30px; display:block; filter:drop-shadow(0 1px 1px rgba(48,26,4,.6)); }
   #emoteBtn.show { display:flex; }
   #emoteBtn:active { transform:scale(.88); box-shadow:0 3px 12px rgba(0,0,0,.5), inset 0 2px 6px rgba(54,30,6,.6); }
+  /* ---- phase-3 boss fight: life bars + action buttons + damage numbers ---- */
+  #fightHud { position:fixed; top:calc(env(safe-area-inset-top) + 12px); left:0; right:0; display:none; justify-content:space-between;
+    gap:12px; padding:0 14px; z-index:8; pointer-events:none; }
+  #fightHud.show { display:flex; }
+  #fightHud .fcol { flex:1; max-width:47%; }
+  #fightHud .fname { font-size:11px; letter-spacing:1.5px; font-weight:800; color:#f3cf86; margin-bottom:4px; text-shadow:0 1px 3px #000; }
+  #fightHud .r .fname { text-align:right; }
+  #fightHud .fbar { height:13px; border-radius:7px; background:rgba(20,12,8,.72); border:1px solid rgba(243,200,120,.55);
+    overflow:hidden; box-shadow:inset 0 1px 3px rgba(0,0,0,.5); }
+  #fightHud .ffill { height:100%; border-radius:6px; transition:width .16s ease; }
+  #fightHud .ffill.p { background:linear-gradient(90deg,#6fe3a0,#bfe85f); }
+  #fightHud .ffill.b { background:linear-gradient(90deg,#e8a35f,#e85f5f); margin-left:auto; }
+  .fightActBtn { position:fixed; bottom:calc(max(26px,env(safe-area-inset-bottom)) + 30px); display:none; align-items:center; justify-content:center;
+    height:54px; min-width:96px; padding:0 22px; border-radius:27px; font-weight:800; letter-spacing:1.5px; font-size:15px; color:#2a1808;
+    cursor:pointer; user-select:none; z-index:8; transition:transform .1s ease, filter .15s ease;
+    background:radial-gradient(circle at 50% 28%, #e6c478, #b9852f 70%); border:2px solid #f3cf86;
+    box-shadow:0 6px 18px rgba(0,0,0,.45), inset 0 1px 2px rgba(255,240,200,.6); }
+  .fightActBtn.show { display:flex; }
+  .fightActBtn:active { transform:scale(.9); }
+  #kickBtn { left:calc(max(16px,env(safe-area-inset-left)) + 8px); }
+  #throwBtn { right:calc(max(16px,env(safe-area-inset-right)) + 8px); }
+  #throwBtn.cooling { filter:grayscale(.75) brightness(.62); }
+  #dmgPops { position:fixed; inset:0; pointer-events:none; z-index:9; overflow:hidden; }
+  .dmgPop { position:absolute; font-weight:800; font-size:23px; text-shadow:0 2px 6px rgba(0,0,0,.65); animation:dmgUp .72s ease-out forwards; }
+  @keyframes dmgUp { 0%{opacity:0; transform:translateY(2px) scale(.55);} 18%{opacity:1; transform:translateY(-8px) scale(1.15);}
+    100%{opacity:0; transform:translateY(-48px) scale(1);} }
 </style>
 </head>
 <body>
@@ -641,6 +667,14 @@
 
 <div id="meterWrap"><div id="meterLabel">LAYER STABILITY</div>
   <div id="meterBar"><div id="meterFill"></div></div></div>
+
+<div id="fightHud">
+  <div class="fcol"><div class="fname" id="fpName">YOU</div><div class="fbar"><div class="ffill p" id="fpFill"></div></div></div>
+  <div class="fcol r"><div class="fname" id="fbName">GUARDIAN</div><div class="fbar"><div class="ffill b" id="fbFill"></div></div></div>
+</div>
+<div id="kickBtn" class="fightActBtn">KICK</div>
+<div id="throwBtn" class="fightActBtn">THROW</div>
+<div id="dmgPops"></div>
 
 <div id="vignette"></div>
 <div id="storm"></div>
@@ -888,7 +922,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.266 · 2026.06.12</div>
+  <div id="appVersion">v1.267 · 2026.06.12</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1076,7 +1110,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.266';
+const APP_VERSION = '1.267';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -3124,6 +3158,7 @@ function resetState(){
     coins:0, timeScale:1, heartT:0, bestPerfect:0, coinsDoubled:false,
     buildQual:0, buildCount:0, allPerfect:true,    // placement quality & count + "every block perfect?" → star rating
     pathSlots:[],          // ordered per-cell {pos, placed} for the runner
+    fight:null, fightWon:false,   // phase-3 boss fight state
     run:null, runner:null };
 }
 
@@ -4260,6 +4295,261 @@ function defeatGuardian(){
   showPop('⚔ ' + guardianName(gameLevel) + ' VANQUISHED  +' + reward + ' ' + COIN_NAME);
 }
 
+// ===================== PHASE 3: BOSS FIGHT =====================
+// On a guardian summit you don't auto-win — you square off and trade blows with the era boss.
+// Tap the LEFT/RIGHT half of the screen to punch with that fist; KICK and THROW buttons round it out.
+// Both fighters have life bars; drop the boss to win, lose your bar and the fight simply restarts.
+const PATK = {                                            // player moves: { kind, dur(s), hit(0..1 impact frame), dmg }
+  punchL: { kind:'punch', arm:'L', dur:0.34, hit:0.45, dmg:5 },
+  punchR: { kind:'punch', arm:'R', dur:0.34, hit:0.45, dmg:5 },
+  kick:   { kind:'kick',           dur:0.46, hit:0.50, dmg:9 },
+  throw:  { kind:'throw', arm:'R', dur:0.52, hit:0.45, dmg:20 },
+};
+const PROP_COOLDOWN = 3.4;                                 // seconds before the thrown prop reforms in hand
+
+// a small throwable that matches the character (exclusives keep their prop; everyone else hurls pyramid rubble)
+function makeThrowProp(style){
+  const grp = new THREE.Group();
+  if (style === 'nzekro'){
+    const wood = new THREE.MeshStandardMaterial({ color:0x9a6a32, roughness:0.6 });
+    grp.add(new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.009, 0.12, 10), wood));
+    const b = new THREE.Mesh(new THREE.ConeGeometry(0.009, 0.028, 8), new THREE.MeshStandardMaterial({ color:0xc24a3a, roughness:0.6 }));
+    b.position.y = -0.08; b.rotation.x = Math.PI; grp.add(b);
+  } else if (style === 'frida'){
+    grp.add(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.024, 0.06, 14), new THREE.MeshStandardMaterial({ color:0xff8fb0, roughness:0.45 })));
+  } else if (style === 'american'){
+    grp.add(new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 10), new THREE.MeshStandardMaterial({ color:0xe0a44e, roughness:0.7 })));
+  } else {
+    const m = new THREE.MeshStandardMaterial({ color:0xcbb079, roughness:0.95 });          // sandstone rubble chunk
+    const c = new THREE.Mesh(new THREE.DodecahedronGeometry(0.032), m); c.scale.set(1, 0.8, 0.9); grp.add(c);
+  }
+  grp.position.set(0, -0.1, 0.02);
+  return grp;
+}
+
+function startFight(){
+  const r = S.run, g = S.runner, gd = S.guardian;
+  if (!gd || !gd.mesh){ summitVictory(); return; }                       // no boss model → just win
+  const apex = r.tiles[r.tiles.length-1].pos;
+  const eraIdx = Math.max(0, ERA_ORDER.indexOf(eraFor(gameLevel).key));
+  const hp = 130 + eraIdx*45;                                            // tougher bosses deeper in
+  const f = {
+    active:true, over:null, t:0, apex, boss:gd.mesh, eraIdx,
+    px: apex.x - 0.05, bx: apex.x + 0.06,                                // fighters stand a short gap apart on the flat top
+    playerMax:100, playerHP:100, bossMax:hp, bossHP:hp,
+    pAnim:null, bAnim:null, bossCD:1.7, pFlinch:0, bFlinch:0,
+    handProp:null, propThrown:false, propCD:0, proj:null,
+  };
+  S.fight = f;
+  try { f.handProp = makeThrowProp(character().style); if (f.handProp && g.armR && g.armR.elbow) g.armR.elbow.add(f.handProp); } catch(e){}
+  $('fpName').textContent = 'YOU';
+  $('fbName').textContent = guardianName(gameLevel);
+  fightHpHud();
+  $('fightHud').classList.add('show'); $('kickBtn').classList.add('show'); $('throwBtn').classList.add('show'); $('throwBtn').classList.remove('cooling');
+  $('emoteBtn').classList.remove('show'); $('hud').style.display='none'; $('meterWrap').style.opacity='0';
+  showPop('⚔ ' + guardianName(gameLevel) + ' — FIGHT! · TAP SIDES TO PUNCH');
+  try { Sound.win(); } catch(e){}
+}
+
+function fightHpHud(){
+  const f = S.fight; if (!f) return;
+  const fp = $('fpFill'), fb = $('fbFill');
+  if (fp) fp.style.width = (100 * f.playerHP / f.playerMax).toFixed(1) + '%';
+  if (fb) fb.style.width = (100 * f.bossHP / f.bossMax).toFixed(1) + '%';
+}
+function floatDmg(side, amt){
+  const c = $('dmgPops'); if (!c) return;
+  const d = document.createElement('div'); d.className = 'dmgPop'; d.textContent = '-' + amt;
+  if (side === 'boss'){ d.style.color = '#ffe27a'; d.style.right = (16 + Math.random()*18) + '%'; d.style.top = (28 + Math.random()*14) + '%'; }
+  else { d.style.color = '#ff7a6a'; d.style.left = (16 + Math.random()*18) + '%'; d.style.top = (34 + Math.random()*14) + '%'; }
+  c.appendChild(d); setTimeout(() => { try { c.removeChild(d); } catch(e){} }, 740);
+}
+
+// ---- player inputs ----
+function pPunch(side){ const f = S.fight; if (!f || !f.active || f.over || f.pAnim || f.pFlinch > 0) return;
+  f.pAnim = { def: side==='L' ? PATK.punchL : PATK.punchR, t:0, hit:false }; try { Sound.step(); } catch(e){} }
+function pKick(){ const f = S.fight; if (!f || !f.active || f.over || f.pAnim || f.pFlinch > 0) return;
+  f.pAnim = { def: PATK.kick, t:0, hit:false }; try { Sound.step(); } catch(e){} }
+function pThrow(){ const f = S.fight; if (!f || !f.active || f.over || f.pAnim || f.propThrown) return;
+  f.pAnim = { def: PATK.throw, t:0, hit:false }; }
+
+// ---- poses & attack motion (shared by player and boss rigs) ----
+function poseFighter(g, t){
+  if (!g.legL) return;
+  const bob = Math.sin(t*4)*0.5 + 0.5;
+  g.armL.rotation.set(-0.55, 0,  0.55); g.armR.rotation.set(-0.55, 0, -0.55);          // boxing guard, forearms up
+  if (g.armL.elbow) g.armL.elbow.rotation.x = -1.5;
+  if (g.armR.elbow) g.armR.elbow.rotation.x = -1.5;
+  g.legL.rotation.set(0.12, 0,  0.06); g.legR.rotation.set(-0.12, 0, -0.06);           // light stance
+  if (g.legL.elbow) g.legL.elbow.rotation.x = 0.15;
+  if (g.legR.elbow) g.legR.elbow.rotation.x = 0.22;
+  g.position.y += bob*0.004;                                                            // bounce on the balls of the feet
+}
+function animAttack(g, def, p){
+  p = Math.max(0, Math.min(1, p));
+  if (def.kind === 'punch'){
+    const ext = Math.sin(p*Math.PI), arm = def.arm==='L' ? g.armL : g.armR;
+    arm.rotation.x = -0.55 - ext*1.05;                                                  // drive the fist straight forward
+    arm.rotation.z = (def.arm==='L' ? 0.55 : -0.55) * (1 - ext*0.85);
+    if (arm.elbow) arm.elbow.rotation.x = -1.5 + ext*1.5;                               // forearm snaps out
+  } else if (def.kind === 'kick'){
+    const ext = Math.sin(p*Math.PI);
+    g.legR.rotation.x = -ext*1.5; g.legR.rotation.z = 0;                                // front kick
+    if (g.legR.elbow) g.legR.elbow.rotation.x = (1 - ext)*0.5;
+    g.armL.rotation.x = -0.7 - ext*0.5;                                                 // counter-balance
+    g.position.y += ext*0.004;
+  } else if (def.kind === 'throw'){
+    const arm = g.armR;
+    if (p < 0.45){ const w = p/0.45; arm.rotation.x = -0.4 + w*0.9; if (arm.elbow) arm.elbow.rotation.x = -1.4 - w*0.5; }   // wind up behind
+    else { const w = (p-0.45)/0.55; arm.rotation.x = 0.5 - w*2.8; if (arm.elbow) arm.elbow.rotation.x = -1.9 + w*1.7; }     // fling overhead
+    arm.rotation.z = -0.1;
+  }
+}
+function applyFlinch(g, faceSign, fl){
+  const f = Math.min(1, fl/0.2);
+  g.rotation.x = -0.25*f;                    // rock back from the blow
+  g.position.x += -faceSign*0.012*f;         // knocked away from the opponent
+}
+
+// ---- damage resolution ----
+function onPlayerHit(def){
+  const f = S.fight;
+  if (def.kind === 'throw'){ launchProjectile(); return; }                              // throw damages on impact, not on release
+  f.bossHP = Math.max(0, f.bossHP - def.dmg); f.bFlinch = 0.2; shake(0.18);
+  try { sparkle(f.boss.position.clone().add(new THREE.Vector3(0, 0.09, 0))); } catch(e){}
+  floatDmg('boss', def.dmg); fightHpHud();
+  if (f.bossHP <= 0) winFight();
+}
+function onBossHit(def){
+  const f = S.fight;
+  f.playerHP = Math.max(0, f.playerHP - def.dmg); f.pFlinch = 0.2; shake(0.22);
+  try { sparkle(S.runner.position.clone().add(new THREE.Vector3(0, 0.05, 0))); } catch(e){}
+  floatDmg('player', def.dmg); fightHpHud();
+  if (f.playerHP <= 0) loseFight();
+}
+function startBossAttack(){
+  const f = S.fight;
+  const def = Math.random() < 0.55
+    ? { kind:'punch', arm: Math.random()<0.5?'L':'R', dur:0.6,  hit:0.55, dmg:7 }
+    : { kind:'kick',                                  dur:0.72, hit:0.55, dmg:11 };
+  f.bAnim = { def, t:0, hit:false };
+  f.bossCD = Math.max(0.95, 1.95 - f.eraIdx*0.12);                                       // bosses press harder deeper in
+}
+
+// ---- thrown prop ----
+function launchProjectile(){
+  const f = S.fight;
+  if (f.handProp) f.handProp.visible = false;                                            // leaves the hand
+  f.propThrown = true; f.propCD = PROP_COOLDOWN; $('throwBtn').classList.add('cooling');
+  const m = makeThrowProp(character().style);
+  const from = new THREE.Vector3(f.px, f.apex.y + 0.07, f.apex.z + 0.01);
+  const to   = new THREE.Vector3(f.bx, f.apex.y + 0.08, f.apex.z);
+  m.position.copy(from); m.scale.set(1.4, 1.4, 1.4); scene.add(m);
+  f.proj = { mesh:m, t:0, dur:0.3, from, to, dmg: PATK.throw.dmg };
+}
+function updateProjectile(dt){
+  const f = S.fight, pr = f.proj; pr.t += dt; const p = Math.min(1, pr.t/pr.dur);
+  pr.mesh.position.set(pr.from.x + (pr.to.x-pr.from.x)*p,
+                       pr.from.y + (pr.to.y-pr.from.y)*p + Math.sin(p*Math.PI)*0.05,
+                       pr.from.z + (pr.to.z-pr.from.z)*p);
+  pr.mesh.rotation.x += dt*16; pr.mesh.rotation.y += dt*12;
+  if (p >= 1){
+    try { scene.remove(pr.mesh); } catch(e){}
+    f.proj = null;
+    f.bossHP = Math.max(0, f.bossHP - pr.dmg); f.bFlinch = 0.25; shake(0.32);
+    try { sparkle(pr.to.clone()); } catch(e){}
+    floatDmg('boss', pr.dmg); fightHpHud();
+    if (f.bossHP <= 0) winFight();
+  }
+}
+
+// ---- win / lose ----
+function endFight(){
+  const f = S.fight; if (!f) return;
+  if (f.handProp){ try { S.runner.armR.elbow.remove(f.handProp); } catch(e){} }
+  if (f.proj && f.proj.mesh){ try { scene.remove(f.proj.mesh); } catch(e){} }
+  $('fightHud').classList.remove('show'); $('kickBtn').classList.remove('show'); $('throwBtn').classList.remove('show','cooling');
+  $('hud').style.display = '';
+  S.fight = null;
+}
+function winFight(){
+  const f = S.fight; if (!f || f.over) return; f.over = 'win'; f.active = false;
+  S.fightWon = true;
+  flash(); shake(0.5); try { Sound.glory(); } catch(e){}
+  endFight();
+  summitVictory();                                       // topple the boss, pay the bounty, run the victory celebration
+}
+function loseFight(){
+  const f = S.fight; if (!f || f.over) return;
+  f.playerHP = f.playerMax; f.bossHP = f.bossMax;        // forgiving: just refill both bars and fight on
+  f.pAnim = null; f.bAnim = null; f.bossCD = 1.6; f.pFlinch = 0; f.bFlinch = 0;
+  f.propThrown = false; f.propCD = 0; if (f.handProp) f.handProp.visible = true; $('throwBtn').classList.remove('cooling');
+  fightHpHud(); flash(); shake(0.4); showPop('TRY AGAIN');
+}
+
+// the original summit victory sequence, shared by normal levels and a won boss fight
+function summitVictory(){
+  const r = S.run, g = S.runner;
+  r.idx = r.tiles.length-1; r.t = 0; r.celebrating = true; r.celebT = 0; r.celebDone = false; Sound.win();
+  if (S.guardian) defeatGuardian();                                // topple the era boss on a guardian summit
+  g.position.copy(r.tiles[r.idx].pos);
+  if (S.shadow) S.shadow.visible = false;                          // no shadow disc on the victory peak
+  if (g.traverse) g.traverse(o => { if (o.isMesh) o.castShadow = false; });
+  spawnDust(g.position.clone(), 0xffe6a0, 18, 2.6, 2.6); flash(); shake(0.3);
+  r.tiles.forEach(tt => { if (tt.obMesh) tt.obMesh.visible = false;
+    if (tt.coin && !tt.coin.got) tt.coin.mesh.visible = false;
+    if (tt.power && !tt.power.got) tt.power.mesh.visible = false;
+    if (tt.gold && !tt.gold.got) tt.gold.mesh.visible = false; });
+  $('hud').style.display='none'; $('coinHud').classList.add('hidden'); $('multHud').classList.add('hidden'); $('combo').classList.remove('show'); setLevelName(true);
+  $('meterWrap').style.opacity='0'; $('menuBtn').style.display='none'; $('restartBtn').style.display='none'; $('emoteBtn').classList.remove('show');
+  victoryBeam(r.tiles[r.idx].pos);                                 // fire the light pillar at the conquered peak
+}
+
+// the fight loop — drives camera, both rigs, the boss AI, and the thrown prop
+function updateFight(dt){
+  const f = S.fight, g = S.runner, boss = f.boss; if (!boss) return;
+  const apex = f.apex;
+  f.t += dt;
+  if (f.pFlinch > 0) f.pFlinch -= dt;
+  if (f.bFlinch > 0) f.bFlinch -= dt;
+
+  // a side-on duel camera that eases in from the climb cam and sways gently
+  const sway = Math.sin(f.t*0.7)*0.02;
+  const want = new THREE.Vector3(apex.x + sway, apex.y + 0.11, apex.z + 0.46);
+  camera.position.lerp(want, Math.min(1, dt*4));
+  camera.lookAt(apex.x + 0.01, apex.y + 0.055, apex.z);
+  applyShake();
+
+  // plant both fighters facing each other on the flat top
+  g.position.set(f.px, apex.y, apex.z);    g.scale.set(RUN_SCALE, RUN_SCALE, RUN_SCALE);                      g.rotation.set(0, Math.PI/2, 0);
+  boss.position.set(f.bx, apex.y, apex.z); boss.scale.set(RUN_SCALE*1.7, RUN_SCALE*1.7, RUN_SCALE*1.7);        boss.rotation.set(0, -Math.PI/2, 0);
+
+  // player rig: guard, then overlay an active strike on the working limb
+  poseFighter(g, f.t);
+  if (f.pAnim){ f.pAnim.t += dt; const p = f.pAnim.t / f.pAnim.def.dur;
+    animAttack(g, f.pAnim.def, p);
+    if (!f.pAnim.hit && p >= f.pAnim.def.hit){ f.pAnim.hit = true; onPlayerHit(f.pAnim.def); }
+    if (p >= 1) f.pAnim = null;
+  }
+  if (f.pFlinch > 0) applyFlinch(g, +1, f.pFlinch);
+
+  // boss rig: same poses, on a telegraphed attack timer (held back briefly during the intro)
+  poseFighter(boss, f.t*0.8 + 1.3);
+  if (f.bAnim){ f.bAnim.t += dt; const p = f.bAnim.t / f.bAnim.def.dur;
+    animAttack(boss, f.bAnim.def, p);
+    if (!f.bAnim.hit && p >= f.bAnim.def.hit){ f.bAnim.hit = true; onBossHit(f.bAnim.def); }
+    if (p >= 1) f.bAnim = null;
+  } else if (f.t > 1.1 && !f.over){
+    f.bossCD -= dt;
+    if (f.bossCD <= 0 && f.bFlinch <= 0) startBossAttack();
+  }
+  if (f.bFlinch > 0) applyFlinch(boss, -1, f.bFlinch);
+
+  // thrown prop in flight + its cooldown respawn into the hand
+  if (f.proj) updateProjectile(dt);
+  if (f.propThrown){ f.propCD -= dt; if (f.propCD <= 0){ f.propThrown = false; if (f.handProp) f.handProp.visible = true; $('throwBtn').classList.remove('cooling'); } }
+}
+
 function startRun(){
   S.phase = 'run';
   Sound.cap();
@@ -4426,7 +4716,9 @@ function updateRun(dt){
   }
   if (r.dead){ followCam(dt, false); return; }     // frozen while the revive prompt is up
 
-  if (S.guardian) updateGuardian(dt);              // boss looms / topples on guardian levels
+  if (S.fight && S.fight.active){ updateFight(dt); return; }   // PHASE 3: boss fight owns the loop
+
+  if (S.guardian && !S.fight) updateGuardian(dt);  // boss looms / topples on guardian levels (paused during the fight)
 
   if (r.celebrating){                               // VICTORY: planted on the summit, both fists thrown straight up
     r.celebT = (r.celebT || 0) + dt;
@@ -4491,22 +4783,12 @@ function updateRun(dt){
   r.t += r.speed * dt / 1;
   while (r.t >= 1){
     r.t -= 1; r.idx++;
-    if (r.idx >= r.tiles.length-1){     // reached the summit → celebrate on the flat top, then offer NEXT LEVEL
-      r.idx = r.tiles.length-1; r.t = 0; r.celebrating = true; r.celebT = 0; r.celebDone = false; Sound.win();
-      if (S.guardian) defeatGuardian();                                // topple the era boss on a guardian summit
-      g.position.copy(r.tiles[r.idx].pos);
-      if (S.shadow) S.shadow.visible = false;                         // no shadow disc on the victory peak
-      if (g.traverse) g.traverse(o => { if (o.isMesh) o.castShadow = false; });   // and the climber casts no dark blob on the summit
-      spawnDust(g.position.clone(), 0xffe6a0, 18, 2.6, 2.6); flash(); shake(0.3);
-      // clear the hazards + leftover pickups off the conquered pyramid for a clean victory shot (keep the trail visible)
-      r.tiles.forEach(tt => { if (tt.obMesh) tt.obMesh.visible = false;
-        if (tt.coin && !tt.coin.got) tt.coin.mesh.visible = false;
-        if (tt.power && !tt.power.got) tt.power.mesh.visible = false;
-        if (tt.gold && !tt.gold.got) tt.gold.mesh.visible = false; });
-      $('hud').style.display='none'; $('coinHud').classList.add('hidden'); $('multHud').classList.add('hidden'); $('combo').classList.remove('show'); setLevelName(true);
-      $('meterWrap').style.opacity='0'; $('menuBtn').style.display='none'; $('restartBtn').style.display='none'; $('emoteBtn').classList.remove('show');
-      victoryBeam(r.tiles[r.idx].pos);                       // fire the light pillar at the conquered peak
-      return;
+    if (r.idx >= r.tiles.length-1){     // reached the summit
+      r.idx = r.tiles.length-1; r.t = 0;
+      if (isGuardianLevel(gameLevel) && S.guardian && S.guardian.alive && !S.fightWon){
+        startFight(); return;           // PHASE 3: square off against the era boss before you can claim the peak
+      }
+      summitVictory(); return;          // normal levels (and after a won fight) → celebrate, offer NEXT LEVEL
     }
     Sound.step();
     if (r.invuln <= 0 && tileUnsafe(r.tiles[r.idx])){
@@ -5174,6 +5456,7 @@ function beginBuild(){
 let shopTab = 'chars';
 function showStart(){            // the main "home" menu (cover art + PLAY / LEADERBOARD / SHOP)
   atMenu = true; charPrevOn = false;
+  if (S.fight) endFight();        // tear down any in-progress boss fight UI
   $('emoteBtn').classList.remove('show');
   setLevelName(false); removeVictoryBeam();
   $('ratingOverlay').classList.remove('show');
@@ -5735,6 +6018,7 @@ function postScore(force){
 }
 function endGame(won, how){
   if (S.gameOver) return;
+  if (S.fight) endFight();        // clear any boss-fight UI on game end
   setSpeedFx(0);
   S.gameOver = true; S.won = won; S.phase = 'over';
   DDA.note(won ? 0.9 : (how==='collapsed' ? 0.15 : 0.3));   // run outcome feeds the adaptive skill estimate
@@ -5874,6 +6158,8 @@ btn('menuFromOver',  goMenu);
 btn('retryBtn',      ()=>startGame(gameLevel));   // retry the level you just died on
 btn('restartBtn',    showRestartConfirm);   // in-game restart → ask first
 btn('emoteBtn',      startEmote);           // stop + turn + do a character emote
+btn('kickBtn',       pKick);                // PHASE 3 boss fight: kick
+btn('throwBtn',      pThrow);               // PHASE 3 boss fight: throw the prop
 btn('restartYes',    ()=>{ hideRestartConfirm(); startGame(gameLevel); });   // restart the current level
 btn('restartNo',     hideRestartConfirm);
 btn('climbBtn',      beginClimb);        // start the climb from the rating screen
@@ -5893,10 +6179,12 @@ window.addEventListener('pointerdown', e => {
   e.preventDefault(); primeAudio();
   if (atMenu){ return; }                                                   // menu uses its own buttons
   if (S.gameOver || S.paused) return;                                      // over/confirm screens use their own buttons
+  if (S.fight && S.fight.active){ pPunch(e.clientX < innerWidth/2 ? 'L' : 'R'); return; }   // PHASE 3: tap a screen half to punch
   if (S.phase==='build'){ drop(); return; }
   if (S.phase==='run'){ gStart = { x:e.clientX, y:e.clientY }; }   // wait for swipe direction
 }, { passive:false });
 window.addEventListener('pointerup', e => {
+  if (S.fight && S.fight.active){ gStart = null; return; }                 // no run-style swipes during the fight
   if (S.phase!=='run' || !gStart) return;
   const dx = e.clientX - gStart.x, dy = e.clientY - gStart.y; gStart = null;
   const TH = 28;
@@ -5917,6 +6205,13 @@ window.addEventListener('keydown', e => {
   if (S.phase==='intro'){ beginBuild(); return; }     // any key starts building the next pyramid
   if (S.phase==='build'){ if (k==='Space'||k==='ArrowUp'||k==='ArrowDown') drop(); return; }
   if (S.phase==='run'){
+    if (S.fight && S.fight.active){                 // PHASE 3 keyboard: ←/→ punch, Space/↑ kick, ↓ throw
+      if (k==='ArrowLeft') pPunch('L');
+      else if (k==='ArrowRight') pPunch('R');
+      else if (k==='Space' || k==='ArrowUp') pKick();
+      else if (k==='ArrowDown') pThrow();
+      return;
+    }
     if (k==='Space') runJump();
     else if (k==='ArrowUp') upAction();            // double-tap ↑ = roll forward
     else if (k==='ArrowDown') downAction();        // double-tap ↓ = roll back
