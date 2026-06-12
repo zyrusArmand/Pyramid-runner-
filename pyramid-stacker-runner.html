@@ -605,6 +605,13 @@
   .dailyRow.today { color:#ffd24a; }
   .dailyRow .dr-d { opacity:.72; letter-spacing:1px; }
   .dailyRow .dr-s { font-weight:700; }
+  /* ---- emote button (bottom-right during a climb) ---- */
+  #emoteBtn { position:fixed; right:calc(max(16px,env(safe-area-inset-right)) + 6px); bottom:calc(max(26px,env(safe-area-inset-bottom)) + 34px); z-index:7;
+    display:none; width:58px; height:58px; border-radius:50%; align-items:center; justify-content:center; cursor:pointer; user-select:none;
+    background:rgba(28,18,36,.72); border:1px solid rgba(243,200,120,.5); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+    box-shadow:0 6px 20px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,224,160,.2); font-size:26px; transition:transform .1s ease; }
+  #emoteBtn.show { display:flex; }
+  #emoteBtn:active { transform:scale(.88); }
 </style>
 </head>
 <body>
@@ -628,6 +635,7 @@
 <div id="coinPops"></div>
 <div id="menuBtn">☰</div>
 <div id="restartBtn">↻</div>
+<div id="emoteBtn">🎭</div>
 
 <div id="meterWrap"><div id="meterLabel">LAYER STABILITY</div>
   <div id="meterBar"><div id="meterFill"></div></div></div>
@@ -878,7 +886,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.260 · 2026.06.11</div>
+  <div id="appVersion">v1.261 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1066,7 +1074,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.260';
+const APP_VERSION = '1.261';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -3486,6 +3494,7 @@ function showRating(){
   // clear the in-game HUD so the rating screen is a clean cinematic beat over the pyramid
   $('hud').style.display='none'; $('coinHud').classList.add('hidden'); $('multHud').classList.add('hidden'); setLevelName(false);
   $('menuBtn').style.display='none'; $('restartBtn').style.display='none'; $('combo').classList.remove('show');
+  $('emoteBtn').classList.remove('show');
   $('meterWrap').style.opacity='0';   // hide the bottom swipe-hint so it doesn't sit under START CLIMB
   $('ratingOverlay').classList.add('show');
   if (stars<=2) ratingStorm(stars);     // bad → flame band + lightning + heavy shake + fire embers + thunder buzz
@@ -4322,6 +4331,7 @@ function startClimbNow(){
   // bring the run HUD back for the actual climb
   $('hud').style.display='flex'; $('coinHud').classList.remove('hidden'); setLevelName(true);
   $('menuBtn').style.display='block'; $('restartBtn').style.display='block';
+  $('emoteBtn').classList.add('show');   // emote button appears for the climb
   $('meterWrap').style.opacity='0';   // keep the bottom of the screen clean during the climb
   // apply character start-of-climb perks (survivability only — never score)
   if (r.perkShield > 0){ r.shield = r.perkShield; addShieldBubble(r); }
@@ -4421,6 +4431,16 @@ function updateRun(dt){
     followCam(dt, false);
     return;
   }
+  if (r.emote){                                    // EMOTE: frozen in place, turned to face the camera, playing a little routine
+    r.emote.t += dt;
+    const faceY = Math.atan2(camera.position.x - g.position.x, camera.position.z - g.position.z);   // turn to face the camera
+    g.rotation.y += (faceY - g.rotation.y) * Math.min(1, dt*9);
+    g.rotation.x = 0; g.rotation.z = 0;
+    playEmote(g, r, r.emote.t, dt);
+    placeShadow(g, r); followCam(dt, false);
+    if (r.emote.t >= r.emote.dur) endEmote(r, g);
+    return;
+  }
   if (r.invuln > 0) r.invuln -= dt;                // brief grace after a revive
   if (r.laneLock > 0) r.laneLock -= dt;            // ice-slick lane freeze ebbing away
   if (r.reflexCD > 0) r.reflexCD -= dt;            // near-miss slow-mo cooldown
@@ -4444,7 +4464,7 @@ function updateRun(dt){
         if (tt.power && !tt.power.got) tt.power.mesh.visible = false;
         if (tt.gold && !tt.gold.got) tt.gold.mesh.visible = false; });
       $('hud').style.display='none'; $('coinHud').classList.add('hidden'); $('multHud').classList.add('hidden'); $('combo').classList.remove('show'); setLevelName(true);
-      $('meterWrap').style.opacity='0'; $('menuBtn').style.display='none'; $('restartBtn').style.display='none';
+      $('meterWrap').style.opacity='0'; $('menuBtn').style.display='none'; $('restartBtn').style.display='none'; $('emoteBtn').classList.remove('show');
       victoryBeam(r.tiles[r.idx].pos);                       // fire the light pillar at the conquered peak
       return;
     }
@@ -4602,6 +4622,53 @@ function startFall(){ die('fell'); }
 function runCrash(){ die('hit'); }
 function slowmo(){ S.timeScale = 0.32; }      // brief bullet-time, eased back to 1 in the loop
 
+// ---- EMOTES: tap the 🎭 button to stop, turn to the camera, and do a little character routine ----
+function emoteDur(){ return (character().style === 'miah') ? 3.4 : 2.0; }   // Miah's guitar bit runs a touch longer
+function startEmote(){
+  const r = S.run, g = S.runner;
+  if (!r || !g || r.emote || r.falling || r.dead || r.celebrating || r.awaitStart || r.startDelay > 0) return;
+  r.emote = { t:0, dur: emoteDur() };
+  r.invuln = Math.max(r.invuln, 0.2);                       // tiny grace as you stop
+  if (character().style === 'miah'){ try { r.emoteProps = makeEmoteGuitar(); g.add(r.emoteProps); } catch(e){} Sound.cap && Sound.cap(); }
+  else { try { Sound.step && Sound.step(); } catch(e){} }
+}
+function endEmote(r, g){
+  if (r && r.emoteProps && g){ try { g.remove(r.emoteProps); } catch(e){} r.emoteProps = null; }
+  if (r) r.emote = null;
+  if (g){ if (g.armL) g.armL.rotation.set(0,0,0); if (g.armR) g.armR.rotation.set(0,0,0); }   // reset so the run resumes cleanly
+}
+// build a little held guitar for Miah's strum emote
+function makeEmoteGuitar(){
+  const gtr = new THREE.Group();
+  const wood = new THREE.MeshStandardMaterial({ color:0xe6cf94, roughness:0.45 });
+  const lower = new THREE.Mesh(new THREE.SphereGeometry(0.06, 18, 14), wood); lower.scale.set(1, 1, 0.3); lower.position.y = -0.02; gtr.add(lower);
+  const upper = new THREE.Mesh(new THREE.SphereGeometry(0.045, 18, 14), wood); upper.scale.set(1, 1, 0.3); upper.position.y = 0.065; gtr.add(upper);
+  const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.012, 14), new THREE.MeshStandardMaterial({ color:0x140a06 })); hole.rotation.x = Math.PI/2; hole.position.set(0, 0.015, 0.02); gtr.add(hole);
+  const guard = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 10), new THREE.MeshStandardMaterial({ color:0x7a3414, roughness:0.4 })); guard.scale.set(0.7, 1.1, 0.16); guard.position.set(0.04, -0.04, 0.022); gtr.add(guard);
+  const neck = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.22, 0.02), new THREE.MeshStandardMaterial({ color:0x6a4326 })); neck.position.set(-0.02, 0.18, 0.004); neck.rotation.z = 0.45; gtr.add(neck);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.05, 0.016), new THREE.MeshStandardMaterial({ color:0x140a06 })); head.position.set(-0.13, 0.28, 0.004); head.rotation.z = 0.45; gtr.add(head);
+  const str = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.3, 0.002), new THREE.MeshStandardMaterial({ color:0xeaeaea, metalness:0.5 })); str.position.set(-0.012, 0.1, 0.022); str.rotation.z = 0.45; gtr.add(str);
+  // held across the front of the chest
+  gtr.scale.set(1, 1, 1); gtr.position.set(0.0, 0.42, 0.13); gtr.rotation.set(0.2, 0, 0); gtr.__scaleUp = true;
+  return gtr;
+}
+// per-character emote animation
+function playEmote(g, r, t, dt){
+  const style = character().style || '';
+  if (style === 'miah'){
+    // hold the neck high with the left arm, STRUM with the right, bob to the beat
+    if (g.armL){ g.armL.rotation.x = -1.15; g.armL.rotation.z = 0.55; }
+    if (g.armR){ g.armR.rotation.x = -1.0 + Math.sin(t*11)*0.5; g.armR.rotation.z = -0.25; }   // strumming hand
+    g.position.y += Math.sin(t*11) * 0.004;
+    if (r.emoteProps){ const e = Math.min(1, t*5); r.emoteProps.scale.set(e, e, e); r.emoteProps.rotation.z = 0.06*Math.sin(t*5.5); }   // guitar pops in + sways
+  } else {
+    // default: a friendly wave
+    if (g.armR){ g.armR.rotation.x = -2.5; g.armR.rotation.z = -0.3 + Math.sin(t*9)*0.5; }
+    if (g.armL){ g.armL.rotation.x = 0.2; }
+    g.position.y += Math.sin(t*4) * 0.003;
+  }
+}
+
 // ---------- death + revive (the "continue" hook for monetisation) ----------
 function reviveCost(){ return 200 * (((S.run && S.run.revives) || 0) + 1); }
 function die(reason){
@@ -4635,6 +4702,7 @@ function offerRevive(reason, cost){
   cb.textContent = `CONTINUE  ◎${cost}`;
   cb.classList.toggle('disabled', bank < cost);
   $('reviveAd').style.display = r.usedAdRevive ? 'none' : 'block';
+  $('emoteBtn').classList.remove('show');
   $('reviveScreen').classList.remove('hidden');
   let c = 5; $('reviveCount').textContent = c;
   r.reviveTimer = setInterval(()=>{ c--; $('reviveCount').textContent = Math.max(0,c); if (c<=0) giveUp(); }, 1000);
@@ -4967,6 +5035,7 @@ function beginBuild(){
 let shopTab = 'chars';
 function showStart(){            // the main "home" menu (cover art + PLAY / LEADERBOARD / SHOP)
   atMenu = true; charPrevOn = false;
+  $('emoteBtn').classList.remove('show');
   setLevelName(false); removeVictoryBeam();
   $('ratingOverlay').classList.remove('show');
   S.phase = null; S.gameOver = false;
@@ -5665,6 +5734,7 @@ btn('menuFromOver',  goMenu);
 })();
 btn('retryBtn',      ()=>startGame(gameLevel));   // retry the level you just died on
 btn('restartBtn',    showRestartConfirm);   // in-game restart → ask first
+btn('emoteBtn',      startEmote);           // stop + turn + do a character emote
 btn('restartYes',    ()=>{ hideRestartConfirm(); startGame(gameLevel); });   // restart the current level
 btn('restartNo',     hideRestartConfirm);
 btn('climbBtn',      beginClimb);        // start the climb from the rating screen
