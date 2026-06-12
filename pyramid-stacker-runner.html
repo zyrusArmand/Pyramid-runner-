@@ -933,7 +933,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.277 · 2026.06.12</div>
+  <div id="appVersion">v1.278 · 2026.06.12</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1121,7 +1121,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.277';
+const APP_VERSION = '1.278';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -3828,7 +3828,7 @@ const HZ_BUILD = {
     const L = hzRndLane();
     const ball = new THREE.Mesh(new THREE.SphereGeometry(0.1, 22, 16), hzMat(s.c1 || 0x9c8763, { roughness:0.92, metalness:0.04, emissive:s.em || 0x000000 }));
     ball.castShadow = true;
-    const g = new THREE.Group(); g.add(ball); scene.add(g);
+    const g = new THREE.Group(); g.add(ball); g.visible = false; scene.add(g);   // hidden until it releases — no parked ball sitting up the slope
     const i = r.tiles.indexOf(t), startIdx = Math.min((i < 0 ? 0 : i) + 10, r.tiles.length - 1);   // starts above this tile
     g.position.set(t.pos.x + L*HZL, t.pos.y + 0.1, t.pos.z);
     const hs = (typeof relicEffects === 'function') ? relicEffects().hazSpeed : 1;
@@ -4823,7 +4823,7 @@ function updateBoulders(dt){
   const playerPos = r.idx + r.t, last = r.tiles.length - 1;
   for (let bi = r.boulders.length - 1; bi >= 0; bi--){
     const b = r.boulders[bi];
-    if (!b.released){ if (playerPos > b.idx - 16) b.released = true; else continue; }   // wait until the player is climbing toward it
+    if (!b.released){ if (playerPos > b.idx - 16){ b.released = true; b.mesh.visible = true; } else continue; }   // appears + releases as the player climbs toward it
     b.idx -= b.spd * dt;                                                                  // barrel DOWN the slope
     const lo = Math.max(0, Math.min(last-1, Math.floor(b.idx))), f = Math.max(0, Math.min(1, b.idx - lo));
     const A = r.tiles[lo].pos, B = r.tiles[lo+1].pos;
@@ -5120,7 +5120,9 @@ function makeEmoteSpray(){   // water spray for Ant Man's power-washer emote
 function endEmote(r, g){
   if (r && r.emoteProps && g){ try { g.remove(r.emoteProps); } catch(e){} r.emoteProps = null; }
   if (r) r.emote = null;
-  if (g){ if (g.armL) g.armL.rotation.set(0,0,0); if (g.armR) g.armR.rotation.set(0,0,0); g.rotation.z = 0; }   // reset so the run resumes cleanly
+  if (g){ if (g.armL) g.armL.rotation.set(0,0,0); if (g.armR) g.armR.rotation.set(0,0,0);
+    if (g.armL && g.armL.wrist) g.armL.wrist.rotation.set(0,0,0); if (g.armR && g.armR.wrist) g.armR.wrist.rotation.set(0,0,0);   // un-flick the wrists
+    g.rotation.z = 0; }   // reset so the run resumes cleanly
 }
 // build a little held guitar for Miah's strum emote
 function makeEmoteGuitar(){
@@ -5178,11 +5180,13 @@ function playEmote(g, r, t, dt){
   if (g.legL){ g.legL.rotation.set(0, 0, 0.05);  if (g.legL.elbow) g.legL.elbow.rotation.x = 0.06;
                g.legR.rotation.set(0, 0, -0.05); if (g.legR.elbow) g.legR.elbow.rotation.x = 0.06; }
   if (style === 'miah'){
-    // left hand frets the neck up-left (elbow folded); right elbow bent ~90°, forearm + wrist STRUM up and down
-    // across the sound hole — the elbow folds/unfolds so the whole forearm sweeps, not just the hand
+    // left hand frets the neck up-left (elbow folded)
     if (g.armL){ g.armL.rotation.x = -0.8; g.armL.rotation.z = -0.55; } bend(g.armL, -1.6);
-    const strum = Math.sin(t*7);
-    if (g.armR){ g.armR.rotation.x = -1.15 + strum*0.12; g.armR.rotation.z = 0.62; } bend(g.armR, -1.35 + strum*0.5);   // forearm sweeps over the strings
+    // STRUM: the right hand SWEEPS diagonally across the strings (shoulder up/down + across), the forearm follows,
+    // and the WRIST flicks — so the hand travels and rotates like a real strum, not a hand bobbing in place
+    const sw = Math.sin(t*7);
+    if (g.armR){ g.armR.rotation.x = -1.08 + sw*0.2; g.armR.rotation.z = 0.6 + sw*0.26; } bend(g.armR, -1.3 + sw*0.32);
+    if (g.armR && g.armR.wrist) g.armR.wrist.rotation.z = sw*0.7;
     if (r.emoteProps){ const e = Math.min(1, t*5); r.emoteProps.scale.set(e, e, e); }   // guitar pops in cleanly
   } else if (style === 'ant'){
     // grip the power-washer wand with the front legs and SPRAY (recoil + pulsing jet)
