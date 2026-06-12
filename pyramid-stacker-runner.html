@@ -886,7 +886,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.264 · 2026.06.12</div>
+  <div id="appVersion">v1.265 · 2026.06.12</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1074,7 +1074,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.264';
+const APP_VERSION = '1.265';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -5654,7 +5654,7 @@ function renderShop(){
     // specials first, then the exclusives, then one labelled group per era
     ['explorer','ferro'].forEach(k => mkItem(k, charStatus(k)));
     { const exHdr = document.createElement('div'); exHdr.className='shopEraHdr'; exHdr.textContent='✦ EXCLUSIVE'; grid.appendChild(exHdr); }
-    ['ant','frida','american','miah'].forEach(k => mkItem(k, charStatus(k)));
+    ['ant','frida','american','miah','nzekro'].forEach(k => mkItem(k, charStatus(k)));
     ERA_ORDER.forEach(era => {
       const eo = ERAS.find(e=>e.key===era), keys = CHAR_SPEC.filter(s=>s[0]===era).map(s=>s[2]);
       const hdr = document.createElement('div'); hdr.className='shopEraHdr'; hdr.textContent = eo ? eo.name : era.toUpperCase();
