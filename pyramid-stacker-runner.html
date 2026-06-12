@@ -878,7 +878,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.253 · 2026.06.11</div>
+  <div id="appVersion">v1.254 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1066,7 +1066,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.253';
+const APP_VERSION = '1.254';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1259,6 +1259,7 @@ const CHARACTERS = {
   ant:      { name:'ANT MAN',      cost:3333, swatch:'#9c3a1c', color:0x9c3a1c, skin:0x9c3a1c, style:'ant',      exclusive:true },
   frida:    { name:'FRIDA KAHLO',  cost:3333, swatch:'#b8344f', color:0xb8344f, skin:0xd9a066, style:'frida',    exclusive:true },
   american: { name:'FAT BOY MEMO', cost:3333, swatch:'#c0303a', color:0xf0c79a, skin:0xf0c79a, style:'american', exclusive:true },
+  miah:     { name:'MIAH MAN',     cost:3333, swatch:'#22b0c2', color:0x22b0c2, skin:0xe0b486, style:'miah',     exclusive:true },
 };
 CHAR_SPEC.forEach(s => {
   const [era,tier,key,name,color,skin,head,glow,reuse] = s;
@@ -1385,7 +1386,7 @@ function makeRunner(){
   const gold   = () => new THREE.MeshStandardMaterial({ color:0xe8c45a, emissive:0x3a2600, metalness:0.75, roughness:0.28 });
   const blue   = () => new THREE.MeshStandardMaterial({ color:0x2b5bd0, emissive:0x0a1638, metalness:0.3, roughness:0.5 });
   const isEra  = style === 'era';                                  // era characters get bare skin limbs + boots (real-person read)
-  const humanLimbs = isEra || style==='frida' || style==='american';   // real-person skin limbs
+  const humanLimbs = isEra || style==='frida' || style==='american' || style==='miah';   // real-person skin limbs
   const slim = style==='frida' ? 0.8 : 1;                          // Frida is skinny
   const limbMat = humanLimbs ? skinMat : cMat;
   const shoeMat = new THREE.MeshStandardMaterial({ color: style==='american' ? 0xf0f0f0 : isEra ? 0x4e3a26 : ch.color, roughness:0.8, metalness: ch.metal?0.5:0.05 });
@@ -1697,6 +1698,30 @@ function makeRunner(){
     const patty = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.018, 16), new THREE.MeshStandardMaterial({ color:0x5a3318, roughness:0.85 })); patty.position.y = -0.012; burger.add(patty);
     const bunB = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.02, 16), new THREE.MeshStandardMaterial({ color:0xe0a44e, roughness:0.7 })); bunB.position.y = -0.03; burger.add(bunB);
     burger.scale.set(0.92, 0.92, 0.92); burger.position.set(0.02, -0.205, 0.05); burger.castShadow = true; g.armR.add(burger);
+  } else if (style === 'miah'){
+    // 🏄🎸 MIAH MAN — a surfer-musician: shaggy hair, board shorts + tank, a SURFBOARD slung on his back and a GUITAR in his hand
+    const hairMat = new THREE.MeshStandardMaterial({ color:0xc8a05a, roughness:0.8 });
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.106, 18, 14, 0, 6.28, 0, 1.55), hairMat); hair.scale.set(1.08, 1.05, 1.1); hair.position.set(0, 0.6, -0.006); hair.castShadow = true; g.add(hair);
+    [[-0.075,0.575,0.06],[0.075,0.575,0.06],[0,0.63,0.085],[-0.095,0.6,-0.02],[0.095,0.6,-0.02],[0,0.66,-0.03]].forEach(([x,y,z]) => { const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 8), hairMat); tuft.scale.set(0.8, 0.9, 0.8); tuft.position.set(x,y,z); tuft.castShadow = true; g.add(tuft); });   // shaggy surfer tufts
+    // colourful board shorts + a shell necklace
+    const shorts = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.118, 0.15, 18), new THREE.MeshStandardMaterial({ color:0xff7a3d, roughness:0.72 })); shorts.position.y = 0.235; shorts.castShadow = true; g.add(shorts);
+    [[-0.04,0.21,0xffd24a],[0.04,0.205,0x2bb0c2]].forEach(([x,y,c]) => { const fl = new THREE.Mesh(new THREE.SphereGeometry(0.016, 8, 6), new THREE.MeshStandardMaterial({ color:c, roughness:0.6 })); fl.scale.set(1.4,1,0.3); fl.position.set(x, y, 0.116); g.add(fl); });   // hibiscus print
+    [-2,-1,0,1,2].forEach(i => { const bead = new THREE.Mesh(new THREE.SphereGeometry(0.01, 8, 6), new THREE.MeshStandardMaterial({ color:0xf0e6d2, roughness:0.6 })); bead.position.set(i*0.03, 0.45 + Math.abs(i)*0.006, 0.09); g.add(bead); });   // puka-shell necklace
+    // 🏄 SURFBOARD slung diagonally on his back
+    const boardMat = new THREE.MeshStandardMaterial({ color:0xf2f2f2, roughness:0.4 });
+    const board = new THREE.Mesh(new THREE.SphereGeometry(0.1, 20, 14), boardMat); board.scale.set(0.5, 2.7, 0.12); board.position.set(0.03, 0.42, -0.17); board.rotation.z = 0.42; board.castShadow = true; g.add(board);
+    const stripe = new THREE.Mesh(new THREE.SphereGeometry(0.1, 20, 14), new THREE.MeshStandardMaterial({ color:0x22b0c2, roughness:0.4 })); stripe.scale.set(0.16, 2.7, 0.13); stripe.position.set(0.03, 0.42, -0.168); stripe.rotation.z = 0.42; g.add(stripe);
+    const fin = new THREE.Mesh(new THREE.ConeGeometry(0.028, 0.07, 4), boardMat); fin.position.set(-0.12, 0.18, -0.2); fin.rotation.set(Math.PI, 0, -0.42); fin.castShadow = true; g.add(fin);
+    // 🎸 ACOUSTIC GUITAR in his right hand
+    const guitar = new THREE.Group();
+    const woodMat = new THREE.MeshStandardMaterial({ color:0x9a4a1e, roughness:0.5 });
+    const gbody = new THREE.Mesh(new THREE.SphereGeometry(0.06, 18, 14), woodMat); gbody.scale.set(1, 1.18, 0.34); gbody.castShadow = true; guitar.add(gbody);
+    const waist = new THREE.Mesh(new THREE.SphereGeometry(0.042, 16, 12), woodMat); waist.scale.set(1, 1, 0.34); waist.position.y = 0.03; guitar.add(waist);
+    const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.012, 14), new THREE.MeshStandardMaterial({ color:0x140a06 })); hole.rotation.x = Math.PI/2; hole.position.set(0, 0.0, 0.021); guitar.add(hole);
+    const neck = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.22, 0.018), new THREE.MeshStandardMaterial({ color:0x3a2412, roughness:0.6 })); neck.position.set(0, 0.165, 0.0); guitar.add(neck);
+    const headG = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.05, 0.016), new THREE.MeshStandardMaterial({ color:0x140a06 })); headG.position.set(0, 0.29, 0); guitar.add(headG);
+    const strings = new THREE.Mesh(new THREE.BoxGeometry(0.013, 0.33, 0.003), new THREE.MeshStandardMaterial({ color:0xdcdcdc, metalness:0.6, roughness:0.3 })); strings.position.set(0, 0.12, 0.021); guitar.add(strings);
+    guitar.rotation.set(0.25, 0.1, -0.7); guitar.position.set(0.0, -0.19, 0.08); g.armR.add(guitar);
   } else {
     // explorer (and the colour variants): a rounded pack + a soft sun hat
     const pack = new THREE.Mesh(new THREE.SphereGeometry(0.085, 18, 14),
@@ -3674,7 +3699,7 @@ const HZ_BUILD = {
   // rolling boulder/asteroid — a smooth stone ball that rolls DOWN the pyramid toward the player; dodge or JUMP
   roll(t, s){
     const L = hzRndLane();
-    t.ob = { type:'lane', lane:L, jumpable:true, phase:RND()*6.28, spd:0.004 + RND()*0.002 };
+    t.ob = { type:'lane', lane:L, L, jumpable:true, phase:RND()*6.28, spd:0.004 + RND()*0.002 };
     const ball = new THREE.Mesh(new THREE.SphereGeometry(0.1, 22, 16), hzMat(s.c1 || 0x9c8763, { roughness:0.92, metalness:0.04, emissive:s.em || 0x000000 }));
     ball.castShadow = true;
     const g = new THREE.Group(); g.add(ball); t.ob.ball = ball;
@@ -3840,6 +3865,7 @@ const HZ_ANIM = {
     t.obMesh.position.x = t.pos.x + ob.L*HZL;
     t.obMesh.position.z = t.pos.z - off * tilesUp * 0.045;        // up-slope = smaller z
     t.obMesh.position.y = t.pos.y + 0.1 + off * tilesUp * 0.055;  // up-slope = higher
+    ob.lane = Math.abs(off) < 0.42 ? ob.L : 99;                   // ONLY deadly while the ball is actually over its tile (fixes phantom crashes once it has rolled away)
     if (ob.ball) ob.ball.rotation.x -= dt * 11;                   // tumbling forward as it barrels down
   },
   sweep(ob, t){
@@ -5403,7 +5429,7 @@ function renderShop(){
     // specials first, then the exclusives, then one labelled group per era
     ['explorer','ferro'].forEach(k => mkItem(k, charStatus(k)));
     { const exHdr = document.createElement('div'); exHdr.className='shopEraHdr'; exHdr.textContent='✦ EXCLUSIVE'; grid.appendChild(exHdr); }
-    ['ant','frida','american'].forEach(k => mkItem(k, charStatus(k)));
+    ['ant','frida','american','miah'].forEach(k => mkItem(k, charStatus(k)));
     ERA_ORDER.forEach(era => {
       const eo = ERAS.find(e=>e.key===era), keys = CHAR_SPEC.filter(s=>s[0]===era).map(s=>s[2]);
       const hdr = document.createElement('div'); hdr.className='shopEraHdr'; hdr.textContent = eo ? eo.name : era.toUpperCase();
