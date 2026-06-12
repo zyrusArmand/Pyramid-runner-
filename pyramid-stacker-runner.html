@@ -886,7 +886,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.262 · 2026.06.11</div>
+  <div id="appVersion">v1.263 · 2026.06.12</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1074,7 +1074,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.262';
+const APP_VERSION = '1.263';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1407,17 +1407,21 @@ function makeRunner(){
     const b = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 12), mat); b.position.y = -len/2; grp.add(b);
     return grp;
   }
-  function limb(px, py, r, len, foot){                  // pivot group at the shoulder/hip
+  function limb(px, py, r, len, foot){                  // pivot at the shoulder/hip → upper segment → ELBOW/KNEE joint → lower segment → hand/foot
     const piv = new THREE.Group(); piv.position.set(px, py, 0);
-    const cap = capsule(r, len, limbMat); cap.position.y = -len/2; piv.add(cap);
-    if (foot){                                          // a little boot: rounded heel + forward toe
+    const half = len*0.5;
+    const upper = capsule(r, half, limbMat); upper.position.y = -half/2; piv.add(upper);   // upper arm / thigh
+    const elbow = new THREE.Group(); elbow.position.y = -half; piv.add(elbow);              // bendable joint
+    const lower = capsule(r*0.94, half, limbMat); lower.position.y = -half/2; elbow.add(lower);   // forearm / shin
+    if (foot){                                          // a little boot: rounded heel + forward toe (on the lower segment)
       const boot = new THREE.Mesh(new THREE.SphereGeometry(r*1.18, 12, 10), shoeMat);
-      boot.scale.set(1, 0.7, 1.7); boot.position.set(0, -len, r*0.8); boot.castShadow = true; piv.add(boot);
-      const toe = new THREE.Mesh(new THREE.SphereGeometry(r*0.74, 10, 8), shoeMat); toe.scale.set(1,0.8,1); toe.position.set(0, -len-r*0.1, r*1.75); piv.add(toe);
+      boot.scale.set(1, 0.7, 1.7); boot.position.set(0, -half, r*0.8); boot.castShadow = true; elbow.add(boot);
+      const toe = new THREE.Mesh(new THREE.SphereGeometry(r*0.74, 10, 8), shoeMat); toe.scale.set(1,0.8,1); toe.position.set(0, -half-r*0.1, r*1.75); elbow.add(toe);
     } else {                                            // a hand
       const hand = new THREE.Mesh(new THREE.SphereGeometry(r*1.3, 12, 10), limbMat);
-      hand.scale.set(1, 1.1, 0.82); hand.position.set(0, -len-r*0.2, 0); hand.castShadow = true; piv.add(hand);
+      hand.scale.set(1, 1.1, 0.82); hand.position.set(0, -half-r*0.2, 0); hand.castShadow = true; elbow.add(hand);
     }
+    piv.elbow = elbow; piv.__len = len;
     g.add(piv); return piv;
   }
 
@@ -1672,7 +1676,7 @@ function makeRunner(){
     const body = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.026, 0.085, 16), pinkMat); cup.add(body);
     const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.016, 16), new THREE.MeshStandardMaterial({ color:0xffd0e4, roughness:0.5 })); lid.position.y = 0.05; cup.add(lid);
     const straw = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.09, 8), new THREE.MeshStandardMaterial({ color:0xff3d8a, roughness:0.4 })); straw.position.set(0.012, 0.09, 0); straw.rotation.z = 0.18; cup.add(straw);
-    cup.position.set(0, -0.205, 0.03); g.armR.add(cup);
+    cup.position.set(0, -0.1, 0.03); g.armR.elbow.add(cup);
   } else if (style === 'american'){
     // 🇺🇸 FAT BOY MEMO — big belly bursting out of a too-small tee (belly button on show), blonde hair, US-flag cap, burger in hand
     const skinB = new THREE.MeshStandardMaterial({ color:0xf0c79a, roughness:0.68 });
@@ -1705,7 +1709,7 @@ function makeRunner(){
     const cheese = new THREE.Mesh(new THREE.BoxGeometry(0.078, 0.008, 0.078), new THREE.MeshStandardMaterial({ color:0xffc01e, roughness:0.5 })); cheese.rotation.y = 0.6; cheese.position.y = 0.0; burger.add(cheese);
     const patty = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.018, 16), new THREE.MeshStandardMaterial({ color:0x5a3318, roughness:0.85 })); patty.position.y = -0.012; burger.add(patty);
     const bunB = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.02, 16), new THREE.MeshStandardMaterial({ color:0xe0a44e, roughness:0.7 })); bunB.position.y = -0.03; burger.add(bunB);
-    burger.scale.set(0.92, 0.92, 0.92); burger.position.set(0.02, -0.205, 0.05); burger.castShadow = true; g.armR.add(burger);
+    burger.scale.set(0.92, 0.92, 0.92); burger.position.set(0.02, -0.1, 0.05); burger.castShadow = true; g.armR.elbow.add(burger);
   } else if (style === 'miah'){
     // 🏄 MIAH MAN — a skinny surfer in a black WETSUIT with teal accents, forward cap + sunglasses, a hibiscus fish board on his back.
     const blackMat = new THREE.MeshStandardMaterial({ color:0x1a1c22, roughness:0.55, metalness:0.05 });   // neoprene
@@ -4563,14 +4567,22 @@ function updateRun(dt){
   if (g.legL){
     r.stride = (r.stride||0) + dt * r.speed * 2.2;
     if (r.jumping){ g.legL.rotation.x = -1.0; g.legR.rotation.x = -0.55; g.armL.rotation.x = -2.2; g.armR.rotation.x = -2.2;
-      g.legL.rotation.z = 0; g.legR.rotation.z = 0; }
-    else if (r.sliding){ g.legL.rotation.x = 1.3; g.legR.rotation.x = 0.95; g.armL.rotation.x = 0.7; g.armR.rotation.x = 0.7; }
+      g.legL.rotation.z = 0; g.legR.rotation.z = 0;
+      if (g.legL.elbow){ g.legL.elbow.rotation.x = 1.0; g.legR.elbow.rotation.x = 0.7; g.armL.elbow.rotation.x = -0.9; g.armR.elbow.rotation.x = -0.9; } }
+    else if (r.sliding){ g.legL.rotation.x = 1.3; g.legR.rotation.x = 0.95; g.armL.rotation.x = 0.7; g.armR.rotation.x = 0.7;
+      if (g.legL.elbow){ g.legL.elbow.rotation.x = 0.5; g.legR.elbow.rotation.x = 0.6; g.armL.elbow.rotation.x = -0.4; g.armR.elbow.rotation.x = -0.4; } }
     else {
       const a = Math.sin(r.stride), b = Math.sin(r.stride + Math.PI);
       g.legL.rotation.x = a*0.95 + Math.max(0,a)*0.4;          // the forward leg reaches & lifts the knee higher
       g.legR.rotation.x = b*0.95 + Math.max(0,b)*0.4;
       g.armL.rotation.x = -a*0.9;  g.armR.rotation.x = -b*0.9; // arms pump opposite the legs
       g.armL.rotation.z = 0.12; g.armR.rotation.z = -0.12;     // elbows tucked in a touch
+      if (g.legL.elbow){
+        g.legL.elbow.rotation.x = Math.max(0, a) * 1.15;        // KNEE folds as the leg lifts
+        g.legR.elbow.rotation.x = Math.max(0, b) * 1.15;
+        g.armL.elbow.rotation.x = -0.55 + a*0.3;                // ELBOW bent ~90°, swings a touch
+        g.armR.elbow.rotation.x = -0.55 + b*0.3;
+      }
       g.position.y += Math.abs(Math.sin(r.stride)) * 0.02;     // light up/down bob with each stride
     }
   }
@@ -4652,51 +4664,56 @@ function endEmote(r, g){
 }
 // build a little held guitar for Miah's strum emote
 function makeEmoteGuitar(){
+  // built straight (neck cleanly out of the body), then the WHOLE group is angled across the chest so it reads right
   const gtr = new THREE.Group();
   const wood = new THREE.MeshStandardMaterial({ color:0xe6cf94, roughness:0.45 });
-  const lower = new THREE.Mesh(new THREE.SphereGeometry(0.06, 18, 14), wood); lower.scale.set(1, 1, 0.3); lower.position.y = -0.02; gtr.add(lower);
-  const upper = new THREE.Mesh(new THREE.SphereGeometry(0.045, 18, 14), wood); upper.scale.set(1, 1, 0.3); upper.position.y = 0.065; gtr.add(upper);
-  const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.012, 14), new THREE.MeshStandardMaterial({ color:0x140a06 })); hole.rotation.x = Math.PI/2; hole.position.set(0, 0.015, 0.02); gtr.add(hole);
-  const guard = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 10), new THREE.MeshStandardMaterial({ color:0x7a3414, roughness:0.4 })); guard.scale.set(0.7, 1.1, 0.16); guard.position.set(0.04, -0.04, 0.022); gtr.add(guard);
-  const neck = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.22, 0.02), new THREE.MeshStandardMaterial({ color:0x6a4326 })); neck.position.set(-0.02, 0.18, 0.004); neck.rotation.z = 0.45; gtr.add(neck);
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.05, 0.016), new THREE.MeshStandardMaterial({ color:0x140a06 })); head.position.set(-0.13, 0.28, 0.004); head.rotation.z = 0.45; gtr.add(head);
-  const str = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.3, 0.002), new THREE.MeshStandardMaterial({ color:0xeaeaea, metalness:0.5 })); str.position.set(-0.012, 0.1, 0.022); str.rotation.z = 0.45; gtr.add(str);
-  // held across the front of the chest
-  gtr.scale.set(1, 1, 1); gtr.position.set(0.0, 0.42, 0.13); gtr.rotation.set(0.2, 0, 0); gtr.__scaleUp = true;
+  const dark = new THREE.MeshStandardMaterial({ color:0x140a06 });
+  const lower = new THREE.Mesh(new THREE.SphereGeometry(0.062, 18, 14), wood); lower.scale.set(1, 1, 0.3); lower.position.y = -0.02; lower.castShadow = true; gtr.add(lower);
+  const upper = new THREE.Mesh(new THREE.SphereGeometry(0.046, 18, 14), wood); upper.scale.set(1, 1, 0.3); upper.position.y = 0.07; gtr.add(upper);
+  const rosette = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.005, 14), new THREE.MeshStandardMaterial({ color:0x7a3414 })); rosette.rotation.x = Math.PI/2; rosette.position.set(0, 0.012, 0.018); gtr.add(rosette);
+  const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.012, 14), dark); hole.rotation.x = Math.PI/2; hole.position.set(0, 0.012, 0.02); gtr.add(hole);
+  const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.012, 0.01), new THREE.MeshStandardMaterial({ color:0x241509 })); bridge.position.set(0, -0.05, 0.02); gtr.add(bridge);
+  const neck = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.2, 0.018), new THREE.MeshStandardMaterial({ color:0x6a4326 })); neck.position.set(0, 0.21, 0.006); gtr.add(neck);
+  const fretb = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.2, 0.008), dark); fretb.position.set(0, 0.21, 0.016); gtr.add(fretb);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.05, 0.015), dark); head.position.set(0, 0.325, 0.004); gtr.add(head);
+  const str = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.32, 0.002), new THREE.MeshStandardMaterial({ color:0xeaeaea, metalness:0.5 })); str.position.set(0, 0.13, 0.02); gtr.add(str);
+  // hold it angled across the chest with the broad face (deck) toward the camera
+  gtr.position.set(0.02, 0.4, 0.15); gtr.rotation.set(0.1, 0, 0.5);
   return gtr;
 }
 // per-character emote animation
 function playEmote(g, r, t, dt){
   const style = character().style || '';
+  const bend = (a, x) => { if (a && a.elbow) a.elbow.rotation.x = x; };
   if (style === 'miah'){
-    // hold the neck high with the left arm, STRUM with the right, bob to the beat
-    if (g.armL){ g.armL.rotation.x = -1.15; g.armL.rotation.z = 0.55; }
-    if (g.armR){ g.armR.rotation.x = -1.0 + Math.sin(t*11)*0.5; g.armR.rotation.z = -0.25; }   // strumming hand
-    g.position.y += Math.sin(t*11) * 0.004;
-    if (r.emoteProps){ const e = Math.min(1, t*5); r.emoteProps.scale.set(e, e, e); r.emoteProps.rotation.z = 0.06*Math.sin(t*5.5); }   // guitar pops in + sways
+    // left hand frets the neck (up-left), right hand STRUMS across the body — both elbows bent
+    if (g.armL){ g.armL.rotation.x = -0.8; g.armL.rotation.z = -0.45; } bend(g.armL, -1.15);
+    if (g.armR){ g.armR.rotation.x = -0.55; g.armR.rotation.z = 0.25; } bend(g.armR, -1.3 + Math.sin(t*12)*0.5);   // strumming forearm
+    g.position.y += Math.sin(t*12) * 0.004;
+    if (r.emoteProps){ const e = Math.min(1, t*5); r.emoteProps.scale.set(e, e, e); }   // guitar pops in cleanly
   } else if (style === 'ant'){
     // grip the power-washer wand with the front legs and SPRAY (recoil + pulsing jet)
-    if (g.armL){ g.armL.rotation.x = -0.95; g.armL.rotation.z = 0.2; }
-    if (g.armR){ g.armR.rotation.x = -0.95; g.armR.rotation.z = -0.2; }
+    if (g.armL){ g.armL.rotation.x = -0.9; g.armL.rotation.z = 0.25; } bend(g.armL, -0.7);
+    if (g.armR){ g.armR.rotation.x = -0.9; g.armR.rotation.z = -0.25; } bend(g.armR, -0.7);
     g.position.y += Math.sin(t*16) * 0.003;   // recoil from the blast
     if (r.emoteProps){ const e = Math.min(1, t*6), pulse = 0.85 + 0.25*Math.sin(t*18);
       r.emoteProps.scale.set(e*pulse, e, e*pulse);
       if (r.emoteProps.__cone && r.emoteProps.__cone.material) r.emoteProps.__cone.material.opacity = 0.32 + 0.26*Math.abs(Math.sin(t*18)); }
   } else if (style === 'american'){
     // bring the burger up to his mouth and CHOMP, with a happy bob
-    if (g.armR){ g.armR.rotation.z = 0.98; g.armR.rotation.x = -1.55 + Math.max(0, Math.sin(t*7))*0.4; }   // up to the mouth, chomping
-    if (g.armL){ g.armL.rotation.x = -0.15; }
+    if (g.armR){ g.armR.rotation.z = 0.9; g.armR.rotation.x = -0.9; } bend(g.armR, -1.4 + Math.max(0, Math.sin(t*7))*0.5);   // forearm folds up to the mouth
+    if (g.armL){ g.armL.rotation.x = -0.15; } bend(g.armL, -0.5);
     g.position.y += Math.abs(Math.sin(t*7)) * 0.005;
   } else if (style === 'frida'){
     // a graceful pose — raise the cup like a toast, other arm out, gentle sway
-    if (g.armR){ g.armR.rotation.x = -2.35; g.armR.rotation.z = -0.12; }
-    if (g.armL){ g.armL.rotation.x = -0.3; g.armL.rotation.z = -0.7; }
+    if (g.armR){ g.armR.rotation.x = -1.5; g.armR.rotation.z = -0.1; } bend(g.armR, -1.1);   // cup raised by the bent forearm
+    if (g.armL){ g.armL.rotation.x = -0.3; g.armL.rotation.z = -0.7; } bend(g.armL, -0.5);
     g.rotation.z = Math.sin(t*2.3) * 0.06;
     g.position.y += Math.sin(t*2.3) * 0.003;
   } else {
     // default: a friendly wave
-    if (g.armR){ g.armR.rotation.x = -2.5; g.armR.rotation.z = -0.3 + Math.sin(t*9)*0.5; }
-    if (g.armL){ g.armL.rotation.x = 0.2; }
+    if (g.armR){ g.armR.rotation.x = -2.3; g.armR.rotation.z = -0.3; } bend(g.armR, -0.4 + Math.sin(t*9)*0.5);
+    if (g.armL){ g.armL.rotation.x = 0.2; } bend(g.armL, -0.4);
     g.position.y += Math.sin(t*4) * 0.003;
   }
 }
