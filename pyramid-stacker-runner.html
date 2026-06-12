@@ -878,7 +878,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.246 · 2026.06.11</div>
+  <div id="appVersion">v1.247 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1066,7 +1066,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.246';
+const APP_VERSION = '1.247';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1256,9 +1256,9 @@ const CHARACTERS = {
   explorer:{ name:'EXPLORER', cost:0, swatch:'#3ad6c5', color:0x3ad6c5, style:'explorer' },
   ferro:   { name:'FERRO',    cost:0, swatch:'#727c8e', color:0x727c8e, style:'ferro', metal:true, account:true },
   // ---- EXCLUSIVES: not tied to any era, bought outright for 3,333 ----
-  ant:      { name:'THE ANT',      cost:3333, swatch:'#3a2012', color:0x2a1810, skin:0x2a1810, style:'ant',      exclusive:true },
+  ant:      { name:'ANT MAN',      cost:3333, swatch:'#3a2012', color:0x2a1810, skin:0x2a1810, style:'ant',      exclusive:true },
   frida:    { name:'FRIDA KAHLO',  cost:3333, swatch:'#b8344f', color:0xb8344f, skin:0xd9a066, style:'frida',    exclusive:true },
-  american: { name:'BIG AL',       cost:3333, swatch:'#c0303a', color:0xf0c79a, skin:0xf0c79a, style:'american', exclusive:true },
+  american: { name:'FAT BOY MEMO', cost:3333, swatch:'#c0303a', color:0xf0c79a, skin:0xf0c79a, style:'american', exclusive:true },
 };
 CHAR_SPEC.forEach(s => {
   const [era,tier,key,name,color,skin,head,glow,reuse] = s;
@@ -1612,6 +1612,23 @@ function makeRunner(){
         const lo = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.006, 0.14, 7), chit(c2)); lo.position.set(s*0.215, 0.18, zz); lo.rotation.set(0.5, 0, s*0.35); g.add(lo);
       });
     });
+    // 🔫 backpack POWER WASHER strapped to his back: tank body + motor + handle, a coiled hose, and a spray wand
+    const pwBody = new THREE.MeshStandardMaterial({ color:0xff7a1e, metalness:0.3, roughness:0.5 });
+    const pwDark = new THREE.MeshStandardMaterial({ color:0x222428, metalness:0.5, roughness:0.4 });
+    const pwSteel = new THREE.MeshStandardMaterial({ color:0xcfd6dc, metalness:0.85, roughness:0.25 });
+    const tank = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.2, 0.1), pwBody); tank.position.set(0, 0.41, -0.18); tank.castShadow = true; g.add(tank);
+    const motor = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.12, 14), pwDark); motor.rotation.z = Math.PI/2; motor.position.set(0, 0.5, -0.18); motor.castShadow = true; g.add(motor);
+    const cap1 = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.03, 10), pwSteel); cap1.position.set(0, 0.52, -0.13); g.add(cap1);
+    [-1,1].forEach(s => { const strap = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.26, 0.014), pwDark); strap.position.set(s*0.07, 0.42, -0.06); strap.rotation.x = 0.12; g.add(strap); });   // shoulder straps
+    // coiled hose (stacked open rings) running up to the wand
+    [0.0, 0.05, 0.1].forEach((d, i) => { const coil = new THREE.Mesh(new THREE.CylinderGeometry(0.058-i*0.006, 0.058-i*0.006, 0.012, 14, 1, true), pwDark);
+      coil.position.set(0.09, 0.34+d, -0.16); coil.rotation.z = 0.4; g.add(coil); });
+    // spray wand/lance held in the right hand
+    const wand = new THREE.Group();
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.07, 0.03), pwDark); grip.position.y = 0; wand.add(grip);
+    const lance = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.2, 10), pwSteel); lance.position.set(0, 0.04, 0.1); lance.rotation.x = Math.PI/2; wand.add(lance);
+    const nozzle = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.04, 10), pwSteel); nozzle.position.set(0, 0.04, 0.21); nozzle.rotation.x = Math.PI/2; wand.add(nozzle);
+    wand.position.set(0, -0.2, 0.04); wand.rotation.x = -0.3; g.armR.add(wand);
   } else if (style === 'frida'){
     // 🌺 FRIDA KAHLO — skinny; dark braided updo with a flower crown, the signature unibrow, gold earrings, a vivid embroidered dress
     const hairMat = new THREE.MeshStandardMaterial({ color:0x1a1108, roughness:0.72 });
@@ -1633,6 +1650,13 @@ function makeRunner(){
     shawl.scale.set(1, 0.7, 0.92); shawl.position.set(0, 0.43, 0); shawl.castShadow = true; g.add(shawl);
     [[-0.05,0.42,0.108,0xff2d6f],[0.05,0.42,0.108,0xffd24a],[0,0.47,0.105,0xff8a3d]].forEach(([x,y,z,c]) => {
       const d = new THREE.Mesh(new THREE.SphereGeometry(0.013, 8, 6), new THREE.MeshStandardMaterial({ color:c, roughness:0.6 })); d.position.set(x,y,z); g.add(d); });
+    // 🥤 a pink tumbler in her right hand — body, lid and a straw
+    const cup = new THREE.Group();
+    const pinkMat = new THREE.MeshStandardMaterial({ color:0xff79b0, roughness:0.4, metalness:0.15 });
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.026, 0.085, 16), pinkMat); cup.add(body);
+    const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.016, 16), new THREE.MeshStandardMaterial({ color:0xffd0e4, roughness:0.5 })); lid.position.y = 0.05; cup.add(lid);
+    const straw = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.09, 8), new THREE.MeshStandardMaterial({ color:0xff3d8a, roughness:0.4 })); straw.position.set(0.012, 0.09, 0); straw.rotation.z = 0.18; cup.add(straw);
+    cup.position.set(0, -0.205, 0.03); g.armR.add(cup);
   } else if (style === 'american'){
     // 🇺🇸 BIG AL — big belly bursting out of a too-small tee (belly button on show), blonde hair, US-flag cap, burger in hand
     const skinB = new THREE.MeshStandardMaterial({ color:0xf0c79a, roughness:0.6, emissive:0x1a0e04 });
