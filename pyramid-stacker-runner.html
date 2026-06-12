@@ -932,7 +932,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.269 · 2026.06.12</div>
+  <div id="appVersion">v1.270 · 2026.06.12</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1120,7 +1120,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.269';
+const APP_VERSION = '1.270';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1758,29 +1758,31 @@ function makeRunner(){
     const bunB = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.02, 16), new THREE.MeshStandardMaterial({ color:0xe0a44e, roughness:0.7 })); bunB.position.y = -0.03; burger.add(bunB);
     burger.scale.set(0.92, 0.92, 0.92); burger.position.set(0.02, -0.1, 0.05); burger.castShadow = true; g.armR.elbow.add(burger);
   } else if (style === 'miah'){
-    // 🏄 MIAH MAN — a skinny surfer in a black WETSUIT with teal accents, forward cap + sunglasses, a hibiscus fish board on his back.
-    const blackMat = new THREE.MeshStandardMaterial({ color:0x1a1c22, roughness:0.55, metalness:0.05 });   // neoprene
-    const teal = new THREE.MeshStandardMaterial({ color:0x1fb6c8, roughness:0.5 });
-    // 🤿 WETSUIT — the black torso/limbs come from the base body; add a high collar, front zip, and teal accent panels/stripes
-    const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.056, 0.05, 16), blackMat); collar.position.y = 0.505; collar.castShadow = true; g.add(collar);
-    const collarTrim = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.052, 0.012, 16), teal); collarTrim.position.y = 0.532; g.add(collarTrim);
-    const zip = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.24, 0.01), new THREE.MeshStandardMaterial({ color:0x4a5158, metalness:0.4, roughness:0.4 })); zip.position.set(0, 0.38, 0.1); g.add(zip);
-    const zipPull = new THREE.Mesh(new THREE.SphereGeometry(0.013, 8, 8), teal); zipPull.position.set(0, 0.27, 0.104); g.add(zipPull);
-    [-1,1].forEach(s => {   // teal side panels + shoulder caps
-      const side = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.3, 0.075), teal); side.position.set(s*0.082, 0.38, 0.005); g.add(side);
-      const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.058, 14, 12), teal); shoulder.scale.set(1, 0.62, 0.9); shoulder.position.set(s*0.1, 0.48, 0.0); shoulder.castShadow = true; g.add(shoulder);
-    });
-    [g.armL, g.armR].forEach(a => { const st = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.17, 0.045), teal); st.position.set(0, -0.08, 0.032); a.add(st); });   // arm stripes
-    [g.legL, g.legR].forEach(l => { const st = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.19, 0.05), teal); st.position.set(0, -0.1, 0.04); l.add(st); });        // leg stripes
-    // baseball cap worn FORWARDS — clean flat brim over the brow + a button
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.108, 20, 14, 0, 6.28, 0, 1.34), blackMat); cap.position.set(0, 0.61, 0); cap.castShadow = true; g.add(cap);
-    const brimCap = new THREE.Mesh(new THREE.BoxGeometry(0.155, 0.013, 0.1), blackMat); brimCap.position.set(0, 0.6, 0.107); brimCap.rotation.x = -0.18; brimCap.castShadow = true; g.add(brimCap);
-    const capBtn = new THREE.Mesh(new THREE.SphereGeometry(0.011, 8, 8), teal); capBtn.position.set(0, 0.7, 0); g.add(capBtn);
-    // SUNGLASSES — two dark lenses + brow bar + bridge, covering the eyes
-    const lensMat = new THREE.MeshStandardMaterial({ color:0x0a0a0a, metalness:0.5, roughness:0.12 });
-    [-1,1].forEach(s => { const lens = new THREE.Mesh(new THREE.SphereGeometry(0.028, 14, 12), lensMat); lens.scale.set(1, 0.85, 0.42); lens.position.set(s*0.035, 0.598, 0.096); g.add(lens); });
-    const sBrow = new THREE.Mesh(new THREE.BoxGeometry(0.094, 0.009, 0.01), blackMat); sBrow.position.set(0, 0.617, 0.094); g.add(sBrow);
-    const sBridge = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.008, 0.01), blackMat); sBridge.position.set(0, 0.602, 0.1); g.add(sBridge);
+    // 🏄 MIAH MAN — a lean surfer in a smooth one-piece black WETSUIT with teal accents, a snug forward cap + sleek shades, hibiscus fish board on his back.
+    const blackMat = new THREE.MeshStandardMaterial({ color:0x16181e, roughness:0.4, metalness:0.1 });    // glossy neoprene sheen
+    const teal = new THREE.MeshStandardMaterial({ color:0x22bccf, roughness:0.4 });
+    // give the body the same glossy neoprene so the suit reads as ONE smooth piece (no add-on boxes)
+    torso.material = blackMat; waist.material = blackMat; shoulders.material = blackMat; pelvis.material = blackMat;
+    // smooth teal RAGLAN yoke hugging the shoulders + upper chest — a thin curved shell, nothing protruding
+    const yoke = new THREE.Mesh(new THREE.SphereGeometry(0.126, 24, 18, 0, 6.283, 0, 1.05), teal);
+    yoke.scale.set(0.9*slim, 1.2, 0.78*slim); yoke.position.y = 0.452; yoke.castShadow = true; g.add(yoke);
+    // snug collar trim at the neck
+    const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.055, 0.024, 18), teal); collar.position.y = 0.5; g.add(collar);
+    // front zip sitting flush ON the chest surface + a teal pull
+    const zip = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.15, 0.006), new THREE.MeshStandardMaterial({ color:0x2b3036, metalness:0.55, roughness:0.4 })); zip.position.set(0, 0.4, 0.066); g.add(zip);
+    const zipPull = new THREE.Mesh(new THREE.SphereGeometry(0.011, 10, 8), teal); zipPull.position.set(0, 0.335, 0.07); g.add(zipPull);
+    // teal cuffs at the wrists + ankles (smooth rings that ride with the limbs)
+    [g.armL, g.armR].forEach(a => { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.022, 14), teal); c.position.set(0, -0.072, 0); if (a.elbow) a.elbow.add(c); });
+    [g.legL, g.legR].forEach(l => { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.046, 0.046, 0.026, 14), teal); c.position.set(0, -0.085, 0); if (l.elbow) l.elbow.add(c); });
+    // snug forward CAP — a smooth dome capping the crown + a rounded brim (sits ON the head, no float)
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.105, 22, 16, 0, 6.283, 0, 1.65), blackMat); cap.scale.set(1.04, 1, 1); cap.position.set(0, 0.585, 0); cap.castShadow = true; g.add(cap);
+    const brim = new THREE.Mesh(new THREE.SphereGeometry(0.072, 18, 12), blackMat); brim.scale.set(1.45, 0.16, 1.25); brim.position.set(0, 0.6, 0.072); brim.rotation.x = -0.12; brim.castShadow = true; g.add(brim);
+    const capBtn = new THREE.Mesh(new THREE.SphereGeometry(0.011, 8, 8), teal); capBtn.position.set(0, 0.688, 0); g.add(capBtn);
+    // sleek wrap SHADES — one smooth dark shield lens + a thin brow frame + temples
+    const lensMat = new THREE.MeshStandardMaterial({ color:0x0c1418, metalness:0.6, roughness:0.1 });
+    const shades = new THREE.Mesh(new THREE.SphereGeometry(0.032, 18, 14), lensMat); shades.scale.set(1.75, 0.58, 0.34); shades.position.set(0, 0.6, 0.085); g.add(shades);
+    const sFrame = new THREE.Mesh(new THREE.BoxGeometry(0.102, 0.006, 0.01), blackMat); sFrame.position.set(0, 0.617, 0.083); g.add(sFrame);
+    [-1,1].forEach(s => { const tmp = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.006, 0.05), blackMat); tmp.position.set(s*0.053, 0.605, 0.055); g.add(tmp); });
     // a strap across the chest holding the board on his back
     const strap = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.4, 0.012), new THREE.MeshStandardMaterial({ color:0x2a2a2a, roughness:0.6 })); strap.position.set(-0.02, 0.42, 0.02); strap.rotation.z = 0.34; g.add(strap);
     // 🏄 HIBISCUS FISH BOARD — light-blue deck, RED rails, red hibiscus print, swallow tail, red twin fins
