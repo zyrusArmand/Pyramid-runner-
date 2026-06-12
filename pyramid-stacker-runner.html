@@ -878,7 +878,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.251 · 2026.06.11</div>
+  <div id="appVersion">v1.252 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1066,7 +1066,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.251';
+const APP_VERSION = '1.252';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1256,7 +1256,7 @@ const CHARACTERS = {
   explorer:{ name:'EXPLORER', cost:0, swatch:'#3ad6c5', color:0x3ad6c5, style:'explorer' },
   ferro:   { name:'FERRO',    cost:0, swatch:'#727c8e', color:0x727c8e, style:'ferro', metal:true, account:true },
   // ---- EXCLUSIVES: not tied to any era, bought outright for 3,333 ----
-  ant:      { name:'ANT MAN',      cost:3333, swatch:'#3a2012', color:0x2a1810, skin:0x2a1810, style:'ant',      exclusive:true },
+  ant:      { name:'ANT MAN',      cost:3333, swatch:'#9c3a1c', color:0x9c3a1c, skin:0x9c3a1c, style:'ant',      exclusive:true },
   frida:    { name:'FRIDA KAHLO',  cost:3333, swatch:'#b8344f', color:0xb8344f, skin:0xd9a066, style:'frida',    exclusive:true },
   american: { name:'FAT BOY MEMO', cost:3333, swatch:'#c0303a', color:0xf0c79a, skin:0xf0c79a, style:'american', exclusive:true },
 };
@@ -1588,22 +1588,33 @@ function makeRunner(){
   } else if (style === 'era'){
     buildEraOutfit(g, ch);                         // parametric per-era, per-tier costume
   } else if (style === 'ant'){
-    // 🐜 THE ANT — dark chitin: three body segments (head · thorax · bulbous gaster), six legs, curved antennae, compound eyes, mandibles
-    const chit = c => new THREE.MeshStandardMaterial({ color:c, emissive:0x0a0603, metalness:0.45, roughness:0.3 });
-    const c1 = 0x3a2012, c2 = 0x22130a;
-    const thorax = new THREE.Mesh(new THREE.SphereGeometry(0.1, 18, 14), chit(c1));
-    thorax.scale.set(0.82, 0.95, 1.05); thorax.position.set(0, 0.42, -0.015); thorax.castShadow = true; g.add(thorax);
-    const sheen = new THREE.Mesh(new THREE.SphereGeometry(0.118, 18, 14), chit(c1)); sheen.scale.set(0.55, 1.05, 0.5); sheen.position.set(0, 0.39, 0.06); g.add(sheen);  // glossy carapace
-    // compound eyes + mandibles
+    // 🐜 ANT MAN — a real RED ANT: three connected segments (head · thorax · gaster), six jointed legs, mandibles, elbowed antennae
+    torso.visible = false; waist.visible = false; shoulders.visible = false; pelvis.visible = false; nose.visible = false;   // drop the humanoid torso
+    const red = c => new THREE.MeshStandardMaterial({ color:c, emissive:0x1a0804, metalness:0.32, roughness:0.34 });
+    const R1 = 0x9c3a1c, R2 = 0x6e2812;
+    // reshape the base head into an ant head on a short neck
+    head.material = red(R1); head.scale.set(1.06, 0.94, 1.16); head.position.set(0, 0.585, 0.055);
+    neck.material = red(R2); neck.position.set(0, 0.5, 0.02);
+    // THORAX (mesosoma) where every leg attaches, with a small hump
+    const thorax = new THREE.Mesh(new THREE.SphereGeometry(0.1, 22, 18), red(R1)); thorax.scale.set(0.84, 0.92, 1.12); thorax.position.set(0, 0.43, -0.02); thorax.castShadow = true; g.add(thorax);
+    const hump = new THREE.Mesh(new THREE.SphereGeometry(0.062, 16, 14), red(R1)); hump.scale.set(0.95, 0.85, 1); hump.position.set(0, 0.49, -0.05); g.add(hump);
+    // narrow PETIOLE node → bulbous GASTER (abdomen) hanging down and back
+    const petiole = new THREE.Mesh(new THREE.SphereGeometry(0.03, 14, 12), red(R2)); petiole.position.set(0, 0.37, -0.1); g.add(petiole);
+    const gaster = new THREE.Mesh(new THREE.SphereGeometry(0.115, 24, 20), red(R1)); gaster.scale.set(0.92, 0.96, 1.28); gaster.position.set(0, 0.33, -0.22); gaster.castShadow = true; g.add(gaster);
+    // compound eyes, mandibles, elbowed antennae (scape up → funiculus forward)
     [-1,1].forEach(s => {
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.04, 16, 14), new THREE.MeshStandardMaterial({ color:0x120a06, metalness:0.25, roughness:0.12 }));
-      eye.scale.set(0.85, 1.25, 0.8); eye.position.set(s*0.07, 0.6, 0.04); eye.castShadow = true; g.add(eye);
-      const md = new THREE.Mesh(new THREE.ConeGeometry(0.013, 0.062, 8), chit(c2)); md.position.set(s*0.026, 0.548, 0.105); md.rotation.set(1.35, 0, s*0.5); g.add(md);
-      // two extra (mid/front) legs per side, bent insect-style
-      [0.05, -0.04].forEach(zz => {
-        const up = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.008, 0.17, 7), chit(c2)); up.position.set(s*0.14, 0.3, zz); up.rotation.set(0.2, 0, s*1.05); up.castShadow = true; g.add(up);
-        const lo = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.006, 0.14, 7), chit(c2)); lo.position.set(s*0.215, 0.18, zz); lo.rotation.set(0.5, 0, s*0.35); g.add(lo);
-      });
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.028, 14, 12), new THREE.MeshStandardMaterial({ color:0x180a04, metalness:0.2, roughness:0.12 })); eye.scale.set(0.9, 1.3, 0.85); eye.position.set(s*0.062, 0.6, 0.115); eye.castShadow = true; g.add(eye);
+      const md = new THREE.Mesh(new THREE.ConeGeometry(0.016, 0.08, 8), red(R2)); md.position.set(s*0.03, 0.54, 0.16); md.rotation.set(1.15, 0, s*0.55); md.castShadow = true; g.add(md);
+      const scape = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.009, 0.1, 8), red(R2)); scape.position.set(s*0.04, 0.655, 0.105); scape.rotation.set(-0.35, 0, -s*0.35); g.add(scape);
+      const funic = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.007, 0.11, 8), red(R2)); funic.position.set(s*0.075, 0.7, 0.175); funic.rotation.set(-1.05, 0, -s*0.35); g.add(funic);
+    });
+    // SIX LEGS — base legs = HIND pair (animated), base arms = FRONT pair (animated), plus a static MID pair; all thinned to insect legs
+    g.legL.position.set(-0.075, 0.28, -0.05); g.legR.position.set(0.075, 0.28, -0.05);
+    g.armL.position.set(-0.085, 0.4, 0.06);   g.armR.position.set(0.085, 0.4, 0.06);
+    [g.legL, g.legR, g.armL, g.armR].forEach(l => l.scale.set(0.34, 1, 0.34));
+    [-1,1].forEach(s => {
+      const fem = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.009, 0.16, 8), red(R2)); fem.position.set(s*0.135, 0.34, 0); fem.rotation.set(0.1, 0, s*0.95); fem.castShadow = true; g.add(fem);
+      const tib = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.007, 0.2, 8), red(R2)); tib.position.set(s*0.21, 0.16, 0); tib.rotation.set(0.35, 0, s*0.3); tib.castShadow = true; g.add(tib);
     });
     // 🧼 SURFACE CLEANER slung on his back (Westinghouse-style): a flat round spinning housing with casters + a long lance
     const steelM = new THREE.MeshStandardMaterial({ color:0xd0d6dc, metalness:0.85, roughness:0.25 });
