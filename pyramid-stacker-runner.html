@@ -878,7 +878,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.258 · 2026.06.11</div>
+  <div id="appVersion">v1.259 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1066,7 +1066,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.258';
+const APP_VERSION = '1.259';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1699,8 +1699,8 @@ function makeRunner(){
     const bunB = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.02, 16), new THREE.MeshStandardMaterial({ color:0xe0a44e, roughness:0.7 })); bunB.position.y = -0.03; burger.add(bunB);
     burger.scale.set(0.92, 0.92, 0.92); burger.position.set(0.02, -0.205, 0.05); burger.castShadow = true; g.armR.add(burger);
   } else if (style === 'miah'){
-    // 🏄🎸 MIAH MAN — a shirtless beach surfer-dude: bare tanned chest, black surf shorts, a cool backwards cap + shades,
-    // with a properly-proportioned two-tone SURFBOARD and a realistic GUITAR strapped to his back at crossing angles.
+    // 🏄 MIAH MAN — a skinny beach surfer: blue Hawaiian shirt, black surf shorts, forward cap + sunglasses, with a clean
+    // FISH surfboard strapped on his back.
     const blackMat = new THREE.MeshStandardMaterial({ color:0x161616, roughness:0.7 });
     // 👕 open HAWAIIAN shirt — BLUE sky → orange sunrise tropical print with neon florals, V-neck + sleeves (slim fit)
     const shTop = new THREE.MeshStandardMaterial({ color:0x2a86d8, roughness:0.6 });
@@ -1710,17 +1710,20 @@ function makeRunner(){
     const vneck = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.07, 0.02), skinMat); vneck.position.set(0, 0.46, 0.094); g.add(vneck);   // bare chest at the open collar
     [-1,1].forEach(s => { const lap = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.09, 0.016), shTop); lap.position.set(s*0.035, 0.45, 0.094); lap.rotation.z = -s*0.42; g.add(lap); });
     [[-0.06,0.42,0xffe24a],[0.06,0.4,0x9affd0],[0,0.46,0xffe24a],[-0.05,0.35,0x4ad0ff],[0.06,0.34,0xffe24a],[0,0.31,0x9affd0],[-0.07,0.39,0xff3d8a],[0.07,0.45,0x4ad0ff]].forEach(([x,y,c]) => { const fl = new THREE.Mesh(new THREE.SphereGeometry(0.015, 8, 6), new THREE.MeshStandardMaterial({ color:c, roughness:0.5 })); fl.scale.set(1.2, 1.2, 0.25); fl.position.set(x, y, 0.1); g.add(fl); });   // neon florals
-    [0.43,0.39,0.35].forEach(y => { const b = new THREE.Mesh(new THREE.SphereGeometry(0.006, 6, 6), new THREE.MeshStandardMaterial({ color:0xf4f4f4 })); b.position.set(0, y, 0.106); g.add(b); });
-    [g.armL, g.armR].forEach(a => { const sl = new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.05, 0.075, 12), shTop); sl.position.y = -0.055; sl.castShadow = true; a.add(sl); });   // short sleeves
+    [-1,1].forEach(s => { const sh = new THREE.Mesh(new THREE.SphereGeometry(0.06, 14, 12), shTop); sh.scale.set(1, 0.72, 0.92); sh.position.set(s*0.108, 0.475, 0.0); sh.castShadow = true; g.add(sh); });   // shirt shoulders so no bare skin shows
+    [g.armL, g.armR].forEach(a => { const sl = new THREE.Mesh(new THREE.CylinderGeometry(0.046, 0.052, 0.08, 12), shTop); sl.position.y = -0.05; sl.castShadow = true; a.add(sl); });   // short sleeves
     // BLACK surf shorts
     const shorts = new THREE.Mesh(new THREE.CylinderGeometry(0.082, 0.1, 0.15, 18), blackMat); shorts.position.y = 0.23; shorts.castShadow = true; g.add(shorts);
     const waistband = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.022, 18), new THREE.MeshStandardMaterial({ color:0x2bb0c2, roughness:0.6 })); waistband.position.y = 0.3; g.add(waistband);   // a teal drawstring band
-    // COOL snapback cap (worn FORWARDS) + sunglasses
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.108, 20, 14, 0, 6.28, 0, 1.32), blackMat); cap.position.set(0, 0.612, 0); cap.castShadow = true; g.add(cap);
-    const peak = new THREE.Mesh(new THREE.CylinderGeometry(0.092, 0.092, 0.014, 16, 1, false, 0, Math.PI), blackMat); peak.rotation.x = -0.16; peak.scale.set(1, 1, 1.45); peak.position.set(0, 0.6, 0.085); g.add(peak);   // brim worn FORWARDS (over the eyes)
-    const capPanel = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.032, 0.012), new THREE.MeshStandardMaterial({ color:0xe23a2e, roughness:0.6 })); capPanel.position.set(0, 0.645, 0.098); g.add(capPanel);
-    const capBtn = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 8), new THREE.MeshStandardMaterial({ color:0xe23a2e })); capBtn.position.set(0, 0.7, 0); g.add(capBtn);
-    const shades = new THREE.Mesh(new THREE.BoxGeometry(0.078, 0.024, 0.014), new THREE.MeshStandardMaterial({ color:0x0a0a0a, metalness:0.4, roughness:0.18 })); shades.position.set(0, 0.6, 0.094); g.add(shades);
+    // baseball cap worn FORWARDS — clean flat brim over the brow + a button
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.108, 20, 14, 0, 6.28, 0, 1.34), blackMat); cap.position.set(0, 0.61, 0); cap.castShadow = true; g.add(cap);
+    const brimCap = new THREE.Mesh(new THREE.BoxGeometry(0.155, 0.013, 0.1), blackMat); brimCap.position.set(0, 0.6, 0.107); brimCap.rotation.x = -0.18; brimCap.castShadow = true; g.add(brimCap);
+    const capBtn = new THREE.Mesh(new THREE.SphereGeometry(0.011, 8, 8), blackMat); capBtn.position.set(0, 0.7, 0); g.add(capBtn);
+    // proper SUNGLASSES — two dark lenses + brow bar + bridge, sized to fully cover the eyes
+    const lensMat = new THREE.MeshStandardMaterial({ color:0x0a0a0a, metalness:0.5, roughness:0.12 });
+    [-1,1].forEach(s => { const lens = new THREE.Mesh(new THREE.SphereGeometry(0.028, 14, 12), lensMat); lens.scale.set(1, 0.85, 0.42); lens.position.set(s*0.035, 0.598, 0.096); g.add(lens); });
+    const sBrow = new THREE.Mesh(new THREE.BoxGeometry(0.094, 0.009, 0.01), blackMat); sBrow.position.set(0, 0.617, 0.094); g.add(sBrow);
+    const sBridge = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.008, 0.01), blackMat); sBridge.position.set(0, 0.602, 0.1); g.add(sBridge);
     // a strap across the chest holding the board on his back
     const strap = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.4, 0.012), new THREE.MeshStandardMaterial({ color:0x2a2a2a, roughness:0.6 })); strap.position.set(-0.02, 0.42, 0.02); strap.rotation.z = 0.34; g.add(strap);
     // 🏄 FISH SURFBOARD — clean retro fish: smooth ROUNDED nose, swallow tail (two rounded lobes), orange rails + white deck + grey bottom, twin fins
@@ -1734,7 +1737,7 @@ function makeRunner(){
     const under = new THREE.Mesh(new THREE.SphereGeometry(0.092, 26, 18), grey); under.scale.set(0.6, 3.0, 0.095); under.position.z = -0.007; surf.add(under);    // grey underside → both sides coloured
     [-1,1].forEach(s => {   // SWALLOW TAIL: two rounded lobes (notch between) + a twin fin under each
       const lobe = new THREE.Mesh(new THREE.SphereGeometry(0.04, 16, 12), rail); lobe.scale.set(0.58, 1.0, 0.15); lobe.position.set(s*0.03, -0.275, 0); lobe.castShadow = true; surf.add(lobe);
-      const fin = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.058, 4), finMat); fin.position.set(s*0.035, -0.225, -0.045); fin.rotation.x = -0.5; fin.castShadow = true; surf.add(fin);
+      const fin = new THREE.Mesh(new THREE.ConeGeometry(0.024, 0.05, 12), finMat); fin.scale.set(0.28, 1, 1); fin.position.set(s*0.03, -0.235, -0.045); fin.rotation.x = -2.15; fin.castShadow = true; surf.add(fin);   // thin swept-back fin on the underside
     });
     surf.position.set(-0.02, 0.42, -0.155); surf.rotation.set(0.05, 0, 0.32); g.add(surf);
   } else {
