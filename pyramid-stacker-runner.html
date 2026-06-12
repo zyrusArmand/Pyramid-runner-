@@ -886,7 +886,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.261 · 2026.06.11</div>
+  <div id="appVersion">v1.262 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1074,7 +1074,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.261';
+const APP_VERSION = '1.262';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4623,19 +4623,32 @@ function runCrash(){ die('hit'); }
 function slowmo(){ S.timeScale = 0.32; }      // brief bullet-time, eased back to 1 in the loop
 
 // ---- EMOTES: tap the 🎭 button to stop, turn to the camera, and do a little character routine ----
-function emoteDur(){ return (character().style === 'miah') ? 3.4 : 2.0; }   // Miah's guitar bit runs a touch longer
+function emoteDur(){ const s = character().style;
+  return s==='miah' ? 3.4 : s==='ant' ? 3.0 : s==='american' ? 3.2 : s==='frida' ? 2.6 : 2.0; }
 function startEmote(){
   const r = S.run, g = S.runner;
   if (!r || !g || r.emote || r.falling || r.dead || r.celebrating || r.awaitStart || r.startDelay > 0) return;
   r.emote = { t:0, dur: emoteDur() };
   r.invuln = Math.max(r.invuln, 0.2);                       // tiny grace as you stop
-  if (character().style === 'miah'){ try { r.emoteProps = makeEmoteGuitar(); g.add(r.emoteProps); } catch(e){} Sound.cap && Sound.cap(); }
-  else { try { Sound.step && Sound.step(); } catch(e){} }
+  const style = character().style;
+  try {
+    if (style === 'miah'){ r.emoteProps = makeEmoteGuitar(); g.add(r.emoteProps); }
+    else if (style === 'ant'){ r.emoteProps = makeEmoteSpray(); g.add(r.emoteProps); }
+  } catch(e){}
+  try { (style==='miah' || style==='frida') ? (Sound.cap && Sound.cap()) : (Sound.step && Sound.step()); } catch(e){}
+}
+function makeEmoteSpray(){   // water spray for Ant Man's power-washer emote
+  const grp = new THREE.Group();
+  const water = new THREE.MeshStandardMaterial({ color:0xbfe6ff, emissive:0x2a6a8a, transparent:true, opacity:0.5, roughness:0.3, depthWrite:false });
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.28, 12, 1, true), water); cone.rotation.x = Math.PI/2; cone.position.set(0, 0.33, 0.3); grp.add(cone); grp.__cone = cone;
+  for (let i=0;i<7;i++){ const d = new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 6), water); d.position.set((Math.random()-0.5)*0.09, 0.33 + (Math.random()-0.5)*0.06, 0.22 + Math.random()*0.22); grp.add(d); }
+  const noz = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.015, 0.07, 8), new THREE.MeshStandardMaterial({ color:0xcfd6dc, metalness:0.7, roughness:0.3 })); noz.rotation.x = Math.PI/2; noz.position.set(0, 0.33, 0.17); grp.add(noz);
+  return grp;
 }
 function endEmote(r, g){
   if (r && r.emoteProps && g){ try { g.remove(r.emoteProps); } catch(e){} r.emoteProps = null; }
   if (r) r.emote = null;
-  if (g){ if (g.armL) g.armL.rotation.set(0,0,0); if (g.armR) g.armR.rotation.set(0,0,0); }   // reset so the run resumes cleanly
+  if (g){ if (g.armL) g.armL.rotation.set(0,0,0); if (g.armR) g.armR.rotation.set(0,0,0); g.rotation.z = 0; }   // reset so the run resumes cleanly
 }
 // build a little held guitar for Miah's strum emote
 function makeEmoteGuitar(){
@@ -4661,6 +4674,25 @@ function playEmote(g, r, t, dt){
     if (g.armR){ g.armR.rotation.x = -1.0 + Math.sin(t*11)*0.5; g.armR.rotation.z = -0.25; }   // strumming hand
     g.position.y += Math.sin(t*11) * 0.004;
     if (r.emoteProps){ const e = Math.min(1, t*5); r.emoteProps.scale.set(e, e, e); r.emoteProps.rotation.z = 0.06*Math.sin(t*5.5); }   // guitar pops in + sways
+  } else if (style === 'ant'){
+    // grip the power-washer wand with the front legs and SPRAY (recoil + pulsing jet)
+    if (g.armL){ g.armL.rotation.x = -0.95; g.armL.rotation.z = 0.2; }
+    if (g.armR){ g.armR.rotation.x = -0.95; g.armR.rotation.z = -0.2; }
+    g.position.y += Math.sin(t*16) * 0.003;   // recoil from the blast
+    if (r.emoteProps){ const e = Math.min(1, t*6), pulse = 0.85 + 0.25*Math.sin(t*18);
+      r.emoteProps.scale.set(e*pulse, e, e*pulse);
+      if (r.emoteProps.__cone && r.emoteProps.__cone.material) r.emoteProps.__cone.material.opacity = 0.32 + 0.26*Math.abs(Math.sin(t*18)); }
+  } else if (style === 'american'){
+    // bring the burger up to his mouth and CHOMP, with a happy bob
+    if (g.armR){ g.armR.rotation.z = 0.98; g.armR.rotation.x = -1.55 + Math.max(0, Math.sin(t*7))*0.4; }   // up to the mouth, chomping
+    if (g.armL){ g.armL.rotation.x = -0.15; }
+    g.position.y += Math.abs(Math.sin(t*7)) * 0.005;
+  } else if (style === 'frida'){
+    // a graceful pose — raise the cup like a toast, other arm out, gentle sway
+    if (g.armR){ g.armR.rotation.x = -2.35; g.armR.rotation.z = -0.12; }
+    if (g.armL){ g.armL.rotation.x = -0.3; g.armL.rotation.z = -0.7; }
+    g.rotation.z = Math.sin(t*2.3) * 0.06;
+    g.position.y += Math.sin(t*2.3) * 0.003;
   } else {
     // default: a friendly wave
     if (g.armR){ g.armR.rotation.x = -2.5; g.armR.rotation.z = -0.3 + Math.sin(t*9)*0.5; }
