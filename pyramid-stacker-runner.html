@@ -933,7 +933,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.271 · 2026.06.12</div>
+  <div id="appVersion">v1.272 · 2026.06.12</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1121,7 +1121,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.271';
+const APP_VERSION = '1.272';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1455,33 +1455,43 @@ function makeRunner(){
     const b = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 12), mat); b.position.y = -len/2; grp.add(b);
     return grp;
   }
-  function limb(px, py, r, len, foot){                  // pivot at the shoulder/hip → upper segment → ELBOW/KNEE joint → lower segment → hand/foot
+  // tapered limb segment (fuller at one end → thinner at the other) for a real muscle silhouette
+  function seg(rTop, rBot, len, mat){
+    const grp = new THREE.Group();
+    const cyl = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, len, 16), mat); cyl.castShadow = true; grp.add(cyl);
+    const a = new THREE.Mesh(new THREE.SphereGeometry(rTop, 12, 10), mat); a.position.y =  len/2; grp.add(a);
+    const b = new THREE.Mesh(new THREE.SphereGeometry(rBot, 12, 10), mat); b.position.y = -len/2; grp.add(b);
+    return grp;
+  }
+  // a human limb: shoulder/hip → tapered upper → ELBOW/KNEE hinge → tapered lower → WRIST/ANKLE → hand/foot
+  function limb(px, py, r, len, foot){
     const piv = new THREE.Group(); piv.position.set(px, py, 0);
     const half = len*0.5;
-    const upper = capsule(r, half, limbMat); upper.position.y = -half/2; piv.add(upper);   // upper arm / thigh
-    const elbow = new THREE.Group(); elbow.position.y = -half; piv.add(elbow);              // bendable joint
-    const lower = capsule(r*0.94, half, limbMat); lower.position.y = -half/2; elbow.add(lower);   // forearm / shin
-    if (foot){                                          // a little boot: rounded heel + forward toe (on the lower segment)
-      const boot = new THREE.Mesh(new THREE.SphereGeometry(r*1.18, 12, 10), shoeMat);
-      boot.scale.set(1, 0.7, 1.7); boot.position.set(0, -half, r*0.8); boot.castShadow = true; elbow.add(boot);
-      const toe = new THREE.Mesh(new THREE.SphereGeometry(r*0.74, 10, 8), shoeMat); toe.scale.set(1,0.8,1); toe.position.set(0, -half-r*0.1, r*1.75); elbow.add(toe);
-    } else {                                            // a hand
-      const hand = new THREE.Mesh(new THREE.SphereGeometry(r*1.3, 12, 10), limbMat);
-      hand.scale.set(1, 1.1, 0.82); hand.position.set(0, -half-r*0.2, 0); hand.castShadow = true; elbow.add(hand);
+    const upper = seg(r*1.16, r*0.84, half, limbMat); upper.position.y = -half/2; piv.add(upper);    // fuller at the shoulder/hip, tapers to the joint
+    const elbow = new THREE.Group(); elbow.position.y = -half; piv.add(elbow);                        // ELBOW / KNEE (one-way hinge)
+    const lower = seg(r*0.9, r*0.62, half, limbMat); lower.position.y = -half/2; elbow.add(lower);    // fuller at the joint, tapers to the wrist/ankle
+    const wrist = new THREE.Group(); wrist.position.y = -half; elbow.add(wrist);                      // WRIST / ANKLE joint
+    if (foot){                                          // a little boot: rounded heel + forward toe
+      const boot = new THREE.Mesh(new THREE.SphereGeometry(r*1.1, 12, 10), shoeMat);
+      boot.scale.set(1, 0.66, 1.8); boot.position.set(0, 0, r*0.8); boot.castShadow = true; wrist.add(boot);
+      const toe = new THREE.Mesh(new THREE.SphereGeometry(r*0.7, 10, 8), shoeMat); toe.scale.set(1,0.78,1); toe.position.set(0, -r*0.1, r*1.75); wrist.add(toe);
+    } else {                                            // a hand (mitt)
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(r*1.18, 12, 10), limbMat);
+      hand.scale.set(1.05, 1.15, 0.78); hand.position.set(0, -r*0.2, 0); hand.castShadow = true; wrist.add(hand);
     }
-    piv.elbow = elbow; piv.__len = len;
+    piv.elbow = elbow; piv.wrist = wrist; piv.__len = len;
     g.add(piv); return piv;
   }
 
-  // torso: tapered chest → waist (less egg-like) + shoulders + hips
-  const torso = new THREE.Mesh(new THREE.SphereGeometry(0.12, 24, 20), cMat);
-  torso.scale.set(0.86*slim, 1.34, 0.72*slim); torso.position.y = 0.38; torso.castShadow = true; g.add(torso);
-  const waist = new THREE.Mesh(new THREE.CylinderGeometry(0.082, 0.092, 0.1, 18), cMat);   // cinched midsection breaks up the blob
-  waist.position.y = 0.3; waist.scale.set(slim, 1, slim); g.add(waist);
-  const shoulders = new THREE.Mesh(new THREE.SphereGeometry(0.1, 20, 16), cMat);
-  shoulders.scale.set(1.36*slim, 0.6, 0.82*slim); shoulders.position.y = 0.475; shoulders.castShadow = true; g.add(shoulders);
-  const pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.1, 20, 16), cMat);
-  pelvis.scale.set(1.06*slim, 0.66, 0.88*slim); pelvis.position.y = 0.27; g.add(pelvis);
+  // torso: a human build — broad chest tapering to a cinched waist, then hips (kept stacked so it reads as a real torso)
+  const torso = new THREE.Mesh(new THREE.SphereGeometry(0.118, 24, 20), cMat);              // ribcage / chest
+  torso.scale.set(0.94*slim, 1.0, 0.64*slim); torso.position.y = 0.42; torso.castShadow = true; g.add(torso);
+  const waist = new THREE.Mesh(new THREE.SphereGeometry(0.09, 22, 18), cMat);               // cinched midsection
+  waist.scale.set(0.82*slim, 0.94, 0.72*slim); waist.position.y = 0.32; g.add(waist);
+  const shoulders = new THREE.Mesh(new THREE.SphereGeometry(0.1, 20, 16), cMat);            // clavicle / deltoid yoke
+  shoulders.scale.set(1.34*slim, 0.5, 0.78*slim); shoulders.position.y = 0.478; shoulders.castShadow = true; g.add(shoulders);
+  const pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.098, 20, 16), cMat);             // hips
+  pelvis.scale.set(1.02*slim, 0.68, 0.82*slim); pelvis.position.y = 0.275; g.add(pelvis);
   // neck + head + face
   const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.04, 0.06, 14), skinMat); neck.position.y = 0.52; g.add(neck);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.1, 28, 24), skinMat);
