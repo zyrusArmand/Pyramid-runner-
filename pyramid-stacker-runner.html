@@ -933,7 +933,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.274 · 2026.06.12</div>
+  <div id="appVersion">v1.275 · 2026.06.12</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1121,7 +1121,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.274';
+const APP_VERSION = '1.275';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1812,7 +1812,7 @@ function makeRunner(){
       const lobe = new THREE.Mesh(new THREE.SphereGeometry(0.04, 16, 12), redMat); lobe.scale.set(0.56, 1.0, 0.15); lobe.position.set(s*0.03, -0.275, 0); lobe.castShadow = true; surf.add(lobe);
       const fin = new THREE.Mesh(new THREE.ConeGeometry(0.024, 0.05, 12), redMat); fin.scale.set(0.28, 1, 1); fin.position.set(s*0.03, -0.235, -0.045); fin.rotation.x = -2.15; fin.castShadow = true; surf.add(fin);
     });
-    surf.position.set(-0.02, 0.42, -0.155); surf.rotation.set(0.05, 0, 0.32); g.add(surf);
+    surf.position.set(-0.02, 0.42, -0.155); surf.rotation.set(0.05, Math.PI, -0.32); g.add(surf);   // flipped so the decorated DECK faces out (visible from behind), same diagonal lean
   } else if (style === 'nzekro'){
     // 🎨 NZEKRO (THE HOBBYIST) — all-black tee + trousers, a camera on a neck strap, a kettlebell in one hand, a paintbrush in the other
     const black = new THREE.MeshStandardMaterial({ color:0x16161a, roughness:0.6, metalness:0.05 });
