@@ -378,16 +378,29 @@
   .iconCol .iconCircle .bicon { width:22px; height:22px; }
   .iconCap { font-family:'Space Mono',monospace; font-size:8.5px; letter-spacing:1.5px; color:#e7d3a6; opacity:.82; }
 
-  /* JOURNEY MAP — full-bleed 3D bird's-eye of the eras */
-  #mapPanel { padding:0; background:#06040c; transition:none; }
+  /* JOURNEY MAP — atmospheric trail of floating era-islands (CSS twilight sky behind a transparent canvas) */
+  #mapPanel { padding:0; transition:none;
+    background:radial-gradient(ellipse 120% 80% at 50% 8%, #3a2a6a 0%, #241544 30%, #140a26 60%, #0a0616 100%); }
   #mapCanvas { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
-  #mapHud { position:fixed; top:max(58px,calc(env(safe-area-inset-top) + 44px)); left:0; right:0; z-index:2;
-    pointer-events:none; text-align:center; color:#f6e9d2; }
-  #mapTitle { font-family:'Cinzel',serif; font-weight:700; font-size:clamp(20px,6vw,30px); letter-spacing:3px;
-    color:#f3d99a; text-shadow:0 0 22px rgba(243,200,120,.45); }
-  #mapEraName { font-family:'Cinzel',serif; font-weight:700; font-size:15px; letter-spacing:2px; margin-top:10px;
-    color:#ffe9b8; text-shadow:0 2px 10px rgba(0,0,0,.7); }
-  #mapEraSub { font-family:'Space Mono',monospace; font-size:10px; letter-spacing:3px; opacity:.7; margin-top:3px; }
+  #mapHud { position:fixed; top:0; left:0; right:0; z-index:2; pointer-events:none; text-align:center; color:#f6e9d2;
+    padding:max(54px,calc(env(safe-area-inset-top) + 42px)) 0 26px;
+    background:linear-gradient(180deg, rgba(10,6,22,.82) 0%, rgba(10,6,22,.5) 55%, transparent 100%); }
+  #mapTitle { font-family:'Cinzel',serif; font-weight:700; font-size:clamp(20px,6vw,30px); letter-spacing:4px;
+    color:#f3d99a; text-shadow:0 0 24px rgba(243,200,120,.5); }
+  #mapHint { font-family:'Space Mono',monospace; font-size:10px; letter-spacing:3px; opacity:.55; margin-top:7px; color:#cdbff0; }
+  /* bottom info card for the focused era + GO button */
+  #mapInfo { position:fixed; left:0; right:0; bottom:0; z-index:2; text-align:center; color:#f6e9d2;
+    padding:30px 20px calc(max(22px,env(safe-area-inset-bottom)) + 22px);
+    background:linear-gradient(0deg, rgba(10,6,22,.9) 0%, rgba(10,6,22,.55) 55%, transparent 100%); }
+  #mapEraName { font-family:'Cinzel',serif; font-weight:700; font-size:22px; letter-spacing:3px;
+    color:#ffe9b8; text-shadow:0 2px 12px rgba(0,0,0,.7); }
+  #mapEraSub { font-family:'Space Mono',monospace; font-size:10px; letter-spacing:3px; opacity:.72; margin-top:5px; }
+  #mapGo { display:inline-flex; align-items:center; justify-content:center; margin-top:16px; cursor:pointer; user-select:none;
+    padding:13px 40px; border-radius:30px; font-family:'Space Mono',monospace; font-weight:700; font-size:14px; letter-spacing:2px; white-space:nowrap;
+    color:#2a1808; background:linear-gradient(180deg,#ffe79a,#e2a93f); border:none;
+    box-shadow:0 8px 24px rgba(224,168,63,.4), inset 0 1px 0 rgba(255,255,255,.55); transition:transform .1s ease, filter .2s ease; }
+  #mapGo:active { transform:scale(.95); }
+  #mapGo.locked { background:rgba(40,30,56,.85); color:#9a90b4; box-shadow:inset 0 0 0 1px rgba(160,150,190,.3); cursor:default; }
   #homePlay { pointer-events:auto; cursor:pointer; margin-top:4px; }
   .cta.hero { border:none; color:#3a2410; font-weight:700; padding:9px 34px; font-size:15px; letter-spacing:3px; white-space:nowrap;
     background:linear-gradient(180deg,#ffe79a,#e2a93f); border-radius:30px; animation:heroGlow 2.2s ease-in-out infinite; }
@@ -913,8 +926,12 @@
   <canvas id="mapCanvas"></canvas>
   <div id="mapHud">
     <div id="mapTitle">JOURNEY MAP</div>
+    <div id="mapHint">⇅ SWIPE TO TRAVEL THE AGES</div>
+  </div>
+  <div id="mapInfo">
     <div id="mapEraName">EGYPT</div>
-    <div id="mapEraSub">LEVEL 1</div>
+    <div id="mapEraSub">1 / 8 ERAS</div>
+    <div id="mapGo">▶ CONTINUE</div>
   </div>
   <div class="backBtn" id="mapBack">◀ BACK</div>
 </div>
@@ -933,7 +950,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.279 · 2026.06.12</div>
+  <div id="appVersion">v1.280 · 2026.06.12</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1121,7 +1138,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.279';
+const APP_VERSION = '1.280';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -5944,85 +5961,115 @@ function howTab(which){
 function closeHow(){ $('howtoPanel').classList.add('hidden'); Store.set('how', 1); }
 function backHome(){ charPrevOn = false; WorldMap.close(); $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden'); $('goalsPanel').classList.add('hidden'); $('settingsPanel').classList.add('hidden'); $('profilePanel').classList.add('hidden'); $('mapPanel').classList.add('hidden'); $('levelsPanel').classList.add('hidden'); $('dailyPanel').classList.add('hidden'); $('startScreen').classList.remove('hidden'); renderHome(); }
 
-// ---------- JOURNEY MAP: a bird's-eye 3D tour of the 8 eras, marking where you are ----------
+// ---------- JOURNEY MAP: an atmospheric trail of floating era-islands you swipe through ----------
 const WorldMap = (function(){
-  let R=null, sc=null, cam=null, raf=0, t0=0, open=false, items=[], marker=null, target={x:0,z:0}, camA=0.6, dragA=0;
-  const SPACING=5.6, CURVE=3.2, PADH=0.42;
-  const nodePos = i => ({ x:(i-(ERA_ORDER.length-1)/2)*SPACING, z:Math.sin(i*0.85)*CURVE });
-  const mat   = (c,r)=> new THREE.MeshStandardMaterial({ color:c, roughness:r==null?0.85:r });
-  const glow  = (c,e)=> new THREE.MeshStandardMaterial({ color:c, emissive:c, emissiveIntensity:e==null?0.5:e, roughness:0.4, metalness:0.2 });
-  const grey  = ()=> new THREE.MeshStandardMaterial({ color:0x3a3a46, roughness:0.96 });
+  let R=null, sc=null, cam=null, raf=0, t0=0, lastT=0, open=false;
+  let items=[], islands=[], motes=[], marker=null, reachedIdx=0, curIdx=0;
+  let focus=0, focusE=0, dragY=null, dragF=0, goLvl=0;
+  const N = ERA_ORDER.length;
+  const ACC = { egypt:0xffcf6a, aztec:0xc6e070, greek:0xfff0c8, norse:0xbfe0ff, nippon:0xff9a8a, alien:0xc89cff, cosmos:0xa9c0ff, heaven:0xfff2cc };
+  const accOf = i => ACC[(ERAS[i]||ERAS[0]).key] || 0xffcf6a;
+  // a gentle serpentine that climbs upward and recedes — the journey literally ascends through the ages
+  const nodePos = i => new THREE.Vector3(Math.sin(i*0.72)*5.6, i*2.7, -i*8.0);
+  const mat   = (c,r,m)=> new THREE.MeshStandardMaterial({ color:c, roughness:r==null?0.85:r, metalness:m||0 });
+  const glow  = (c,e)=> new THREE.MeshStandardMaterial({ color:c, emissive:c, emissiveIntensity:e==null?0.6:e, roughness:0.4, metalness:0.15 });
+  const add   = (o)=>{ sc.add(o); items.push(o); return o; };
   function ensure(){
     if (R) return true;
     try {
-      R = new THREE.WebGLRenderer({ canvas:$('mapCanvas'), antialias:true });
+      R = new THREE.WebGLRenderer({ canvas:$('mapCanvas'), antialias:true, alpha:true });
       if (R.setPixelRatio) R.setPixelRatio(Math.min(2, window.devicePixelRatio||1));
-      sc = new THREE.Scene(); sc.fog = new THREE.Fog(0x06040c, 24, 64);
-      cam = new THREE.PerspectiveCamera(46, 1, 0.1, 200);
-      sc.add(new THREE.HemisphereLight(0xdde6ff, 0x20131a, 1.0));
-      const dl = new THREE.DirectionalLight(0xffffff, 0.95); dl.position.set(6,14,8); sc.add(dl);
-      const dl2 = new THREE.DirectionalLight(0x8aa0ff, 0.4); dl2.position.set(-8,6,-10); sc.add(dl2);
-      // drag to spin the camera around
-      const cv = $('mapCanvas'); let dx0=null, a0=0;
+      if (R.setClearColor) R.setClearColor(0x000000, 0);                 // transparent — the CSS gradient sky shows through
+      sc = new THREE.Scene(); sc.fog = new THREE.Fog(0x140a22, 22, 78);
+      cam = new THREE.PerspectiveCamera(48, 1, 0.1, 240);
+      sc.add(new THREE.HemisphereLight(0xbfd0ff, 0x241326, 1.05));
+      const dl = new THREE.DirectionalLight(0xfff0d8, 1.0); dl.position.set(7,16,9); sc.add(dl);
+      const dl2 = new THREE.DirectionalLight(0x8a6aff, 0.5); dl2.position.set(-9,7,-12); sc.add(dl2);
+      // swipe UP to travel forward through the ages, DOWN to go back
+      const cv = $('mapCanvas');
       if (cv && cv.addEventListener){
-        cv.addEventListener('pointerdown', e=>{ dx0=e.clientX; a0=dragA; });
-        cv.addEventListener('pointermove', e=>{ if(dx0!=null) dragA = a0 + (e.clientX-dx0)*0.006; });
-        window.addEventListener('pointerup', ()=>{ dx0=null; });
+        cv.addEventListener('pointerdown', e=>{ dragY=e.clientY; dragF=focus; });
+        cv.addEventListener('pointermove', e=>{ if(dragY!=null) focus = Math.max(0, Math.min(N-1, dragF + (dragY-e.clientY)*0.011)); });
+        window.addEventListener('pointerup', ()=>{ dragY=null; });
       }
       return true;
     } catch(e){ R=null; return false; }
   }
-  // one themed landmark per era, sitting on its terrain pad (grey silhouette if still locked)
+  // a themed landmark per era (full colour when reached, dim slate when still locked)
   function landmark(i, lit){
     const g = new THREE.Group();
-    const A = c => lit ? mat(c) : grey(), GL = (c,e) => lit ? glow(c,e) : grey();
-    if (i===0){ const p=new THREE.Mesh(new THREE.ConeGeometry(1.0,1.7,4), GL(0xe0c060,0.22)); p.rotation.y=Math.PI/4; p.position.y=0.85; g.add(p); }
+    const A = c => lit ? mat(c) : mat(0x3a3a48,0.96), GL = (c,e) => lit ? glow(c,e) : mat(0x3a3a48,0.96);
+    if (i===0){ const p=new THREE.Mesh(new THREE.ConeGeometry(1.05,1.8,4), GL(0xe6c45a,0.25)); p.rotation.y=Math.PI/4; p.position.y=0.9; g.add(p); }
     else if (i===1){ for(let k=0;k<4;k++){ const w=1.8-k*0.42; const b=new THREE.Mesh(new THREE.BoxGeometry(w,0.32,w), A(0x9a7a52)); b.position.y=k*0.32+0.16; g.add(b);} const t=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.5,0.7), A(0xb08a4a)); t.position.y=1.5; g.add(t); }
     else if (i===2){ [-0.75,0,0.75].forEach(px=>{ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.16,1.5,12), A(0xeee6d4)); c.position.set(px,0.75,0); g.add(c); }); const ar=new THREE.Mesh(new THREE.BoxGeometry(2.1,0.28,0.6), A(0xf2ecde)); ar.position.y=1.62; g.add(ar); }
-    else if (i===3){ const b=new THREE.Mesh(new THREE.BoxGeometry(1.9,0.95,1.1), A(0x6a4a30)); b.position.y=0.48; g.add(b); const rf=new THREE.Mesh(new THREE.ConeGeometry(1.25,0.85,4), A(0x4a3320)); rf.rotation.y=Math.PI/4; rf.position.y=1.3; g.add(rf); }
-    else if (i===4){ [-0.72,0.72].forEach(px=>{ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.11,1.7,10), GL(0xc0392b,0.18)); c.position.set(px,0.85,0); g.add(c); }); const l1=new THREE.Mesh(new THREE.BoxGeometry(2.1,0.2,0.26), GL(0xc0392b,0.18)); l1.position.y=1.62; g.add(l1); const l2=new THREE.Mesh(new THREE.BoxGeometry(1.8,0.13,0.22), A(0x8a2a20)); l2.position.y=1.34; g.add(l2); }
-    else if (i===5){ const d=new THREE.Mesh(new THREE.CylinderGeometry(1.0,1.0,0.2,18), GL(0x9a4aca,0.5)); d.position.y=1.5; g.add(d); const dome=new THREE.Mesh(new THREE.SphereGeometry(0.5,16,12), GL(0xc89cff,0.6)); dome.position.y=1.62; g.add(dome); const st=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,1.5,8), A(0x4a3a66)); st.position.y=0.75; g.add(st); }
-    else if (i===6){ const pl=new THREE.Mesh(new THREE.SphereGeometry(0.85,20,14), GL(0x4a6aca,0.45)); pl.position.y=1.2; g.add(pl); const rg=new THREE.Mesh(new THREE.RingGeometry(1.05,1.6,30), new THREE.MeshBasicMaterial({ color:lit?0xa9c0ff:0x55586a, transparent:true, opacity:0.8, side:THREE.DoubleSide, depthWrite:false })); rg.rotation.x=1.15; rg.position.y=1.2; g.add(rg); }
-    else { [-0.75,0.75].forEach(px=>{ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.15,1.7,12), GL(0xffe9a8,0.4)); c.position.set(px,0.85,0); g.add(c); }); const ar=new THREE.Mesh(new THREE.BoxGeometry(2.0,0.26,0.4), GL(0xffe9a8,0.4)); ar.position.y=1.68; g.add(ar); const cl=new THREE.Mesh(new THREE.SphereGeometry(0.7,14,12), new THREE.MeshStandardMaterial({ color:0xffffff, emissive:0xeae6ff, emissiveIntensity:0.4, roughness:1 })); cl.position.set(0,0.45,0.2); g.add(cl); }
-    g.position.y = PADH; return g;
+    else if (i===3){ const b=new THREE.Mesh(new THREE.BoxGeometry(1.9,0.95,1.1), A(0x6a4a30)); b.position.y=0.48; g.add(b); const rf=new THREE.Mesh(new THREE.ConeGeometry(1.3,0.9,4), A(0x4a3320)); rf.rotation.y=Math.PI/4; rf.position.y=1.3; g.add(rf); }
+    else if (i===4){ [-0.72,0.72].forEach(px=>{ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.11,1.7,10), GL(0xc0392b,0.2)); c.position.set(px,0.85,0); g.add(c); }); const l1=new THREE.Mesh(new THREE.BoxGeometry(2.1,0.2,0.26), GL(0xc0392b,0.2)); l1.position.y=1.62; g.add(l1); const l2=new THREE.Mesh(new THREE.BoxGeometry(1.8,0.13,0.22), A(0x8a2a20)); l2.position.y=1.34; g.add(l2); }
+    else if (i===5){ const d=new THREE.Mesh(new THREE.CylinderGeometry(1.0,1.0,0.2,18), GL(0x9a4aca,0.55)); d.position.y=1.5; g.add(d); const dome=new THREE.Mesh(new THREE.SphereGeometry(0.5,16,12), GL(0xc89cff,0.65)); dome.position.y=1.62; g.add(dome); const st=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,1.5,8), A(0x4a3a66)); st.position.y=0.75; g.add(st); }
+    else if (i===6){ const pl=new THREE.Mesh(new THREE.SphereGeometry(0.85,20,14), GL(0x4a6aca,0.5)); pl.position.y=1.25; g.add(pl); const rg=new THREE.Mesh(new THREE.RingGeometry(1.05,1.6,30), new THREE.MeshBasicMaterial({ color:lit?0xa9c0ff:0x55586a, transparent:true, opacity:0.85, side:THREE.DoubleSide, depthWrite:false })); rg.rotation.x=1.15; rg.position.y=1.25; g.add(rg); }
+    else { [-0.75,0.75].forEach(px=>{ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.15,1.7,12), GL(0xffe9a8,0.45)); c.position.set(px,0.85,0); g.add(c); }); const ar=new THREE.Mesh(new THREE.BoxGeometry(2.0,0.26,0.4), GL(0xffe9a8,0.45)); ar.position.y=1.68; g.add(ar); const cl=new THREE.Mesh(new THREE.SphereGeometry(0.7,14,12), new THREE.MeshStandardMaterial({ color:0xffffff, emissive:0xeae6ff, emissiveIntensity:0.45, roughness:1 })); cl.position.set(0,0.45,0.2); g.add(cl); }
+    g.position.y = 0.3; return g;
   }
-  function makePad(i, lit){
-    const e = ERAS[i] || ERAS[0];
-    const pad = new THREE.Mesh(new THREE.CylinderGeometry(2.1,2.4,PADH,8), mat(lit ? e.dune : 0x2c2c36, 0.95));
-    pad.position.y = PADH/2; return pad;
+  // a clean floating island: soft grass/sand top + glowing rim + a rocky tapering underside
+  function island(i, lit){
+    const e = ERAS[i] || ERAS[0], g = new THREE.Group();
+    const topC = lit ? e.ground : 0x2b2b38, sandC = lit ? e.dune : 0x33333f;
+    const u1 = new THREE.Mesh(new THREE.ConeGeometry(2.35, 2.3, 12), mat(lit?0x4a3f33:0x222231, 0.99)); u1.rotation.x=Math.PI; u1.position.y=-1.0; g.add(u1);
+    const u2 = new THREE.Mesh(new THREE.ConeGeometry(1.35, 2.6, 9), mat(lit?0x3a3228:0x1b1b27, 1)); u2.rotation.x=Math.PI; u2.position.y=-2.5; g.add(u2);
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 2.12, 0.5, 16), mat(sandC, 0.92)); top.castShadow=true; g.add(top);
+    const mound = new THREE.Mesh(new THREE.SphereGeometry(2.16, 18, 12, 0, 6.2832, 0, 1.15), mat(topC, 0.9)); mound.scale.set(1,0.4,1); mound.position.y=0.18; mound.castShadow=true; g.add(mound);
+    if (lit){ const rim = new THREE.Mesh(new THREE.CylinderGeometry(2.36, 2.36, 0.09, 30), glow(accOf(i),0.55)); rim.position.y=0.2; g.add(rim); }
+    g.add(landmark(i, lit));
+    if (!lit){ const lk=new THREE.Mesh(new THREE.BoxGeometry(0.46,0.46,0.3), glow(0x9aa0b8,0.3)); lk.position.y=2.7; g.add(lk);
+      const sh=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.26,0.34,12,1,true), glow(0x9aa0b8,0.3)); sh.position.y=3.0; g.add(lk); g.add(sh); }
+    return g;
   }
-  function clear(){ items.forEach(o=>{ try{ sc.remove(o); }catch(e){} }); items=[]; marker=null; }
+  function clear(){ items.forEach(o=>{ try{ sc.remove(o); }catch(e){} }); items=[]; islands=[]; motes=[]; marker=null; }
   function build(){
     if (!ensure()) return;
     clear();
-    const reachedIdx = ERA_ORDER.indexOf(eraFor(Math.max(1,maxLevel)).key);
-    const curIdx     = ERA_ORDER.indexOf(eraFor(Math.max(1,resumeLevel||1)).key);
-    // connecting path: stepping stones between consecutive era pads
-    for (let i=0;i<ERA_ORDER.length-1;i++){
-      const a=nodePos(i), b=nodePos(i+1), lit=(i+1)<=reachedIdx;
-      for (let s=1;s<=3;s++){ const f=s/4; const st=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.18,0.5),
-        mat(lit?0x6a5a3a:0x2e2e38, 0.9)); st.position.set(a.x+(b.x-a.x)*f, 0.1, a.z+(b.z-a.z)*f); st.rotation.y=0.5; sc.add(st); items.push(st); }
+    reachedIdx = ERA_ORDER.indexOf(eraFor(Math.max(1,maxLevel)).key);
+    curIdx     = ERA_ORDER.indexOf(eraFor(Math.max(1,resumeLevel||1)).key);
+    // far starfield for depth
+    for (let s=0;s<46;s++){ const st=new THREE.Mesh(new THREE.SphereGeometry(0.06+Math.random()*0.05,6,6), new THREE.MeshBasicMaterial({ color:0xfff4e0, transparent:true, opacity:0.5+Math.random()*0.4 }));
+      st.position.set((Math.random()-0.5)*70, 6+Math.random()*40, -10-Math.random()*120); add(st); }
+    // glowing trail of dots between consecutive islands (bright once the next era is reached)
+    for (let i=0;i<N-1;i++){ const a=nodePos(i), b=nodePos(i+1), litSeg=(i+1)<=reachedIdx;
+      for (let s=1;s<=5;s++){ const f=s/6; const dot=new THREE.Mesh(new THREE.SphereGeometry(litSeg?0.17:0.12,10,8),
+        litSeg ? glow(accOf(i),0.8) : new THREE.MeshStandardMaterial({ color:0x3a3a48, roughness:0.9 }));
+        dot.position.set(a.x+(b.x-a.x)*f, a.y+(b.y-a.y)*f+0.4, a.z+(b.z-a.z)*f); add(dot); }
     }
-    // era nodes
+    // era islands
     ERA_ORDER.forEach((key,i)=>{
-      const p=nodePos(i), lit=(i<=reachedIdx), grp=new THREE.Group();
-      grp.position.set(p.x,0,p.z);
-      grp.add(makePad(i,lit)); grp.add(landmark(i,lit));
-      if (!lit){ const lock=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.5,0.32), glow(0x88889a,0.25)); lock.position.y=PADH+1.0; grp.add(lock); }
-      sc.add(grp); items.push(grp);
-      if (i===curIdx){ // YOU-ARE-HERE marker
+      const p=nodePos(i), lit=(i<=reachedIdx), grp=island(i,lit);
+      grp.position.copy(p); add(grp); islands.push({ grp, base:p.clone(), i });
+      if (i===curIdx){
         const mk=new THREE.Group();
-        const pin=new THREE.Mesh(new THREE.ConeGeometry(0.34,0.7,4), glow(0xffe08a,0.85)); pin.rotation.x=Math.PI; pin.position.y=3.1; mk.add(pin);
-        const ball=new THREE.Mesh(new THREE.SphereGeometry(0.17,14,12), glow(0xfff0c0,0.95)); ball.position.y=3.6; mk.add(ball);
-        const beam=new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.05,3.0,16,1,true),
-          new THREE.MeshBasicMaterial({ color:0xffe08a, transparent:true, opacity:0.18, side:THREE.DoubleSide, depthWrite:false, blending:THREE.AdditiveBlending }));
-        beam.position.y=1.6; mk.add(beam);
+        const pin=new THREE.Mesh(new THREE.ConeGeometry(0.36,0.78,4), glow(0xffe08a,0.9)); pin.rotation.x=Math.PI; pin.position.y=3.4; mk.add(pin);
+        const ball=new THREE.Mesh(new THREE.SphereGeometry(0.18,14,12), glow(0xfff2cc,1.0)); ball.position.y=3.95; mk.add(ball);
+        const beam=new THREE.Mesh(new THREE.CylinderGeometry(0.62,0.06,3.4,18,1,true),
+          new THREE.MeshBasicMaterial({ color:0xffe08a, transparent:true, opacity:0.16, side:THREE.DoubleSide, depthWrite:false, blending:THREE.AdditiveBlending }));
+        beam.position.y=1.8; mk.add(beam);
         grp.add(mk); marker=mk;
       }
     });
-    target = nodePos(curIdx);
-    const e = ERAS[curIdx] || ERAS[0];
-    try { $('mapEraName').textContent = e.name; $('mapEraSub').textContent = 'LEVEL ' + Math.max(1,resumeLevel||1) + ' · ' + (curIdx+1) + '/' + ERA_ORDER.length + ' ERAS'; } catch(e2){}
+    // drifting glow motes for atmosphere
+    for (let m=0;m<26;m++){ const mo=new THREE.Mesh(new THREE.SphereGeometry(0.05,6,6), new THREE.MeshBasicMaterial({ color:0xffe6b0, transparent:true, opacity:0.5, depthWrite:false }));
+      mo.position.set((Math.random()-0.5)*26, Math.random()*26, -Math.random()*70); mo.__sp=0.4+Math.random()*0.8; add(mo); motes.push(mo); }
+    focus = curIdx; focusE = curIdx;
+    updateCard();
+  }
+  function updateCard(){
+    const i = Math.max(0, Math.min(N-1, Math.round(focusE))), e = ERAS[i] || ERAS[0];
+    const lit = i <= reachedIdx, lvl = eraEnterLevel ? eraEnterLevel(e.key) : (i*10+1);
+    try {
+      $('mapEraName').textContent = e.name;
+      $('mapEraSub').textContent  = (i+1)+' / '+N+' ERAS · ' + (lit ? ('LEVELS '+(i*10+1)+'–'+(i*10+10)) : 'LOCKED');
+      const go = $('mapGo'); if (go){
+        if (i === curIdx){ go.textContent = '▶ CONTINUE'; go.classList.remove('locked'); goLvl = Math.max(1,resumeLevel||1); }
+        else if (lit){ go.textContent = '▶ ENTER ' + e.name; go.classList.remove('locked'); goLvl = lvl; }
+        else { go.textContent = '🔒 REACH LEVEL ' + lvl; go.classList.add('locked'); goLvl = 0; }
+      }
+    } catch(e2){}
   }
   function resize(){
     if (!R) return;
@@ -6032,17 +6079,25 @@ const WorldMap = (function(){
   function loop(){
     if (!open) return;
     raf = (window.requestAnimationFrame||(()=>0))(loop);
-    const t=(performance.now()-t0)*0.001;
-    camA += 0.0015;
-    const A = camA + dragA, rad=16, hgt=12.5;
-    cam.position.set(target.x + Math.sin(A)*rad, hgt, target.z + Math.cos(A)*rad);
-    if (cam.lookAt) cam.lookAt(target.x, 1.3, target.z);
-    if (marker){ marker.position.y = Math.sin(t*2.2)*0.18; marker.rotation.y += 0.02; }
+    const now=performance.now(), t=(now-t0)*0.001, dt=Math.min(0.05,(now-lastT)*0.001||0.016); lastT=now;
+    // snap toward the nearest era when not dragging, then ease the framed position
+    if (dragY==null){ const tgt=Math.round(focus); focus += (tgt-focus)*Math.min(1,dt*7); }
+    const prev=Math.round(focusE); focusE += (focus-focusE)*Math.min(1,dt*6);
+    if (Math.round(focusE)!==prev) updateCard();
+    // camera trails the focused island at a cinematic 3/4 angle, drifting gently
+    const node=nodePos(focusE), drift=Math.sin(t*0.22)*1.4;
+    cam.position.set(node.x+3.6+drift, node.y+7.6, node.z+13.0);
+    if (cam.lookAt) cam.lookAt(node.x, node.y+1.3, node.z-2.6);
+    // life: islands bob, marker hovers + spins, motes rise
+    islands.forEach(o=>{ o.grp.position.y = o.base.y + Math.sin(t*0.7 + o.i*1.3)*0.16; o.grp.rotation.y = Math.sin(t*0.18 + o.i)*0.05; });
+    if (marker){ marker.position.y = Math.sin(t*2.1)*0.2; marker.rotation.y += dt*1.4; }
+    motes.forEach(mo=>{ mo.position.y += dt*mo.__sp; if (mo.position.y > 28) mo.position.y = -2; });
     try { R.render(sc,cam); } catch(e){}
   }
   return {
-    open(){ if (!ensure()) return; open=true; t0=performance.now(); camA=0.6; dragA=0; build(); resize(); loop(); },
+    open(){ if (!ensure()) return; open=true; t0=lastT=performance.now(); build(); resize(); loop(); },
     close(){ open=false; try{ (window.cancelAnimationFrame||function(){})(raf); }catch(e){} },
+    go(){ if (goLvl > 0){ this.close(); $('mapPanel').classList.add('hidden'); startGame(goLvl); } },
     resize
   };
 })();
@@ -6247,6 +6302,7 @@ btn('dailyPlayBtn',  playDaily);
 btn('dailyShare',    shareDaily);
 btn('dailyBack',     backHome);
 btn('mapBack',       backHome);
+btn('mapGo',         () => WorldMap.go());     // enter the focused era's level from the journey map
 btn('homeSettings',  showSettings);
 btn('homeHelp',      showHow);
 btn('howClose',      closeHow);
