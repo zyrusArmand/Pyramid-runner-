@@ -886,7 +886,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.263 · 2026.06.12</div>
+  <div id="appVersion">v1.264 · 2026.06.12</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1074,7 +1074,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.263';
+const APP_VERSION = '1.264';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1268,6 +1268,7 @@ const CHARACTERS = {
   frida:    { name:'FRIDA KAHLO',  cost:3333, swatch:'#b8344f', color:0xb8344f, skin:0xd9a066, style:'frida',    exclusive:true },
   american: { name:'FAT BOY MEMO', cost:3333, swatch:'#c0303a', color:0xf0c79a, skin:0xf0c79a, style:'american', exclusive:true },
   miah:     { name:'MIAH MAN',     cost:3333, swatch:'#22b0c2', color:0x1a1c22, skin:0xe0b486, style:'miah',     exclusive:true },
+  nzekro:   { name:'NZEKRO',       cost:3333, swatch:'#2a2a30', color:0x1a1a1f, skin:0x8a5a3a, style:'nzekro',   exclusive:true },
 };
 CHAR_SPEC.forEach(s => {
   const [era,tier,key,name,color,skin,head,glow,reuse] = s;
@@ -1753,6 +1754,39 @@ function makeRunner(){
       const fin = new THREE.Mesh(new THREE.ConeGeometry(0.024, 0.05, 12), redMat); fin.scale.set(0.28, 1, 1); fin.position.set(s*0.03, -0.235, -0.045); fin.rotation.x = -2.15; fin.castShadow = true; surf.add(fin);
     });
     surf.position.set(-0.02, 0.42, -0.155); surf.rotation.set(0.05, 0, 0.32); g.add(surf);
+  } else if (style === 'nzekro'){
+    // 🎨 NZEKRO (THE HOBBYIST) — all-black tee + trousers, a camera on a neck strap, a kettlebell in one hand, a paintbrush in the other
+    const black = new THREE.MeshStandardMaterial({ color:0x16161a, roughness:0.6, metalness:0.05 });
+    const metal = new THREE.MeshStandardMaterial({ color:0x2c2f36, roughness:0.35, metalness:0.7 });
+    const wood  = new THREE.MeshStandardMaterial({ color:0x9a6a32, roughness:0.6 });
+    // tidy crew-neck collar + short cropped hair so he reads as a casual creative
+    const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.066, 0.084, 0.03, 16), black); collar.position.y = 0.47; g.add(collar);
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.103, 20, 14, 0, 6.28, 0, 1.5), new THREE.MeshStandardMaterial({ color:0x1b1410, roughness:0.85 }));
+    hair.scale.set(1, 0.9, 1); hair.position.y = 0.605; hair.castShadow = true; g.add(hair);
+    // 📷 CAMERA ON A NECK STRAP — a black strap looping the neck down to a camera body resting on his chest
+    [-1,1].forEach(s => { const strap = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.2, 0.012), new THREE.MeshStandardMaterial({ color:0x0c0c0e, roughness:0.7 }));
+      strap.position.set(s*0.05, 0.42, 0.058); strap.rotation.z = -s*0.28; g.add(strap); });
+    const cam = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.058, 0.04), new THREE.MeshStandardMaterial({ color:0x202227, roughness:0.4, metalness:0.3 })); body.castShadow = true; cam.add(body);
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.058, 0.044), new THREE.MeshStandardMaterial({ color:0x141519, roughness:0.6 })); grip.position.set(0.046, 0, 0); cam.add(grip);
+    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.026, 0.03, 18), metal); lens.rotation.x = Math.PI/2; lens.position.set(-0.005, 0, 0.032); cam.add(lens);
+    const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.006, 18), new THREE.MeshStandardMaterial({ color:0x10243a, metalness:0.6, roughness:0.1 })); glass.rotation.x = Math.PI/2; glass.position.set(-0.005, 0, 0.048); cam.add(glass);
+    const vf = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.016, 0.022), new THREE.MeshStandardMaterial({ color:0x141519, roughness:0.6 })); vf.position.set(-0.02, 0.035, 0); cam.add(vf);
+    const shutter = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.008, 10), new THREE.MeshStandardMaterial({ color:0xb33030, roughness:0.4 })); shutter.position.set(0.046, 0.033, 0); cam.add(shutter);
+    cam.position.set(0, 0.32, 0.108); cam.rotation.x = 0.12; g.add(cam);
+    // 🏋️ KETTLEBELL hanging from the LEFT hand — cast-iron bell + a squared handle
+    const kb = new THREE.Group();
+    const bell = new THREE.Mesh(new THREE.SphereGeometry(0.05, 18, 14), metal); bell.scale.set(1, 0.92, 1); bell.castShadow = true; kb.add(bell);
+    const flat = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.012, 16), metal); flat.position.y = -0.045; kb.add(flat);
+    [-1,1].forEach(s => { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.05, 10), metal); post.position.set(s*0.026, 0.05, 0); post.rotation.z = -s*0.22; kb.add(post); });
+    const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.05, 10), metal); bar.rotation.z = Math.PI/2; bar.position.y = 0.072; kb.add(bar);
+    kb.position.set(0, -0.18, 0.01); g.armL.elbow.add(kb);
+    // 🖌️ PAINTBRUSH in the RIGHT hand — wooden handle, metal ferrule, loaded bristle tip
+    const pb = new THREE.Group();
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.009, 0.14, 12), wood); handle.position.y = -0.02; pb.add(handle);
+    const ferrule = new THREE.Mesh(new THREE.CylinderGeometry(0.0085, 0.0085, 0.022, 12), metal); ferrule.position.y = -0.092; pb.add(ferrule);
+    const bristle = new THREE.Mesh(new THREE.ConeGeometry(0.009, 0.03, 10), new THREE.MeshStandardMaterial({ color:0xc24a3a, roughness:0.6 })); bristle.position.y = -0.116; bristle.rotation.x = Math.PI; pb.add(bristle);
+    pb.position.set(0, -0.08, 0.01); pb.rotation.x = 0.2; g.armR.elbow.add(pb);
   } else {
     // explorer (and the colour variants): a rounded pack + a soft sun hat
     const pack = new THREE.Mesh(new THREE.SphereGeometry(0.085, 18, 14),
@@ -4636,7 +4670,7 @@ function slowmo(){ S.timeScale = 0.32; }      // brief bullet-time, eased back t
 
 // ---- EMOTES: tap the 🎭 button to stop, turn to the camera, and do a little character routine ----
 function emoteDur(){ const s = character().style;
-  return s==='miah' ? 3.4 : s==='ant' ? 3.0 : s==='american' ? 3.2 : s==='frida' ? 2.6 : 2.0; }
+  return s==='nzekro' ? 4.6 : s==='miah' ? 3.4 : s==='ant' ? 3.0 : s==='american' ? 3.2 : s==='frida' ? 2.6 : 2.0; }
 function startEmote(){
   const r = S.run, g = S.runner;
   if (!r || !g || r.emote || r.falling || r.dead || r.celebrating || r.awaitStart || r.startDelay > 0) return;
@@ -4646,6 +4680,7 @@ function startEmote(){
   try {
     if (style === 'miah'){ r.emoteProps = makeEmoteGuitar(); g.add(r.emoteProps); }
     else if (style === 'ant'){ r.emoteProps = makeEmoteSpray(); g.add(r.emoteProps); }
+    else if (style === 'nzekro'){ r.emoteProps = makeEmoteCanvas(); g.add(r.emoteProps); }
   } catch(e){}
   try { (style==='miah' || style==='frida') ? (Sound.cap && Sound.cap()) : (Sound.step && Sound.step()); } catch(e){}
 }
@@ -4681,6 +4716,35 @@ function makeEmoteGuitar(){
   gtr.position.set(0.02, 0.4, 0.15); gtr.rotation.set(0.1, 0, 0.5);
   return gtr;
 }
+// a pop-up easel + canvas for NZekro's painting emote — painted face starts toward him, then spins to the viewer
+function makeEmoteCanvas(){
+  const grp = new THREE.Group();
+  const legM = new THREE.MeshStandardMaterial({ color:0x5a3d22, roughness:0.75 });
+  // tripod easel: two splayed front legs + a rear support leg
+  const mkLeg = (x, z, tiltX, tiltZ) => { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.5, 10), legM);
+    leg.position.set(x, 0.1, z); leg.rotation.set(tiltX, 0, tiltZ); leg.castShadow = true; grp.add(leg); };
+  mkLeg(-0.07, 0.03, 0,  0.16);
+  mkLeg( 0.07, 0.03, 0, -0.16);
+  mkLeg( 0,   -0.08, -0.3, 0);
+  const tray = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.012, 0.022), legM); tray.position.set(0, 0.18, 0.03); grp.add(tray);
+  // the canvas board — its painted face points at NZekro (-z) while he works, then rotates to face the camera
+  const board = new THREE.Group();
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(0.21, 0.23, 0.014), new THREE.MeshStandardMaterial({ color:0x7a5530, roughness:0.6 })); frame.castShadow = true; board.add(frame);
+  const face = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.2, 0.008), new THREE.MeshStandardMaterial({ color:0xf2ead8, roughness:0.9 })); face.position.z = -0.009; board.add(face);
+  // the painting: a golden pyramid + a sun, on the face that points toward NZekro (-z)
+  const paint = new THREE.Group();
+  const goldM = new THREE.MeshStandardMaterial({ color:0xe2b24a, emissive:0x3a2600, emissiveIntensity:0.25, roughness:0.5 });
+  const rows = 4;
+  for (let row = 0; row < rows; row++){ const count = row + 1;
+    for (let c = 0; c < count; c++){ const blk = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.026, 0.004), goldM);
+      blk.position.set((c - (count-1)/2) * 0.032, -0.058 + (rows-1-row) * 0.027, 0); blk.visible = false; paint.add(blk); } }
+  const sun = new THREE.Mesh(new THREE.CircleGeometry(0.024, 16), new THREE.MeshBasicMaterial({ color:0xffd86a })); sun.position.set(-0.052, 0.064, 0.001); sun.visible = false; paint.add(sun);
+  paint.position.z = -0.014; board.add(paint);
+  board.position.set(0, 0.32, 0.03); grp.add(board);
+  grp.__board = board; grp.__paint = paint;
+  grp.position.set(0, 0.0, 0.34);     // stands in front of him, between NZekro and the camera
+  return grp;
+}
 // per-character emote animation
 function playEmote(g, r, t, dt){
   const style = character().style || '';
@@ -4704,6 +4768,30 @@ function playEmote(g, r, t, dt){
     if (g.armR){ g.armR.rotation.z = 0.9; g.armR.rotation.x = -0.9; } bend(g.armR, -1.4 + Math.max(0, Math.sin(t*7))*0.5);   // forearm folds up to the mouth
     if (g.armL){ g.armL.rotation.x = -0.15; } bend(g.armL, -0.5);
     g.position.y += Math.abs(Math.sin(t*7)) * 0.005;
+  } else if (style === 'nzekro'){
+    // 🎨 the easel pops out, he paints the pyramid he just built, then spins the canvas to the viewer
+    const P = r.emoteProps;
+    if (P){ const pop = Math.min(1, t*4); P.scale.set(pop, pop, pop); }
+    if (t < 2.7){
+      // PAINTING — dab the brush across the canvas while the pyramid fills in block by block
+      if (g.armR){ g.armR.rotation.x = -1.0; g.armR.rotation.z = 0.18 + Math.sin(t*14)*0.16; } bend(g.armR, -1.0 + Math.sin(t*14)*0.28);
+      if (g.armL){ g.armL.rotation.x = -0.18; g.armL.rotation.z = 0.15; } bend(g.armL, -0.45);
+      g.position.y += Math.sin(t*14) * 0.0025;
+      if (P && P.__paint){ const prog = Math.max(0, (t-0.5)/1.9), kids = P.__paint.children;
+        for (let i=0;i<kids.length;i++) kids[i].visible = (i/kids.length) <= prog; }
+    } else if (t < 3.6){
+      // step back and SPIN the canvas around to show the finished piece
+      if (g.armR){ g.armR.rotation.x = -0.6; g.armR.rotation.z = 0.45; } bend(g.armR, -0.5);
+      if (g.armL){ g.armL.rotation.x = -0.4; g.armL.rotation.z = -0.45; } bend(g.armL, -0.5);
+      if (P && P.__paint) P.__paint.children.forEach(k => k.visible = true);
+      if (P && P.__board) P.__board.rotation.y = Math.min(1, (t-2.7)/0.9) * Math.PI;
+    } else {
+      // TA-DA — present the painting, both arms out, facing the viewer
+      if (g.armR){ g.armR.rotation.x = -1.1; g.armR.rotation.z = 0.7; } bend(g.armR, -0.3);
+      if (g.armL){ g.armL.rotation.x = -1.1; g.armL.rotation.z = -0.7; } bend(g.armL, -0.3);
+      if (P && P.__board) P.__board.rotation.y = Math.PI;
+      g.position.y += Math.abs(Math.sin(t*3)) * 0.004;
+    }
   } else if (style === 'frida'){
     // a graceful pose — raise the cup like a toast, other arm out, gentle sway
     if (g.armR){ g.armR.rotation.x = -1.5; g.armR.rotation.z = -0.1; } bend(g.armR, -1.1);   // cup raised by the bent forearm
