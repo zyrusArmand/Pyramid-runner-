@@ -878,7 +878,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.247 · 2026.06.11</div>
+  <div id="appVersion">v1.248 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1066,7 +1066,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.247';
+const APP_VERSION = '1.248';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1612,28 +1612,29 @@ function makeRunner(){
         const lo = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.006, 0.14, 7), chit(c2)); lo.position.set(s*0.215, 0.18, zz); lo.rotation.set(0.5, 0, s*0.35); g.add(lo);
       });
     });
-    // 🔫 backpack POWER WASHER strapped to his back: tank body + motor + handle, a coiled hose, and a spray wand
-    const pwBody = new THREE.MeshStandardMaterial({ color:0xff7a1e, metalness:0.3, roughness:0.5 });
-    const pwDark = new THREE.MeshStandardMaterial({ color:0x222428, metalness:0.5, roughness:0.4 });
-    const pwSteel = new THREE.MeshStandardMaterial({ color:0xcfd6dc, metalness:0.85, roughness:0.25 });
-    const tank = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.2, 0.1), pwBody); tank.position.set(0, 0.41, -0.18); tank.castShadow = true; g.add(tank);
-    const motor = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.12, 14), pwDark); motor.rotation.z = Math.PI/2; motor.position.set(0, 0.5, -0.18); motor.castShadow = true; g.add(motor);
-    const cap1 = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.03, 10), pwSteel); cap1.position.set(0, 0.52, -0.13); g.add(cap1);
-    [-1,1].forEach(s => { const strap = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.26, 0.014), pwDark); strap.position.set(s*0.07, 0.42, -0.06); strap.rotation.x = 0.12; g.add(strap); });   // shoulder straps
-    // coiled hose (stacked open rings) running up to the wand
-    [0.0, 0.05, 0.1].forEach((d, i) => { const coil = new THREE.Mesh(new THREE.CylinderGeometry(0.058-i*0.006, 0.058-i*0.006, 0.012, 14, 1, true), pwDark);
-      coil.position.set(0.09, 0.34+d, -0.16); coil.rotation.z = 0.4; g.add(coil); });
-    // spray wand/lance held in the right hand
-    const wand = new THREE.Group();
-    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.07, 0.03), pwDark); grip.position.y = 0; wand.add(grip);
-    const lance = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.2, 10), pwSteel); lance.position.set(0, 0.04, 0.1); lance.rotation.x = Math.PI/2; wand.add(lance);
-    const nozzle = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.04, 10), pwSteel); nozzle.position.set(0, 0.04, 0.21); nozzle.rotation.x = Math.PI/2; wand.add(nozzle);
-    wand.position.set(0, -0.2, 0.04); wand.rotation.x = -0.3; g.armR.add(wand);
+    // 🧼 SURFACE CLEANER slung on his back (Westinghouse-style): a flat round spinning housing with casters + a long lance
+    const steelM = new THREE.MeshStandardMaterial({ color:0xd0d6dc, metalness:0.85, roughness:0.25 });
+    const blueM  = new THREE.MeshStandardMaterial({ color:0x2f6fd0, metalness:0.35, roughness:0.42 });
+    const darkM  = new THREE.MeshStandardMaterial({ color:0x23262b, metalness:0.5, roughness:0.4 });
+    // the flat disc housing, stood vertical against his back
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.125, 0.125, 0.028, 30), steelM); disc.rotation.x = Math.PI/2; disc.position.set(0, 0.36, -0.175); disc.castShadow = true; g.add(disc);
+    const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.132, 0.132, 0.05, 30, 1, true), darkM); skirt.rotation.x = Math.PI/2; skirt.position.set(0, 0.36, -0.158); g.add(skirt);
+    const topPlate = new THREE.Mesh(new THREE.CylinderGeometry(0.094, 0.094, 0.02, 30), blueM); topPlate.rotation.x = Math.PI/2; topPlate.position.set(0, 0.36, -0.19); g.add(topPlate);
+    const logo = new THREE.Mesh(new THREE.ConeGeometry(0.026, 0.012, 3), new THREE.MeshStandardMaterial({ color:0xeef4f8 })); logo.rotation.x = -Math.PI/2; logo.rotation.z = -Math.PI/2; logo.position.set(0, 0.36, -0.202); g.add(logo);   // the play-triangle badge
+    // four caster wheels around the rim
+    [0,1,2,3].forEach(i => { const a = i*Math.PI/2 + 0.5, x = Math.cos(a)*0.118, y = 0.36 + Math.sin(a)*0.118;
+      const cw = new THREE.Mesh(new THREE.SphereGeometry(0.015, 8, 8), darkM); cw.position.set(x, y, -0.145); cw.castShadow = true; g.add(cw); });
+    // long steel lance angling up over his shoulder + grip
+    const lance = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.5, 12), steelM); lance.position.set(0.05, 0.53, -0.12); lance.rotation.set(-0.55, 0, -0.26); lance.castShadow = true; g.add(lance);
+    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.09, 10), darkM); grip.position.set(0.115, 0.71, -0.04); grip.rotation.set(-0.55, 0, -0.26); g.add(grip);
+    // a strap across the chest holding it on
+    const strap = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.32, 0.014), darkM); strap.position.set(-0.04, 0.4, 0.02); strap.rotation.z = 0.32; g.add(strap);
   } else if (style === 'frida'){
     // 🌺 FRIDA KAHLO — skinny; dark braided updo with a flower crown, the signature unibrow, gold earrings, a vivid embroidered dress
     const hairMat = new THREE.MeshStandardMaterial({ color:0x1a1108, roughness:0.72 });
-    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.106, 20, 16, 0, 6.28, 0, 1.75), hairMat); hair.scale.set(1.05, 1, 1.05); hair.position.set(0, 0.6, -0.004); hair.castShadow = true; g.add(hair);
-    const bun = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 12), hairMat); bun.position.set(0, 0.71, -0.03); g.add(bun);
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.108, 22, 18, 0, 6.28, 0, 1.9), hairMat); hair.scale.set(1.06, 1.02, 1.08); hair.position.set(0, 0.598, -0.006); hair.castShadow = true; g.add(hair);
+    const bun = new THREE.Mesh(new THREE.SphereGeometry(0.052, 16, 12), hairMat); bun.position.set(0, 0.71, -0.035); g.add(bun);
+    [-1,1].forEach(s => { const lock = new THREE.Mesh(new THREE.SphereGeometry(0.032, 14, 12), hairMat); lock.scale.set(0.62, 1.35, 0.7); lock.position.set(s*0.088, 0.55, 0.018); lock.castShadow = true; g.add(lock); });   // soft locks framing the face → fuller, more natural
     // flower crown
     [[0,0.73,0.05,0xff2d6f],[-0.07,0.7,0.02,0xff8a3d],[0.07,0.7,0.02,0xffd24a],[0,0.77,-0.04,0xff5fa2]].forEach(([x,y,z,c]) => {
       const fl = new THREE.Mesh(new THREE.SphereGeometry(0.02, 10, 8), new THREE.MeshStandardMaterial({ color:c, emissive:0x200008, roughness:0.6 })); fl.position.set(x,y,z); g.add(fl);
@@ -1658,10 +1659,12 @@ function makeRunner(){
     const straw = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.09, 8), new THREE.MeshStandardMaterial({ color:0xff3d8a, roughness:0.4 })); straw.position.set(0.012, 0.09, 0); straw.rotation.z = 0.18; cup.add(straw);
     cup.position.set(0, -0.205, 0.03); g.armR.add(cup);
   } else if (style === 'american'){
-    // 🇺🇸 BIG AL — big belly bursting out of a too-small tee (belly button on show), blonde hair, US-flag cap, burger in hand
-    const skinB = new THREE.MeshStandardMaterial({ color:0xf0c79a, roughness:0.6, emissive:0x1a0e04 });
-    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.135, 22, 18), skinB); belly.scale.set(1.04, 0.95, 1.12); belly.position.set(0, 0.3, 0.06); belly.castShadow = true; g.add(belly);
-    const navel = new THREE.Mesh(new THREE.SphereGeometry(0.013, 8, 8), new THREE.MeshStandardMaterial({ color:0xb88a5a, roughness:0.85 })); navel.position.set(0, 0.285, 0.2); g.add(navel);
+    // 🇺🇸 FAT BOY MEMO — big belly bursting out of a too-small tee (belly button on show), blonde hair, US-flag cap, burger in hand
+    const skinB = new THREE.MeshStandardMaterial({ color:0xf0c79a, roughness:0.68 });
+    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.145, 24, 20), skinB); belly.scale.set(1.12, 1.02, 1.16); belly.position.set(0, 0.29, 0.055); belly.castShadow = true; g.add(belly);   // rounder, fuller gut
+    [-1,1].forEach(s => { const love = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 14), skinB);  // soft love-handles so the belly meets the body smoothly
+      love.scale.set(1, 1.1, 1); love.position.set(s*0.13, 0.31, 0.0); love.castShadow = true; g.add(love); });
+    const navel = new THREE.Mesh(new THREE.SphereGeometry(0.014, 10, 8), new THREE.MeshStandardMaterial({ color:0xb88a5a, roughness:0.85 })); navel.position.set(0, 0.275, 0.205); g.add(navel);
     // too-small shirt riding up over the gut
     const shirtMat = new THREE.MeshStandardMaterial({ color:0xdedede, roughness:0.78 });
     const shirt = new THREE.Mesh(new THREE.SphereGeometry(0.14, 20, 16), shirtMat); shirt.scale.set(0.96, 0.78, 0.82); shirt.position.set(0, 0.44, 0.015); shirt.castShadow = true; g.add(shirt);
