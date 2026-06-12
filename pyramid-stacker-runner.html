@@ -933,7 +933,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.278 · 2026.06.12</div>
+  <div id="appVersion">v1.279 · 2026.06.12</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1121,7 +1121,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.278';
+const APP_VERSION = '1.279';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -5181,12 +5181,12 @@ function playEmote(g, r, t, dt){
                g.legR.rotation.set(0, 0, -0.05); if (g.legR.elbow) g.legR.elbow.rotation.x = 0.06; }
   if (style === 'miah'){
     // left hand frets the neck up-left (elbow folded)
-    if (g.armL){ g.armL.rotation.x = -0.8; g.armL.rotation.z = -0.55; } bend(g.armL, -1.6);
-    // STRUM: the right hand SWEEPS diagonally across the strings (shoulder up/down + across), the forearm follows,
-    // and the WRIST flicks — so the hand travels and rotates like a real strum, not a hand bobbing in place
+    if (g.armL){ g.armL.rotation.x = -0.75; g.armL.rotation.z = -0.7; } bend(g.armL, -1.7);
+    // STRUM: the right arm reaches IN across the body so the hand sits over the sound hole (NEGATIVE z = inward, like
+    // the run gait's tucked right elbow), then sweeps diagonally with a WRIST flick — a real strum, not a knock to the side
     const sw = Math.sin(t*7);
-    if (g.armR){ g.armR.rotation.x = -1.08 + sw*0.2; g.armR.rotation.z = 0.6 + sw*0.26; } bend(g.armR, -1.3 + sw*0.32);
-    if (g.armR && g.armR.wrist) g.armR.wrist.rotation.z = sw*0.7;
+    if (g.armR){ g.armR.rotation.x = -0.92 + sw*0.12; g.armR.rotation.z = -0.5 + sw*0.18; } bend(g.armR, -1.45 + sw*0.32);
+    if (g.armR && g.armR.wrist) g.armR.wrist.rotation.z = sw*0.6;
     if (r.emoteProps){ const e = Math.min(1, t*5); r.emoteProps.scale.set(e, e, e); }   // guitar pops in cleanly
   } else if (style === 'ant'){
     // grip the power-washer wand with the front legs and SPRAY (recoil + pulsing jet)
