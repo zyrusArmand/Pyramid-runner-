@@ -878,7 +878,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.249 · 2026.06.11</div>
+  <div id="appVersion">v1.250 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1066,7 +1066,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.249';
+const APP_VERSION = '1.250';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1658,26 +1658,28 @@ function makeRunner(){
   } else if (style === 'american'){
     // 🇺🇸 FAT BOY MEMO — big belly bursting out of a too-small tee (belly button on show), blonde hair, US-flag cap, burger in hand
     const skinB = new THREE.MeshStandardMaterial({ color:0xf0c79a, roughness:0.68 });
-    // a big ROUND fat midsection (wide all around — not a forward pregnancy bump)
-    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.16, 24, 20), skinB); belly.scale.set(1.22, 1.16, 1.18); belly.position.set(0, 0.31, 0.03); belly.castShadow = true; g.add(belly);
-    const navel = new THREE.Mesh(new THREE.SphereGeometry(0.014, 10, 8), new THREE.MeshStandardMaterial({ color:0xb88a5a, roughness:0.85 })); navel.position.set(0, 0.275, 0.225); g.add(navel);
-    g.armL.position.set(-0.21, 0.47, 0); g.armR.position.set(0.21, 0.47, 0);   // arms held out wide of the gut (no weird side bulges)
+    // a CURVED paunch (taller egg that hangs forward) — smaller than before, not a round bubble
+    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.122, 24, 20), skinB); belly.scale.set(1.04, 1.26, 1.14); belly.position.set(0, 0.3, 0.05); belly.castShadow = true; g.add(belly);
+    const navel = new THREE.Mesh(new THREE.SphereGeometry(0.013, 10, 8), new THREE.MeshStandardMaterial({ color:0x9a6e44, roughness:0.9 })); navel.scale.set(1, 1, 0.45); navel.position.set(0, 0.275, 0.178); g.add(navel);   // recessed innie, not poking out
+    g.armL.position.set(-0.175, 0.47, 0); g.armR.position.set(0.175, 0.47, 0);   // arms held clear of the gut
     // ---- CAMO kit ----
     const camo  = new THREE.MeshStandardMaterial({ color:0x5e6a3a, roughness:0.86 });   // olive base
     const camoP = [0x3c4626, 0x726a46, 0x4a4030];
     const blotch = (x,y,z,r,ci) => { const b = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), new THREE.MeshStandardMaterial({ color:camoP[ci], roughness:0.86 })); b.scale.set(1.3, 1, 0.35); b.position.set(x, y, z); g.add(b); };
-    // too-small CAMO tee riding up over the gut (belly bulges out below)
-    const shirt = new THREE.Mesh(new THREE.SphereGeometry(0.165, 22, 18), camo); shirt.scale.set(1.06, 0.8, 0.94); shirt.position.set(0, 0.46, 0.0); shirt.castShadow = true; g.add(shirt);
-    const hemUp = new THREE.Mesh(new THREE.CylinderGeometry(0.152, 0.16, 0.05, 22, 1, true), camo); hemUp.position.y = 0.4; g.add(hemUp);
-    blotch(-0.06,0.5,0.135,0.03,0); blotch(0.07,0.45,0.135,0.026,1); blotch(0.0,0.55,0.115,0.022,2); blotch(-0.1,0.44,0.1,0.02,1);   // camo patches on the shirt
-    // blonde hair
-    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.103, 20, 14, 0, 6.28, 0, 1.5), new THREE.MeshStandardMaterial({ color:0xe8c24a, roughness:0.7 })); hair.position.set(0, 0.6, -0.004); g.add(hair);
-    // CAMO baseball cap
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.112, 20, 14, 0, 6.28, 0, 1.28), camo); cap.position.set(0, 0.615, 0); cap.castShadow = true; g.add(cap);
-    blotch(-0.04,0.66,0.088,0.02,0); blotch(0.05,0.635,0.082,0.018,1); blotch(0.0,0.69,0.05,0.016,2);   // camo patches on the cap
-    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.014, 16, 1, false, 0, Math.PI), camo); brim.rotation.x = -0.12; brim.scale.set(1, 1, 1.35); brim.position.set(0, 0.6, 0.075); g.add(brim);
-    // olive cargo shorts
-    const shorts = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.125, 0.13, 18), new THREE.MeshStandardMaterial({ color:0x4a4a30, roughness:0.86 })); shorts.position.y = 0.235; shorts.castShadow = true; g.add(shorts);
+    // too-small CAMO tee — gut hangs out below it
+    const shirt = new THREE.Mesh(new THREE.SphereGeometry(0.152, 22, 18), camo); shirt.scale.set(1.03, 0.82, 0.92); shirt.position.set(0, 0.47, 0.0); shirt.castShadow = true; g.add(shirt);
+    const hemUp = new THREE.Mesh(new THREE.CylinderGeometry(0.142, 0.15, 0.05, 22, 1, true), camo); hemUp.position.y = 0.41; g.add(hemUp);
+    blotch(-0.055,0.5,0.13,0.028,0); blotch(0.065,0.46,0.13,0.024,1); blotch(0.0,0.55,0.11,0.02,2);   // camo patches on the shirt
+    // CAMO cap (no hair — bare head under the cap)
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.112, 20, 14, 0, 6.28, 0, 1.32), camo); cap.position.set(0, 0.61, 0); cap.castShadow = true; g.add(cap);
+    blotch(-0.04,0.655,0.088,0.02,0); blotch(0.05,0.63,0.082,0.018,1); blotch(0.0,0.685,0.05,0.016,2);   // camo patches on the cap
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.014, 16, 1, false, 0, Math.PI), camo); brim.rotation.x = -0.12; brim.scale.set(1, 1, 1.35); brim.position.set(0, 0.595, 0.075); g.add(brim);
+    // CAMO cargo pants — full legs, clearly visible
+    const waistP = new THREE.Mesh(new THREE.CylinderGeometry(0.112, 0.106, 0.1, 18), camo); waistP.position.y = 0.26; waistP.castShadow = true; g.add(waistP);
+    [g.legL, g.legR].forEach(l => {
+      const pant = new THREE.Mesh(new THREE.CylinderGeometry(0.053, 0.047, 0.21, 12), camo); pant.position.y = -0.095; pant.castShadow = true; l.add(pant);
+      [[0.0,-0.03,0.046,0],[0.022,-0.09,0.044,2]].forEach(([x,y,z,ci]) => { const pp = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 6), new THREE.MeshStandardMaterial({ color:camoP[ci], roughness:0.86 })); pp.scale.set(1.1, 1.3, 0.3); pp.position.set(x, y, z); pant.add(pp); });
+    });
     // a giant burger in his right hand
     const burger = new THREE.Group();
     const bunT = new THREE.Mesh(new THREE.SphereGeometry(0.046, 14, 10, 0, 6.28, 0, 1.4), new THREE.MeshStandardMaterial({ color:0xe0a44e, roughness:0.7 })); bunT.scale.set(1, 0.62, 1); bunT.position.y = 0.028; burger.add(bunT);
