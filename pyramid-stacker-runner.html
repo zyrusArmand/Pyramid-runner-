@@ -932,7 +932,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.268 · 2026.06.12</div>
+  <div id="appVersion">v1.269 · 2026.06.12</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1120,7 +1120,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.268';
+const APP_VERSION = '1.269';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4316,9 +4316,9 @@ const PATK = {                                            // player moves: { kin
   throw:  { kind:'throw', arm:'R', dur:0.52, hit:0.45, dmg:20 },
 };
 const PROP_COOLDOWN = 3.4;                                 // seconds before the thrown prop reforms in hand
-const ARENA_R = 0.34, PLAYER_SPD = 0.42, BOSS_SPD = 0.27;  // movement on the flat summit
+const ARENA_R = 0.34, PLAYER_SPD = 0.5, BOSS_SPD = 0.3;    // movement on the flat summit
 const BOSS_RANGE = 0.15, MELEE_P = 0.19, MELEE_B = 0.19;   // contact distances — strikes only land when fighters actually touch
-const CAM_OFF = new THREE.Vector3(0.30, 0.40, 0.30);       // raised corner follow-cam offset
+const CAM_DIST = 0.46, CAM_HEIGHT = 0.27, CAM_LOOK_H = 0.06, CAM_LOOK_AHEAD = 0.10;   // third-person chase cam that trails behind the character
 
 // a small throwable that matches the character (exclusives keep their prop; everyone else hurls pyramid rubble)
 function makeThrowProp(style){
@@ -4351,13 +4351,14 @@ function startFight(){
     pPos: new THREE.Vector3(apex.x - 0.13, apex.y, apex.z),              // free-moving positions on the summit
     bPos: new THREE.Vector3(apex.x + 0.15, apex.y, apex.z),
     pFacing:0, bFacing:0, pStride:0, bStride:0,
+    vel: new THREE.Vector3(0, 0, 0), camYaw:0,                            // smooth movement + trailing camera yaw
     joy:{ active:false, id:null, vx:0, vz:0 }, punchSide:'R',
     playerMax:100, playerHP:100, bossMax:hp, bossHP:hp,
     pAnim:null, bAnim:null, bossCD:1.7, pFlinch:0, bFlinch:0,
     handProp:null, propThrown:false, propCD:0, proj:null,
   };
   f.pFacing = Math.atan2(f.bPos.x - f.pPos.x, f.bPos.z - f.pPos.z);      // start facing each other
-  f.bFacing = f.pFacing + Math.PI;
+  f.bFacing = f.pFacing + Math.PI; f.camYaw = f.pFacing;
   S.fight = f;
   try { f.handProp = makeThrowProp(character().style); if (f.handProp && g.armR && g.armR.elbow) g.armR.elbow.add(f.handProp); } catch(e){}
   $('fpName').textContent = 'YOU';
@@ -4399,7 +4400,6 @@ function pThrow(){ const f = S.fight; if (!f || !f.active || f.over || f.pAnim |
 // ---- arena helpers ----
 function clampArena(p, apex){ const dx = p.x-apex.x, dz = p.z-apex.z, d = Math.hypot(dx, dz);
   if (d > ARENA_R){ p.x = apex.x + dx/d*ARENA_R; p.z = apex.z + dz/d*ARENA_R; } }
-function cameraGroundForward(){ const dx = -CAM_OFF.x, dz = -CAM_OFF.z, l = Math.hypot(dx, dz)||1; return { x:dx/l, z:dz/l }; }
 function approachAngle(cur, target, t){ let d = target - cur; while (d > Math.PI) d -= 2*Math.PI; while (d < -Math.PI) d += 2*Math.PI; return cur + d*Math.min(1, t); }
 
 // ---- poses & attack motion (shared by player and boss rigs) ----
@@ -4554,21 +4554,25 @@ function updateFight(dt){
   if (f.pFlinch > 0) f.pFlinch -= dt;
   if (f.bFlinch > 0) f.bFlinch -= dt;
 
-  // ---- player movement from the joystick (locked while striking / flinching) ----
-  let moveSpd = 0;
+  // ---- camera-relative movement with smooth accel/decel (Stumble-Guys feel) ----
+  // basis is taken from the TRAILING camera yaw so "push up" always means "into the screen"
+  const F = { x:Math.sin(f.camYaw), z:Math.cos(f.camYaw) };       // ground-forward (into screen)
+  const Rt = { x:-F.z, z:F.x };                                   // screen-right
+  let tvx = 0, tvz = 0;
   if (!f.pAnim && f.pFlinch <= 0 && f.joy && f.joy.active && (f.joy.vx || f.joy.vz)){
-    const fwd = cameraGroundForward(), rgt = { x:fwd.z, z:-fwd.x };
-    let mx = rgt.x*f.joy.vx + fwd.x*(-f.joy.vz), mz = rgt.z*f.joy.vx + fwd.z*(-f.joy.vz);
+    let mx = Rt.x*f.joy.vx + F.x*(-f.joy.vz), mz = Rt.z*f.joy.vx + F.z*(-f.joy.vz);
     const ml = Math.hypot(mx, mz);
-    if (ml > 0.001){ mx /= ml; mz /= ml;
-      moveSpd = Math.min(1, Math.hypot(f.joy.vx, f.joy.vz)) * PLAYER_SPD;
-      f.pPos.x += mx*moveSpd*dt; f.pPos.z += mz*moveSpd*dt;
-      f.pFacing = Math.atan2(mx, mz);
-    }
+    if (ml > 0.001){ const mag = Math.min(1, Math.hypot(f.joy.vx, f.joy.vz)); tvx = mx/ml*mag*PLAYER_SPD; tvz = mz/ml*mag*PLAYER_SPD; }
   }
+  const acc = Math.min(1, dt*9);                                  // ramp the velocity (snappy but not instant)
+  f.vel.x += (tvx - f.vel.x)*acc; f.vel.z += (tvz - f.vel.z)*acc;
+  f.pPos.x += f.vel.x*dt; f.pPos.z += f.vel.z*dt;
+  let moveSpd = Math.hypot(f.vel.x, f.vel.z);
   clampArena(f.pPos, apex);
+  if (moveSpd > 0.04) f.pFacing = approachAngle(f.pFacing, Math.atan2(f.vel.x, f.vel.z), dt*12);   // turn to face travel
   const faceBoss = Math.atan2(f.bPos.x - f.pPos.x, f.bPos.z - f.pPos.z);
-  if (f.pAnim || moveSpd < 0.001) f.pFacing = approachAngle(f.pFacing, faceBoss, dt*10);   // square up to the boss when not running
+  if (f.pAnim || moveSpd < 0.04) f.pFacing = approachAngle(f.pFacing, faceBoss, dt*8);   // square up to the boss when not running
+  f.camYaw = approachAngle(f.camYaw, f.pFacing, dt*4);                                    // camera eases in behind the character
 
   // ---- boss AI: stalk toward the player, stop in range and strike ----
   const tox = f.pPos.x - f.bPos.x, toz = f.pPos.z - f.bPos.z, dP = Math.hypot(tox, toz);
@@ -4580,17 +4584,18 @@ function updateFight(dt){
   }
   clampArena(f.bPos, apex);
 
-  // ---- raised corner follow-cam, tracking the player (with a little boss lead) ----
-  const tx = f.pPos.x*0.62 + f.bPos.x*0.38, tz = f.pPos.z*0.62 + f.bPos.z*0.38;
-  const want = new THREE.Vector3(tx + CAM_OFF.x, apex.y + CAM_OFF.y, tz + CAM_OFF.z);
-  camera.position.lerp(want, Math.min(1, dt*4));
-  camera.lookAt(tx, apex.y + 0.04, tz);
+  // ---- third-person chase cam: trails behind the character, looks slightly ahead ----
+  const cf = { x:Math.sin(f.camYaw), z:Math.cos(f.camYaw) };
+  const want = new THREE.Vector3(f.pPos.x - cf.x*CAM_DIST, apex.y + CAM_HEIGHT, f.pPos.z - cf.z*CAM_DIST);
+  camera.position.lerp(want, Math.min(1, dt*5));
+  camera.lookAt(f.pPos.x + cf.x*CAM_LOOK_AHEAD, apex.y + CAM_LOOK_H, f.pPos.z + cf.z*CAM_LOOK_AHEAD);
   applyShake();
 
   // ---- player: place, walk/idle pose, overlay a strike ----
-  f.pStride += (moveSpd > 0.001 ? dt*22 : 0);
+  const pWalking = moveSpd > 0.05;
+  f.pStride += (pWalking ? dt*Math.min(28, 14 + moveSpd*28) : 0);                          // stride speed scales with how fast you run
   g.position.set(f.pPos.x, apex.y, f.pPos.z); g.scale.set(RUN_SCALE, RUN_SCALE, RUN_SCALE); g.rotation.set(0, f.pFacing, 0);
-  poseFighter(g, f.t, moveSpd > 0.001, f.pStride);
+  poseFighter(g, f.t, pWalking, f.pStride);
   if (f.pAnim){ f.pAnim.t += dt; const p = f.pAnim.t / f.pAnim.def.dur;
     animAttack(g, f.pAnim.def, p);
     if (!f.pAnim.hit && p >= f.pAnim.def.hit){ f.pAnim.hit = true; onPlayerHit(f.pAnim.def); }
