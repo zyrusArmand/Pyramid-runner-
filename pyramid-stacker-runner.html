@@ -933,7 +933,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.275 · 2026.06.12</div>
+  <div id="appVersion">v1.276 · 2026.06.12</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1121,7 +1121,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.275';
+const APP_VERSION = '1.276';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -5147,11 +5147,15 @@ function makeEmoteCanvas(){
 function playEmote(g, r, t, dt){
   const style = character().style || '';
   const bend = (a, x) => { if (a && a.elbow) a.elbow.rotation.x = x; };
+  // PLANT the legs for every emote so no leftover mid-stride leg stays in the air
+  if (g.legL){ g.legL.rotation.set(0, 0, 0.05);  if (g.legL.elbow) g.legL.elbow.rotation.x = 0.06;
+               g.legR.rotation.set(0, 0, -0.05); if (g.legR.elbow) g.legR.elbow.rotation.x = 0.06; }
   if (style === 'miah'){
-    // hold the guitar steady against the chest: left hand frets the neck up-left, right hand makes a SMALL strum
-    // over the sound hole (stays on the strings instead of flapping up and down) — and no body bob
-    if (g.armL){ g.armL.rotation.x = -0.85; g.armL.rotation.z = -0.62; } bend(g.armL, -1.55);
-    if (g.armR){ g.armR.rotation.x = -1.2; g.armR.rotation.z = 0.58; } bend(g.armR, -0.85 + Math.sin(t*8)*0.2);   // small wrist/forearm strum at the strings
+    // left hand frets the neck up-left (elbow folded); right elbow bent ~90°, forearm + wrist STRUM up and down
+    // across the sound hole — the elbow folds/unfolds so the whole forearm sweeps, not just the hand
+    if (g.armL){ g.armL.rotation.x = -0.8; g.armL.rotation.z = -0.55; } bend(g.armL, -1.6);
+    const strum = Math.sin(t*7);
+    if (g.armR){ g.armR.rotation.x = -1.15 + strum*0.12; g.armR.rotation.z = 0.62; } bend(g.armR, -1.35 + strum*0.5);   // forearm sweeps over the strings
     if (r.emoteProps){ const e = Math.min(1, t*5); r.emoteProps.scale.set(e, e, e); }   // guitar pops in cleanly
   } else if (style === 'ant'){
     // grip the power-washer wand with the front legs and SPRAY (recoil + pulsing jet)
