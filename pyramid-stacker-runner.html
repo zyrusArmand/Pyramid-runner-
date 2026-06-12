@@ -878,7 +878,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.256 · 2026.06.11</div>
+  <div id="appVersion">v1.257 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1066,7 +1066,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.256';
+const APP_VERSION = '1.257';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1702,9 +1702,16 @@ function makeRunner(){
     // 🏄🎸 MIAH MAN — a shirtless beach surfer-dude: bare tanned chest, black surf shorts, a cool backwards cap + shades,
     // with a properly-proportioned two-tone SURFBOARD and a realistic GUITAR strapped to his back at crossing angles.
     const blackMat = new THREE.MeshStandardMaterial({ color:0x161616, roughness:0.7 });
-    // SHIRTLESS torso — pec + ab definition so he reads masculine
-    [-1,1].forEach(s => { const pec = new THREE.Mesh(new THREE.SphereGeometry(0.046, 14, 12), skinMat); pec.scale.set(1, 0.72, 0.6); pec.position.set(s*0.05, 0.41, 0.072); pec.castShadow = true; g.add(pec); });
-    [[-0.026,0.34],[0.026,0.34],[-0.026,0.3],[0.026,0.3]].forEach(([x,y]) => { const ab = new THREE.Mesh(new THREE.SphereGeometry(0.019, 10, 8), skinMat); ab.scale.set(1, 1, 0.5); ab.position.set(x, y, 0.078); g.add(ab); });
+    // 👕 open HAWAIIAN shirt — neon sunrise tropical print (magenta sky → orange sunrise) with a floral print, V-neck + sleeves
+    const shTop = new THREE.MeshStandardMaterial({ color:0xff4f9a, roughness:0.6 });
+    const shBot = new THREE.MeshStandardMaterial({ color:0xff9a36, roughness:0.6 });
+    const shirtBody = new THREE.Mesh(new THREE.SphereGeometry(0.127, 22, 18), shTop); shirtBody.scale.set(0.93, 1.32, 0.82); shirtBody.position.set(0, 0.4, 0.012); shirtBody.castShadow = true; g.add(shirtBody);
+    const shirtLower = new THREE.Mesh(new THREE.SphereGeometry(0.125, 22, 18), shBot); shirtLower.scale.set(0.94, 0.72, 0.84); shirtLower.position.set(0, 0.32, 0.012); shirtLower.castShadow = true; g.add(shirtLower);
+    const vneck = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.07, 0.02), skinMat); vneck.position.set(0, 0.46, 0.094); g.add(vneck);   // bare chest at the open collar
+    [-1,1].forEach(s => { const lap = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.09, 0.016), shTop); lap.position.set(s*0.035, 0.45, 0.094); lap.rotation.z = -s*0.42; g.add(lap); });
+    [[-0.06,0.42,0xffe24a],[0.06,0.4,0x9affd0],[0,0.46,0xffe24a],[-0.05,0.35,0x4ad0ff],[0.06,0.34,0xffe24a],[0,0.31,0x9affd0],[-0.07,0.39,0xff3d8a],[0.07,0.45,0x4ad0ff]].forEach(([x,y,c]) => { const fl = new THREE.Mesh(new THREE.SphereGeometry(0.015, 8, 6), new THREE.MeshStandardMaterial({ color:c, roughness:0.5 })); fl.scale.set(1.2, 1.2, 0.25); fl.position.set(x, y, 0.1); g.add(fl); });   // neon florals
+    [0.43,0.39,0.35].forEach(y => { const b = new THREE.Mesh(new THREE.SphereGeometry(0.006, 6, 6), new THREE.MeshStandardMaterial({ color:0xf4f4f4 })); b.position.set(0, y, 0.106); g.add(b); });
+    [g.armL, g.armR].forEach(a => { const sl = new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.05, 0.075, 12), shTop); sl.position.y = -0.055; sl.castShadow = true; a.add(sl); });   // short sleeves
     // BLACK surf shorts
     const shorts = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.122, 0.16, 18), blackMat); shorts.position.y = 0.23; shorts.castShadow = true; g.add(shorts);
     const waistband = new THREE.Mesh(new THREE.CylinderGeometry(0.102, 0.102, 0.024, 18), new THREE.MeshStandardMaterial({ color:0x2bb0c2, roughness:0.6 })); waistband.position.y = 0.3; g.add(waistband);   // a teal drawstring band
@@ -1716,32 +1723,38 @@ function makeRunner(){
     const shades = new THREE.Mesh(new THREE.BoxGeometry(0.078, 0.024, 0.014), new THREE.MeshStandardMaterial({ color:0x0a0a0a, metalness:0.4, roughness:0.18 })); shades.position.set(0, 0.6, 0.094); g.add(shades);
     // two crossing straps over the shoulders holding the gear
     [[-0.055,0.46,0.55],[0.055,0.46,-0.55]].forEach(([x,y,rz]) => { const strap = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.36, 0.012), new THREE.MeshStandardMaterial({ color:0x2a2a2a, roughness:0.6 })); strap.position.set(x, y, 0.03); strap.rotation.z = rz; g.add(strap); });
-    // 🏄 SURFBOARD — long, narrow, tapered nose & tail; two-tone (red deck / teal bottom), white stringer, real fin
+    // 🏄 FISH SURFBOARD — wide retro fish: pointed nose, SWALLOW TAIL (two points), coloured rails + cream centre, twin fins
     const surf = new THREE.Group();
-    const redMat = new THREE.MeshStandardMaterial({ color:0xe23a2e, roughness:0.4 });
-    const tealMat = new THREE.MeshStandardMaterial({ color:0x1fb6c8, roughness:0.4 });
-    const whiteMat = new THREE.MeshStandardMaterial({ color:0xf4f4f4, roughness:0.4 });
-    const deck = new THREE.Mesh(new THREE.SphereGeometry(0.09, 24, 16), redMat); deck.scale.set(0.5, 3.4, 0.16); deck.castShadow = true; surf.add(deck);         // red top face
-    const bottom = new THREE.Mesh(new THREE.SphereGeometry(0.09, 24, 16), tealMat); bottom.scale.set(0.5, 3.42, 0.1); bottom.position.z = -0.007; surf.add(bottom);  // teal bottom face → both sides coloured
-    const stringer = new THREE.Mesh(new THREE.SphereGeometry(0.09, 24, 16), whiteMat); stringer.scale.set(0.06, 3.42, 0.18); surf.add(stringer);                    // white centre stringer
-    const noseTip = new THREE.Mesh(new THREE.ConeGeometry(0.043, 0.1, 14), redMat); noseTip.scale.set(1, 1, 0.34); noseTip.position.y = 0.3; surf.add(noseTip);       // pointed nose
-    const tailTip = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.07, 14), redMat); tailTip.rotation.z = Math.PI; tailTip.scale.set(1, 1, 0.34); tailTip.position.y = -0.3; surf.add(tailTip);
-    const finS = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.075, 4), new THREE.MeshStandardMaterial({ color:0x111316, roughness:0.5 })); finS.position.set(0, -0.245, -0.05); finS.rotation.x = -0.5; finS.castShadow = true; surf.add(finS);
+    const orange = new THREE.MeshStandardMaterial({ color:0xff7a2e, roughness:0.4 });
+    const cream  = new THREE.MeshStandardMaterial({ color:0xf6efe0, roughness:0.4 });
+    const grey   = new THREE.MeshStandardMaterial({ color:0x8a8f96, roughness:0.45 });
+    const finMat = new THREE.MeshStandardMaterial({ color:0x111316, roughness:0.5 });
+    const deck = new THREE.Mesh(new THREE.SphereGeometry(0.092, 24, 16), orange); deck.scale.set(0.62, 2.9, 0.16); deck.castShadow = true; surf.add(deck);       // orange rails (top)
+    const center = new THREE.Mesh(new THREE.SphereGeometry(0.092, 24, 16), cream); center.scale.set(0.34, 2.5, 0.18); center.position.y = 0.04; surf.add(center);  // cream centre panel
+    const bottom = new THREE.Mesh(new THREE.SphereGeometry(0.092, 24, 16), grey); bottom.scale.set(0.62, 2.92, 0.1); bottom.position.z = -0.007; surf.add(bottom);  // grey underside → both sides coloured
+    const noseTip = new THREE.Mesh(new THREE.ConeGeometry(0.052, 0.12, 14), orange); noseTip.scale.set(1, 1, 0.32); noseTip.position.y = 0.29; surf.add(noseTip);   // pointed nose
+    [-1,1].forEach(s => {   // swallow tail: two splayed points with the notch between + a twin fin under each
+      const tail = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.11, 12), orange); tail.scale.set(1, 1, 0.32); tail.rotation.z = Math.PI - s*0.32; tail.position.set(s*0.035, -0.285, 0); surf.add(tail);
+      const fin = new THREE.Mesh(new THREE.ConeGeometry(0.024, 0.065, 4), finMat); fin.position.set(s*0.04, -0.235, -0.05); fin.rotation.x = -0.5; fin.castShadow = true; surf.add(fin);
+    });
     surf.position.set(-0.06, 0.42, -0.16); surf.rotation.set(0.06, 0, 0.5); g.add(surf);
-    // 🎸 REALISTIC ACOUSTIC GUITAR — figure-8 body (upper + lower bout), rosette soundhole, bridge, fretted neck, headstock + pegs, strings
+    // 🎸 ORANGEWOOD-STYLE ACOUSTIC — natural light spruce top, dark rosewood fretboard/bridge, tortoiseshell pickguard, GOLD tuners
     const guitar = new THREE.Group();
-    const woodMat = new THREE.MeshStandardMaterial({ color:0xcf8a3a, roughness:0.45 });
-    const lowerBout = new THREE.Mesh(new THREE.SphereGeometry(0.058, 18, 14), woodMat); lowerBout.scale.set(1, 1, 0.3); lowerBout.position.y = -0.025; lowerBout.castShadow = true; guitar.add(lowerBout);
-    const upperBout = new THREE.Mesh(new THREE.SphereGeometry(0.044, 18, 14), woodMat); upperBout.scale.set(1, 1, 0.3); upperBout.position.y = 0.06; guitar.add(upperBout);
-    const rosette = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.006, 16), new THREE.MeshStandardMaterial({ color:0x3a2412 })); rosette.rotation.x = Math.PI/2; rosette.position.set(0, 0.01, 0.017); guitar.add(rosette);
-    const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.012, 16), new THREE.MeshStandardMaterial({ color:0x0e0805 })); hole.rotation.x = Math.PI/2; hole.position.set(0, 0.01, 0.019); guitar.add(hole);
-    const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.015, 0.012), new THREE.MeshStandardMaterial({ color:0x2a1a0e })); bridge.position.set(0, -0.06, 0.019); guitar.add(bridge);
-    const gneck = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.2, 0.02), new THREE.MeshStandardMaterial({ color:0x6a4326, roughness:0.55 })); gneck.position.set(0, 0.2, 0.004); guitar.add(gneck);
-    const fretboard = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.2, 0.008), new THREE.MeshStandardMaterial({ color:0x241509 })); fretboard.position.set(0, 0.2, 0.017); guitar.add(fretboard);
+    const topMat = new THREE.MeshStandardMaterial({ color:0xe6cf94, roughness:0.42 });   // light natural spruce
+    const goldMat = new THREE.MeshStandardMaterial({ color:0xd4af37, metalness:0.7, roughness:0.32 });
+    const lowerBout = new THREE.Mesh(new THREE.SphereGeometry(0.058, 18, 14), topMat); lowerBout.scale.set(1, 1, 0.3); lowerBout.position.y = -0.025; lowerBout.castShadow = true; guitar.add(lowerBout);
+    const upperBout = new THREE.Mesh(new THREE.SphereGeometry(0.044, 18, 14), topMat); upperBout.scale.set(1, 1, 0.3); upperBout.position.y = 0.06; guitar.add(upperBout);
+    const rosette = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.006, 16), new THREE.MeshStandardMaterial({ color:0x3a2412 })); rosette.rotation.x = Math.PI/2; rosette.position.set(0, 0.012, 0.017); guitar.add(rosette);
+    const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.012, 16), new THREE.MeshStandardMaterial({ color:0x0e0805 })); hole.rotation.x = Math.PI/2; hole.position.set(0, 0.012, 0.019); guitar.add(hole);
+    const pickguard = new THREE.Mesh(new THREE.SphereGeometry(0.03, 14, 10), new THREE.MeshStandardMaterial({ color:0x7a3414, roughness:0.35, metalness:0.05 })); pickguard.scale.set(0.78, 1.15, 0.16); pickguard.position.set(0.04, -0.04, 0.02); guitar.add(pickguard);   // tortoiseshell pickguard
+    const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.015, 0.012), new THREE.MeshStandardMaterial({ color:0x241509 })); bridge.position.set(0, -0.062, 0.019); guitar.add(bridge);
+    const gneck = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.2, 0.02), new THREE.MeshStandardMaterial({ color:0x7a4e2a, roughness:0.55 })); gneck.position.set(0, 0.2, 0.004); guitar.add(gneck);
+    const fretboard = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.2, 0.008), new THREE.MeshStandardMaterial({ color:0x1f1208 })); fretboard.position.set(0, 0.2, 0.017); guitar.add(fretboard);
     for (let i=0;i<5;i++){ const fret = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.0025, 0.01), new THREE.MeshStandardMaterial({ color:0xc8c8c8, metalness:0.7, roughness:0.3 })); fret.position.set(0, 0.125 + i*0.036, 0.021); guitar.add(fret); }
-    const ghead = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.058, 0.016), new THREE.MeshStandardMaterial({ color:0x2a1a0e })); ghead.position.set(0, 0.325, 0.0); ghead.rotation.x = -0.12; guitar.add(ghead);
-    [-1,1].forEach(s => { for (let k=0;k<3;k++){ const peg = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.016, 8), new THREE.MeshStandardMaterial({ color:0xd0d0d0, metalness:0.6 })); peg.rotation.z = Math.PI/2; peg.position.set(s*0.024, 0.31 + k*0.018, 0.0); guitar.add(peg); } });
-    const gstr = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.32, 0.002), new THREE.MeshStandardMaterial({ color:0xeaeaea, metalness:0.5, roughness:0.3 })); gstr.position.set(0, 0.12, 0.021); guitar.add(gstr);
+    [0.18,0.25].forEach(y => { const dot = new THREE.Mesh(new THREE.SphereGeometry(0.0035, 6, 6), new THREE.MeshStandardMaterial({ color:0xf0f0f0 })); dot.position.set(0, y, 0.022); guitar.add(dot); });   // fret markers
+    const ghead = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.06, 0.016), new THREE.MeshStandardMaterial({ color:0x140a06 })); ghead.position.set(0, 0.325, 0.0); ghead.rotation.x = -0.12; guitar.add(ghead);
+    [-1,1].forEach(s => { for (let k=0;k<3;k++){ const peg = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.018, 8), goldMat); peg.rotation.z = Math.PI/2; peg.position.set(s*0.026, 0.31 + k*0.018, 0.004); guitar.add(peg); } });   // gold tuners
+    const gstr = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.32, 0.002), new THREE.MeshStandardMaterial({ color:0xeaeaea, metalness:0.5, roughness:0.3 })); gstr.position.set(0, 0.12, 0.022); guitar.add(gstr);
     guitar.scale.set(0.92, 0.92, 0.92); guitar.position.set(0.08, 0.4, -0.125); guitar.rotation.set(0.08, 0.12, -0.62); g.add(guitar);
   } else {
     // explorer (and the colour variants): a rounded pack + a soft sun hat
