@@ -878,7 +878,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.250 · 2026.06.11</div>
+  <div id="appVersion">v1.251 · 2026.06.11</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1066,7 +1066,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.250';
+const APP_VERSION = '1.251';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1599,10 +1599,6 @@ function makeRunner(){
       const eye = new THREE.Mesh(new THREE.SphereGeometry(0.04, 16, 14), new THREE.MeshStandardMaterial({ color:0x120a06, metalness:0.25, roughness:0.12 }));
       eye.scale.set(0.85, 1.25, 0.8); eye.position.set(s*0.07, 0.6, 0.04); eye.castShadow = true; g.add(eye);
       const md = new THREE.Mesh(new THREE.ConeGeometry(0.013, 0.062, 8), chit(c2)); md.position.set(s*0.026, 0.548, 0.105); md.rotation.set(1.35, 0, s*0.5); g.add(md);
-      // antennae: two bent segments + a club tip
-      const a1 = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.009, 0.12, 8), chit(c2)); a1.position.set(s*0.03, 0.69, 0.04); a1.rotation.set(-0.5, 0, -s*0.22); g.add(a1);
-      const a2 = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.008, 0.11, 8), chit(c2)); a2.position.set(s*0.055, 0.76, 0.13); a2.rotation.set(-1.15, 0, -s*0.22); g.add(a2);
-      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.013, 8, 8), chit(c1)); knob.position.set(s*0.07, 0.79, 0.2); g.add(knob);
       // two extra (mid/front) legs per side, bent insect-style
       [0.05, -0.04].forEach(zz => {
         const up = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.008, 0.17, 7), chit(c2)); up.position.set(s*0.14, 0.3, zz); up.rotation.set(0.2, 0, s*1.05); up.castShadow = true; g.add(up);
@@ -1630,6 +1626,8 @@ function makeRunner(){
     // 🌺 FRIDA KAHLO — skinny; dark braided updo with a flower crown, the signature unibrow, gold earrings, a vivid embroidered dress
     const hairMat = new THREE.MeshStandardMaterial({ color:0x1a1108, roughness:0.72 });
     const hair = new THREE.Mesh(new THREE.SphereGeometry(0.107, 22, 18, 0, 6.28, 0, 1.45), hairMat); hair.scale.set(1.05, 1.0, 1.06); hair.position.set(0, 0.605, -0.018); hair.castShadow = true; g.add(hair);   // sits ON the crown, face stays clear
+    const backHair = new THREE.Mesh(new THREE.SphereGeometry(0.103, 20, 16), hairMat); backHair.scale.set(0.98, 1.08, 0.9); backHair.position.set(0, 0.585, -0.05); backHair.castShadow = true; g.add(backHair);   // fills out the back of the head
+    const nape = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 14), hairMat); nape.scale.set(0.95, 1.5, 0.7); nape.position.set(0, 0.5, -0.075); nape.castShadow = true; g.add(nape);   // hair gathered down the back of the neck
     const bun = new THREE.Mesh(new THREE.SphereGeometry(0.052, 16, 12), hairMat); bun.position.set(0, 0.715, -0.04); g.add(bun);
     [-1,1].forEach(s => { const lock = new THREE.Mesh(new THREE.SphereGeometry(0.03, 14, 12), hairMat); lock.scale.set(0.55, 1.25, 0.7); lock.position.set(s*0.1, 0.55, -0.02); lock.castShadow = true; g.add(lock); });   // side hair beside (not over) the face
     // flower crown
