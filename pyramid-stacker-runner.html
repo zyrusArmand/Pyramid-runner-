@@ -933,7 +933,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.276 · 2026.06.12</div>
+  <div id="appVersion">v1.277 · 2026.06.12</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1121,7 +1121,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.276';
+const APP_VERSION = '1.277';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -3822,14 +3822,18 @@ const HZ_BUILD = {
     const core = new THREE.Mesh(new THREE.ConeGeometry(0.03,0.15,10), fmat2); core.position.y = 0.13; g.add(core); t.ob.coreMesh = core;
     g.position.set(t.pos.x + L*HZL, t.pos.y, t.pos.z); scene.add(g); t.obMesh = g;
   },
-  // rolling boulder/asteroid — a smooth stone ball that rolls DOWN the pyramid toward the player; dodge or JUMP
+  // rolling boulder/asteroid — a FREE stone ball that barrels ALL the way DOWN its lane once (no respawn); dodge or JUMP
   roll(t, s){
+    const r = S.run; if (!r) return;
     const L = hzRndLane();
-    t.ob = { type:'lane', lane:L, L, jumpable:true, phase:RND()*6.28, spd:0.004 + RND()*0.002 };
     const ball = new THREE.Mesh(new THREE.SphereGeometry(0.1, 22, 16), hzMat(s.c1 || 0x9c8763, { roughness:0.92, metalness:0.04, emissive:s.em || 0x000000 }));
     ball.castShadow = true;
-    const g = new THREE.Group(); g.add(ball); t.ob.ball = ball;
-    g.position.set(t.pos.x + L*HZL, t.pos.y + 0.1, t.pos.z); scene.add(g); t.obMesh = g;
+    const g = new THREE.Group(); g.add(ball); scene.add(g);
+    const i = r.tiles.indexOf(t), startIdx = Math.min((i < 0 ? 0 : i) + 10, r.tiles.length - 1);   // starts above this tile
+    g.position.set(t.pos.x + L*HZL, t.pos.y + 0.1, t.pos.z);
+    const hs = (typeof relicEffects === 'function') ? relicEffects().hazSpeed : 1;
+    // NB: deliberately NO t.ob — boulders run their own continuous collision (see updateBoulders), so they can't merge or pass through you
+    (r.boulders = r.boulders || []).push({ lane:L, idx:startIdx, spd:(2.2 + RND()*1.3) * hs, mesh:g, ball, released:false });
   },
   // swinging blade/scythe/wing — sweeps across the lanes; dodge clear or SLIDE under
   sweep(t, s){
@@ -4556,6 +4560,7 @@ function summitVictory(){
     if (tt.coin && !tt.coin.got) tt.coin.mesh.visible = false;
     if (tt.power && !tt.power.got) tt.power.mesh.visible = false;
     if (tt.gold && !tt.gold.got) tt.gold.mesh.visible = false; });
+  if (r.boulders) r.boulders.forEach(b => { if (b.mesh) b.mesh.visible = false; });   // clear any boulders still rolling
   $('hud').style.display='none'; $('coinHud').classList.add('hidden'); $('multHud').classList.add('hidden'); $('combo').classList.remove('show'); setLevelName(true);
   $('meterWrap').style.opacity='0'; $('menuBtn').style.display='none'; $('restartBtn').style.display='none'; $('emoteBtn').classList.remove('show');
   victoryBeam(r.tiles[r.idx].pos);                                 // fire the light pillar at the conquered peak
@@ -4717,7 +4722,7 @@ function startRun(){
             perkShield: perks.shieldCharges + rel.shield, perkMagnet: perks.startMagnet || rel.magnet, perkSlow: perks.startSlow || rel.slowmo,
             perkReflex: perks.nearMissSlow, reflexCD: 0,
             freeSaves: perks.freeSaves + rel.save, coinMul: perks.coinMul * rel.coinMul,
-            storms, revives:0, usedAdRevive:false, invuln:0, dead:false, deathReason:'fell' };
+            storms, revives:0, usedAdRevive:false, invuln:0, dead:false, deathReason:'fell', boulders:[] };
   // NB: obstacles / coins / power-ups / lane guides are NOT created yet — only when the climb starts
   // (loadRunDressing in beginClimb), so the rating screen shows a clean pyramid with nothing moving on it.
   g.position.copy(tiles[0].pos);
@@ -4810,6 +4815,25 @@ function runRoll(dir){   // +1 = forward roll, -1 = backward roll — a quick so
 let _lastUp = 0, _lastDown = 0;
 function upAction(){   const now = performance.now(); if (now-_lastUp   < 320){ _lastUp = 0;   runRoll(1);  } else { _lastUp = now;   runJump();  } }
 function downAction(){ const now = performance.now(); if (now-_lastDown < 320){ _lastDown = 0; runRoll(-1); } else { _lastDown = now; runSlide(); } }
+
+// free rolling boulders: each releases as the player climbs near, barrels DOWN its own lane to the bottom, then is gone.
+// They never merge (separate meshes, removed at the base) and use continuous hit-testing so they can't pass through you.
+function updateBoulders(dt){
+  const r = S.run; if (!r || !r.boulders || !r.boulders.length) return;
+  const playerPos = r.idx + r.t, last = r.tiles.length - 1;
+  for (let bi = r.boulders.length - 1; bi >= 0; bi--){
+    const b = r.boulders[bi];
+    if (!b.released){ if (playerPos > b.idx - 16) b.released = true; else continue; }   // wait until the player is climbing toward it
+    b.idx -= b.spd * dt;                                                                  // barrel DOWN the slope
+    const lo = Math.max(0, Math.min(last-1, Math.floor(b.idx))), f = Math.max(0, Math.min(1, b.idx - lo));
+    const A = r.tiles[lo].pos, B = r.tiles[lo+1].pos;
+    b.mesh.position.set(A.x + (B.x-A.x)*f + b.lane*HZL, A.y + (B.y-A.y)*f + 0.1, A.z + (B.z-A.z)*f);
+    if (b.ball) b.ball.rotation.x -= dt * b.spd * 6;                                       // tumble
+    // continuous collision: same lane, overlapping the player, and not cleared by a jump or i-frames
+    if (r.invuln <= 0 && !r.dead && !r.jumping && b.lane === r.lane && Math.abs(b.idx - playerPos) < 0.6){ runCrash(); return; }
+    if (b.idx <= 0.2){ try { scene.remove(b.mesh); } catch(e){} r.boulders.splice(bi, 1); }   // reached the base → gone for good
+  }
+}
 
 function updateRun(dt){
   const r = S.run, g = S.runner; if (!r) return;
@@ -4946,6 +4970,9 @@ function updateRun(dt){
       }
     }
   }
+  updateBoulders(dt);                         // free boulders roll down their lanes; continuous collision
+  if (r.dead || r.falling) return;
+
   const A = r.tiles[r.idx].pos, B = r.tiles[Math.min(r.idx+1,r.tiles.length-1)].pos;
   const base = A.clone().lerp(B, r.t);
 
