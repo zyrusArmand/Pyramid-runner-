@@ -933,7 +933,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.273 · 2026.06.12</div>
+  <div id="appVersion">v1.274 · 2026.06.12</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1121,7 +1121,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.273';
+const APP_VERSION = '1.274';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1832,7 +1832,7 @@ function makeRunner(){
     const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.006, 18), new THREE.MeshStandardMaterial({ color:0x10243a, metalness:0.6, roughness:0.1 })); glass.rotation.x = Math.PI/2; glass.position.set(-0.005, 0, 0.048); cam.add(glass);
     const vf = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.016, 0.022), new THREE.MeshStandardMaterial({ color:0x141519, roughness:0.6 })); vf.position.set(-0.02, 0.035, 0); cam.add(vf);
     const shutter = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.008, 10), new THREE.MeshStandardMaterial({ color:0xb33030, roughness:0.4 })); shutter.position.set(0.046, 0.033, 0); cam.add(shutter);
-    cam.position.set(0, 0.32, 0.108); cam.rotation.x = 0.12; g.add(cam);
+    cam.position.set(0, 0.33, 0.085); cam.rotation.x = 0.12; g.add(cam);   // rests on the (shallower) chest
     // 🏋️ KETTLEBELL hanging from the LEFT hand — cast-iron bell + a squared handle
     const kb = new THREE.Group();
     const bell = new THREE.Mesh(new THREE.SphereGeometry(0.05, 18, 14), metal); bell.scale.set(1, 0.92, 1); bell.castShadow = true; kb.add(bell);
@@ -1870,24 +1870,24 @@ function buildEraOutfit(g, ch){
   const headHalf = (r,col,th) => { const h=new THREE.Mesh(new THREE.SphereGeometry(r,18,14,0,6.28,0,th||1.55), col); h.position.set(0,0.6,0); h.castShadow=true; return add(h); };
   const cloth = c => M(c, 0.04, 0.9);
   // ---- garments every era character wears (tunic hem, collar, belt) so nobody is a bare blob ----
-  const hem = new THREE.Mesh(new THREE.CylinderGeometry(0.092, 0.132, 0.17, 18, 1, true), cloth(body)); hem.position.y=0.225; hem.castShadow=true; add(hem);   // tunic skirt over the hips
-  const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.088, 0.032, 16), cloth(body)); collar.position.y=0.47; add(collar);                            // neckline
+  const hem = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.134, 0.17, 18, 1, true), cloth(body)); hem.position.y=0.232; hem.castShadow=true; add(hem);   // tunic skirt over the (new, narrower) hips
+  const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.068, 0.086, 0.032, 16), cloth(body)); collar.position.y=0.472; add(collar);                        // neckline
   const beltGold = tier>=2;
-  const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.097, 0.097, 0.03, 18), M(beltGold?0xe8c45a:0x4a3320, beltGold?0.6:0.1, beltGold?0.3:0.7)); belt.position.y=0.3; add(belt);
-  const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.042,0.036,0.02), GOLD()); buckle.position.set(0,0.3,0.095); add(buckle);
+  const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.03, 18), M(beltGold?0xe8c45a:0x4a3320, beltGold?0.6:0.1, beltGold?0.3:0.7)); belt.position.y=0.305; add(belt);   // snug to the cinched waist
+  const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.034,0.02), GOLD()); buckle.position.set(0,0.305,0.073); add(buckle);                                // sits on the waist surface
   // ---- detail that rises with social rank ----
   if (tier===0){               // PEASANT — rope belt, shoulder strap, satchel
     const strap=new THREE.Mesh(new THREE.BoxGeometry(0.028,0.26,0.014), cloth(0x7a5a3a)); strap.position.set(-0.045,0.39,0.072); strap.rotation.z=0.5; add(strap);
     const bag=new THREE.Mesh(new THREE.SphereGeometry(0.05,12,10), M(0x6a4a2a,0,0.95)); bag.scale.set(1,1.1,0.6); bag.position.set(0.1,0.27,-0.02); bag.castShadow=true; add(bag);
-    const patch=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.05,0.012), cloth(0x8a6a44)); patch.position.set(0.04,0.36,0.092); add(patch);   // a patched tunic
+    const patch=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.05,0.012), cloth(0x8a6a44)); patch.position.set(0.04,0.37,0.073); add(patch);   // a patched tunic (on the chest surface)
   } else if (tier===1){        // WARRIOR — crossed leather straps, studded belt, a shoulder guard
     [-1,1].forEach(d=>{ const st=new THREE.Mesh(new THREE.BoxGeometry(0.03,0.3,0.014), M(0x4a3320,0,0.8)); st.position.set(0,0.4,0.075); st.rotation.z=d*0.5; add(st);} );
     const guard=new THREE.Mesh(new THREE.SphereGeometry(0.058,12,10,0,6.28,0,1.6), M(body,0.3,0.5)); guard.scale.set(1.25,0.95,1.05); guard.position.set(-0.135,0.49,0); guard.castShadow=true; add(guard);
-    for(let i=0;i<3;i++){ const stud=new THREE.Mesh(new THREE.SphereGeometry(0.01,6,6), GOLD()); stud.position.set((i-1)*0.042,0.3,0.097); add(stud);}
+    for(let i=0;i<3;i++){ const stud=new THREE.Mesh(new THREE.SphereGeometry(0.01,6,6), GOLD()); stud.position.set((i-1)*0.042,0.305,0.073); add(stud);}
   } else if (tier===2){        // NOBLE — diagonal sash, shoulder mantle, a gem at the belt
     const sash=new THREE.Mesh(new THREE.BoxGeometry(0.052,0.34,0.018), cloth(0xb83a4a)); sash.position.set(0,0.39,0.072); sash.rotation.z=0.55; add(sash);
     const mantle=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.145,0.11,18,1,true), cloth(body)); mantle.position.y=0.475; mantle.castShadow=true; add(mantle);
-    const gem=new THREE.Mesh(new THREE.DodecahedronGeometry(0.022), GLOW(0x4ad0ff,0.5)); gem.position.set(0,0.3,0.1); add(gem);
+    const gem=new THREE.Mesh(new THREE.DodecahedronGeometry(0.022), GLOW(0x4ad0ff,0.5)); gem.position.set(0,0.305,0.076); add(gem);
   }
   if (head==='hood'){ headHalf(0.108, M(body,0.05,0.85)); }
   else if (head==='furhood'){ headHalf(0.115, M(0x6a5a44,0,0.95), 1.75);
