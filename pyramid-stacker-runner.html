@@ -933,7 +933,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.272 · 2026.06.12</div>
+  <div id="appVersion">v1.273 · 2026.06.12</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1121,7 +1121,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.272';
+const APP_VERSION = '1.273';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4734,8 +4734,13 @@ function startRun(){
   updateCoinHud(false);
   showRating();                                          // hold on the pyramid + 1–5 star rating; wait for START CLIMB
 }
-// player tapped START CLIMB on the rating screen → drop into the climb
+// player tapped START CLIMB on the rating screen → pick a relic for THIS climb, then drop in
 function beginClimb(){
+  const r = S.run; if (!r || !r.awaitStart) return;
+  if (!dailyMode && !r.relicOffered){ r.relicOffered = true; showRelicPicker(); return; }   // one blessing, chosen after the build, for this climb only
+  proceedToClimb();
+}
+function proceedToClimb(){
   const r = S.run; if (!r || !r.awaitStart) return;
   // first time the player meets a freshly unlocked mechanic this level: freeze on the pyramid overview and explain
   // it before the climb actually starts. Otherwise drop straight in.
@@ -4760,6 +4765,9 @@ function showFeatureIntros(list, done){
 function startClimbNow(){
   const r = S.run; if (!r || !r.awaitStart) return;
   r.awaitStart = false;
+  { const rel = relicEffects(), pk = charPerks(curChar);   // fold in the relic just chosen for this climb
+    r.perkShield = pk.shieldCharges + rel.shield; r.perkMagnet = pk.startMagnet || rel.magnet;
+    r.perkSlow = pk.startSlow || rel.slowmo; r.freeSaves = pk.freeSaves + rel.save; r.coinMul = pk.coinMul * rel.coinMul; }
   loadRunDressing();                                  // NOW spawn obstacles / coins / power-ups / lanes
   $('ratingOverlay').classList.remove('show'); $('featureIntro').classList.remove('show');
   // bring the run HUD back for the actual climb
@@ -4987,7 +4995,7 @@ function updateRun(dt){
 
   // ---- rig animation: a human-ish climbing gait — knee drives up, opposite arm pumps, body bobs on each step ----
   if (g.legL){
-    r.stride = (r.stride||0) + dt * r.speed * 2.2;
+    r.stride = (r.stride||0) + dt * Math.min(r.speed, 5) * 1.7;     // step cadence (capped so it doesn't flutter at high speed)
     if (r.jumping){ g.legL.rotation.x = -1.0; g.legR.rotation.x = -0.55; g.armL.rotation.x = -2.2; g.armR.rotation.x = -2.2;
       g.legL.rotation.z = 0; g.legR.rotation.z = 0;
       if (g.legL.elbow){ g.legL.elbow.rotation.x = 1.0; g.legR.elbow.rotation.x = 0.7; g.armL.elbow.rotation.x = -0.9; g.armR.elbow.rotation.x = -0.9; } }
@@ -4995,17 +5003,19 @@ function updateRun(dt){
       if (g.legL.elbow){ g.legL.elbow.rotation.x = 0.5; g.legR.elbow.rotation.x = 0.6; g.armL.elbow.rotation.x = -0.4; g.armR.elbow.rotation.x = -0.4; } }
     else {
       const a = Math.sin(r.stride), b = Math.sin(r.stride + Math.PI);
-      g.legL.rotation.x = a*0.95 + Math.max(0,a)*0.4;          // the forward leg reaches & lifts the knee higher
-      g.legR.rotation.x = b*0.95 + Math.max(0,b)*0.4;
-      g.armL.rotation.x = -a*0.9;  g.armR.rotation.x = -b*0.9; // arms pump opposite the legs
-      g.armL.rotation.z = 0.12; g.armR.rotation.z = -0.12;     // elbows tucked in a touch
+      // a controlled STAIR-STEP gait: lift the lead thigh only moderately and fold the knee to clear the step;
+      // the trailing leg pushes back just a little — no wild forward/back kicking that clips through hazards
+      g.legL.rotation.x = Math.max(0,a)*0.5 - Math.max(0,-a)*0.16;
+      g.legR.rotation.x = Math.max(0,b)*0.5 - Math.max(0,-b)*0.16;
+      g.armL.rotation.x = -a*0.5;  g.armR.rotation.x = -b*0.5;       // arms pump opposite, gentler
+      g.armL.rotation.z = 0.12; g.armR.rotation.z = -0.12;
       if (g.legL.elbow){
-        g.legL.elbow.rotation.x = Math.max(0, a) * 1.15;        // KNEE folds as the leg lifts
-        g.legR.elbow.rotation.x = Math.max(0, b) * 1.15;
-        g.armL.elbow.rotation.x = -0.55 + a*0.3;                // ELBOW bent ~90°, swings a touch
-        g.armR.elbow.rotation.x = -0.55 + b*0.3;
+        g.legL.elbow.rotation.x = Math.max(0, a) * 1.35;             // KNEE folds to lift the foot over the step
+        g.legR.elbow.rotation.x = Math.max(0, b) * 1.35;
+        g.armL.elbow.rotation.x = -0.5 + a*0.25;                     // ELBOW bent ~90°, swings a touch
+        g.armR.elbow.rotation.x = -0.5 + b*0.25;
       }
-      g.position.y += Math.abs(Math.sin(r.stride)) * 0.02;     // light up/down bob with each stride
+      g.position.y += Math.abs(Math.sin(r.stride)) * 0.012;          // gentler up/down bob
     }
   }
 
@@ -5101,7 +5111,7 @@ function makeEmoteGuitar(){
   const head = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.05, 0.015), dark); head.position.set(0, 0.325, 0.004); gtr.add(head);
   const str = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.32, 0.002), new THREE.MeshStandardMaterial({ color:0xeaeaea, metalness:0.5 })); str.position.set(0, 0.13, 0.02); gtr.add(str);
   // hold it angled across the chest with the broad face (deck) toward the camera
-  gtr.position.set(0.02, 0.4, 0.15); gtr.rotation.set(0.1, 0, 0.5);
+  gtr.position.set(0.0, 0.36, 0.16); gtr.rotation.set(0.12, 0, 0.5);   // sits where the strumming hand reaches the strings
   return gtr;
 }
 // a pop-up easel + canvas for NZekro's painting emote — painted face starts toward him, then spins to the viewer
@@ -5138,10 +5148,10 @@ function playEmote(g, r, t, dt){
   const style = character().style || '';
   const bend = (a, x) => { if (a && a.elbow) a.elbow.rotation.x = x; };
   if (style === 'miah'){
-    // left hand frets the neck (up-left), right hand STRUMS across the body — both elbows bent
-    if (g.armL){ g.armL.rotation.x = -0.8; g.armL.rotation.z = -0.45; } bend(g.armL, -1.15);
-    if (g.armR){ g.armR.rotation.x = -0.55; g.armR.rotation.z = 0.25; } bend(g.armR, -1.3 + Math.sin(t*12)*0.5);   // strumming forearm
-    g.position.y += Math.sin(t*12) * 0.004;
+    // hold the guitar steady against the chest: left hand frets the neck up-left, right hand makes a SMALL strum
+    // over the sound hole (stays on the strings instead of flapping up and down) — and no body bob
+    if (g.armL){ g.armL.rotation.x = -0.85; g.armL.rotation.z = -0.62; } bend(g.armL, -1.55);
+    if (g.armR){ g.armR.rotation.x = -1.2; g.armR.rotation.z = 0.58; } bend(g.armR, -0.85 + Math.sin(t*8)*0.2);   // small wrist/forearm strum at the strings
     if (r.emoteProps){ const e = Math.min(1, t*5); r.emoteProps.scale.set(e, e, e); }   // guitar pops in cleanly
   } else if (style === 'ant'){
     // grip the power-washer wand with the front legs and SPRAY (recoil + pulsing jet)
@@ -5490,32 +5500,33 @@ function startGame(atLevel){
 }
 
 // reached the summit → start the NEXT pyramid: keep score/coins, bump the level, everything a bit faster
-// tapped NEXT LEVEL → offer a relic choice (non-daily), then build the next pyramid
+// tapped NEXT LEVEL → just build the next pyramid (relics are now chosen before each climb, not here)
 function onNextLevel(){
   $('nextLevelWrap').classList.remove('show');
-  if (!dailyMode) showRelicPicker(); else nextLevel();
+  nextLevel();
 }
+// choose ONE relic for the climb ahead (shown after the build, before the run)
 function showRelicPicker(){
-  const wrap = $('relicCards'); if (!wrap){ nextLevel(); return; }
+  const wrap = $('relicCards'); if (!wrap){ proceedToClimb(); return; }
   const pool = RELIC_IDS.slice();
   for (let a = pool.length-1; a > 0; a--){ const b = Math.floor(RND()*(a+1)); const t = pool[a]; pool[a] = pool[b]; pool[b] = t; }
   const choices = pool.slice(0, 3);
-  const counts = {}; runRelics.forEach(id => counts[id] = (counts[id]||0) + 1);
-  wrap.innerHTML = choices.map(id => { const r = RELICS[id], have = counts[id]||0;
-    return '<div class="relicCard" data-relic="'+id+'"><div class="relicIcon">'+r.icon+'</div><div class="relicName">'+r.name+'</div><div class="relicDesc">'+r.desc+'</div><div class="relicHave">'+(have>0?('OWNED ×'+have):'')+'</div></div>'; }).join('');
+  wrap.innerHTML = choices.map(id => { const r = RELICS[id];
+    return '<div class="relicCard" data-relic="'+id+'"><div class="relicIcon">'+r.icon+'</div><div class="relicName">'+r.name+'</div><div class="relicDesc">'+r.desc+'</div><div class="relicHave"></div></div>'; }).join('');
   if (wrap.querySelectorAll) wrap.querySelectorAll('.relicCard').forEach(c =>
     c.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); pickRelic(c.getAttribute('data-relic')); }));
   $('relicPicker').classList.add('show');
 }
 function pickRelic(id){
-  if (RELICS[id]) runRelics.push(id);
+  runRelics = RELICS[id] ? [id] : [];                 // ONE relic, active for this climb only — no stacking
   $('relicPicker').classList.remove('show');
-  const r = RELICS[id]; if (r) showHint(r.icon + ' ' + r.name + ' CLAIMED', 2200);
-  nextLevel();
+  const r = RELICS[id]; if (r) showHint(r.icon + ' ' + r.name + ' — ACTIVE THIS CLIMB', 2000);
+  proceedToClimb();
 }
 // build the next pyramid
 function nextLevel(){
   $('nextLevelWrap').classList.remove('show');
+  runRelics = [];                                         // last level's relic is spent — clear it (no carry/stack)
   Analytics.track('level_complete', { level: gameLevel, value: S.score||0 });
   gameLevel++;
   if (!dailyMode && gameLevel > resumeLevel){ resumeLevel = gameLevel; Store.set('resumeLevel', resumeLevel); CloudSave.queue(); }  // SAVE progress (+ cloud)
