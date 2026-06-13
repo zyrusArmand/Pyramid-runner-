@@ -645,11 +645,14 @@
   .dailyRow.today { color:#ffd24a; }
   /* ---- emote button (bottom-right during a climb) ---- */
   #emoteBtn { position:fixed; right:calc(max(16px,env(safe-area-inset-right)) + 6px); bottom:calc(max(26px,env(safe-area-inset-bottom)) + 34px); z-index:7;
-    display:none; width:58px; height:58px; border-radius:50%; align-items:center; justify-content:center; cursor:pointer; user-select:none;
-    background:radial-gradient(circle at 50% 34%, #e6c478 0%, #b9852f 58%, #6f4a1d 100%);
-    border:2px solid #f3cf86; box-shadow:0 6px 20px rgba(0,0,0,.45), inset 0 1px 2px rgba(255,240,200,.65), inset 0 -3px 9px rgba(54,30,6,.55);
+    display:none; width:58px; height:58px; border-radius:50%; overflow:hidden; align-items:center; justify-content:center; cursor:pointer; user-select:none;
+    background:radial-gradient(circle at 50% 32%, #5277cf 0%, #2c478a 52%, #16244c 100%);
+    border:2px solid #f3cf86; box-shadow:0 6px 20px rgba(0,0,0,.45), inset 0 1px 2px rgba(255,240,200,.5), inset 0 -3px 9px rgba(10,18,42,.7);
     transition:transform .1s ease, box-shadow .1s ease; }
-  #emoteBtn svg { width:30px; height:30px; display:block; filter:drop-shadow(0 1px 1px rgba(48,26,4,.6)); }
+  #emoteBtn svg { width:30px; height:30px; display:block; position:relative; z-index:1; filter:drop-shadow(0 1px 1px rgba(10,18,42,.7)); }
+  #emoteBtn::after { content:''; position:absolute; inset:0; pointer-events:none;
+    background:linear-gradient(115deg,transparent 38%,rgba(255,240,200,.32) 50%,transparent 62%);
+    transform:translateX(-130%); animation:emoteSheen 3.4s ease-in-out infinite; }
   #emoteBtn.show { display:flex; }
   #emoteBtn:active { transform:scale(.88); box-shadow:0 3px 12px rgba(0,0,0,.5), inset 0 2px 6px rgba(54,30,6,.6); }
   /* ---- phase-3 boss fight: life bars + action buttons + joystick + damage numbers ---- */
@@ -710,7 +713,7 @@
 <div id="coinPops"></div>
 <div id="menuBtn">☰</div>
 <div id="restartBtn">↻</div>
-<div id="emoteBtn" aria-label="Emote"><svg viewBox="0 0 64 64" fill="none" stroke="#fbe6bf" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 23 Q30 11 53 21"/><path d="M10 31 Q30 19 54 31 Q32 43 10 31 Z" fill="rgba(251,230,191,.12)"/><circle cx="31" cy="31" r="5.2" fill="#fbe6bf" stroke="none"/><path d="M23 39 L18 53"/><path d="M41 38 Q47 50 38 54 Q31 55 33 47"/></svg></div>
+<div id="emoteBtn" aria-label="Emote"><svg viewBox="0 0 64 64" fill="none" stroke="#ffe7ad" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 23 Q30 11 53 21"/><path d="M10 31 Q30 19 54 31 Q32 43 10 31 Z" fill="rgba(255,231,173,.16)"/><circle cx="31" cy="31" r="5.2" fill="#ffd86a" stroke="none"/><path d="M23 39 L18 53"/><path d="M41 38 Q47 50 38 54 Q31 55 33 47"/></svg></div>
 
 <div id="meterWrap"><div id="meterLabel">LAYER STABILITY</div>
   <div id="meterBar"><div id="meterFill"></div></div></div>
@@ -980,7 +983,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.288 · 2026.06.13</div>
+  <div id="appVersion">v1.289 · 2026.06.13</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1204,7 +1207,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.288';
+const APP_VERSION = '1.289';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
