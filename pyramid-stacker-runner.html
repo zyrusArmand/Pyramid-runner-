@@ -613,12 +613,28 @@
   #dailyHero .dailySmall { font-family:'Space Mono',monospace; font-size:11px; letter-spacing:2px; color:#e8d8be; opacity:.65; margin-top:5px; }
   #dailyShare { text-align:center; margin:12px auto 2px; color:#ffb45e; font-family:'Space Mono',monospace; font-size:12px; letter-spacing:1.5px; cursor:pointer; }
   #dailyShare:active { opacity:.6; }
-  .dailyHistTitle { text-align:center; font-family:'Space Mono',monospace; font-size:11px; letter-spacing:2px; color:#e8d8be; opacity:.55; margin:20px 0 6px; }
-  #dailyHist { width:100%; max-width:360px; margin:0 auto; }
-  .dailyRow { display:flex; justify-content:space-between; padding:8px 18px; font-family:'Space Mono',monospace; font-size:12px; color:#f0e6d2; border-bottom:1px solid rgba(255,255,255,.07); }
+  /* daily: TODAY'S RANKING / CHAMPIONS toggle + boards */
+  .dailyTabs { display:flex; gap:8px; justify-content:center; width:100%; max-width:360px; margin:18px auto 10px; }
+  .dTab { flex:1; text-align:center; padding:8px 4px; border-radius:11px; cursor:pointer; font-family:'Space Mono',monospace;
+    font-size:10.5px; letter-spacing:1.5px; font-weight:700; color:#cdbfa6; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); transition:all .14s; }
+  .dTab.sel { color:#ffe6a8; background:rgba(255,210,74,.12); border-color:rgba(255,210,74,.45); }
+  .dTab:active { transform:scale(.97); }
+  .dailyBoard { width:100%; max-width:360px; margin:0 auto; min-height:60px; }
+  .dailyLeader { display:flex; align-items:center; gap:10px; margin:2px 0 10px; padding:11px 14px; border-radius:14px;
+    background:linear-gradient(180deg,rgba(255,210,74,.16),rgba(255,160,60,.06)); border:1px solid rgba(255,210,74,.5); }
+  .dailyLeader .dlCrown { font-size:20px; }
+  .dailyLeader .dlName { font-family:'Cinzel',serif; font-weight:700; font-size:16px; letter-spacing:1px; color:#ffe6a8; }
+  .dailyLeader .dlSub { font-family:'Space Mono',monospace; font-size:9.5px; letter-spacing:1.5px; color:#e8d8be; opacity:.7; }
+  .dailyLeader b { margin-left:auto; font-family:'Cinzel',serif; font-size:19px; color:#ffd86a; }
+  .dailyEmpty { text-align:center; font-family:'Space Mono',monospace; font-size:11px; letter-spacing:1.5px; color:#cdbfa6; opacity:.7; padding:16px 8px; }
+  .dailyRow { display:flex; align-items:center; gap:9px; padding:8px 12px; font-family:'Space Mono',monospace; font-size:12px; color:#f0e6d2; border-bottom:1px solid rgba(255,255,255,.07); }
+  .dailyRow .drk { width:20px; text-align:center; font-weight:700; opacity:.85; }
+  .dailyRow .drName { flex:1; letter-spacing:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .dailyRow .drDay { flex:1; opacity:.72; letter-spacing:1px; }
+  .dailyRow .drScore { font-weight:700; color:#ffd86a; }
+  .dailyRow.me { background:rgba(255,210,74,.08); border-radius:8px; }
+  .dailyRow.win .drName { color:#ffe6a8; }
   .dailyRow.today { color:#ffd24a; }
-  .dailyRow .dr-d { opacity:.72; letter-spacing:1px; }
-  .dailyRow .dr-s { font-weight:700; }
   /* ---- emote button (bottom-right during a climb) ---- */
   #emoteBtn { position:fixed; right:calc(max(16px,env(safe-area-inset-right)) + 6px); bottom:calc(max(26px,env(safe-area-inset-bottom)) + 34px); z-index:7;
     display:none; width:58px; height:58px; border-radius:50%; align-items:center; justify-content:center; cursor:pointer; user-select:none;
@@ -878,16 +894,20 @@
 
 <div class="overlay hidden panel" id="dailyPanel">
   <div class="panelTitle">DAILY CHALLENGE</div>
-  <div id="dailyDesc">⛏ BASE-10 PYRAMID · FULL HAZARD ARSENAL · HARD</div>
+  <div id="dailyDesc">⛏ BASE-10 PYRAMID · ONE FIXED SPEED · SAME CLIMB FOR EVERYONE</div>
   <div id="dailyClock">resets in —</div>
   <div id="dailyHero">
     <div class="dailyBig" id="dailyBest">0</div>
-    <div class="dailySmall">YOUR BEST TODAY · SAME CLIMB FOR EVERYONE</div>
+    <div class="dailySmall">YOUR BEST TODAY</div>
   </div>
   <div class="cta hero" id="dailyPlayBtn">PLAY TODAY'S CLIMB</div>
   <div id="dailyShare">◈ SHARE MY SCORE</div>
-  <div class="dailyHistTitle">LAST 7 DAYS</div>
-  <div id="dailyHist"></div>
+  <div class="dailyTabs">
+    <div class="dTab sel" id="dTabToday">TODAY'S RANKING</div>
+    <div class="dTab" id="dTabChamps">🏆 CHAMPIONS</div>
+  </div>
+  <div id="dailyToday" class="dailyBoard"></div>
+  <div id="dailyChamps" class="dailyBoard" style="display:none"></div>
   <div class="backBtn" id="dailyBack">◀ BACK</div>
 </div>
 
@@ -952,7 +972,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.285 · 2026.06.13</div>
+  <div id="appVersion">v1.286 · 2026.06.13</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1097,6 +1117,16 @@ let firstTime = !Store.get('tut', 0);             // show the onboarding hints o
 //   create policy "public read" on public.scores for select using (true);
 //   drop policy if exists "public insert" on public.scores;
 //   create policy "public insert" on public.scores for insert with check (true);
+//   -- SEPARATE live board for the DAILY CHALLENGE (one seeded climb per day). Optional: if this table is missing,
+//   -- the Daily panel quietly falls back to your local-only history.
+//   create table if not exists public.daily_scores (id bigint generated always as identity primary key,
+//     name text not null, score integer not null, char text, day text not null, created_at timestamptz default now());
+//   grant select, insert on table public.daily_scores to anon, authenticated;
+//   alter table public.daily_scores enable row level security;
+//   drop policy if exists "public read" on public.daily_scores;
+//   create policy "public read" on public.daily_scores for select using (true);
+//   drop policy if exists "public insert" on public.daily_scores;
+//   create policy "public insert" on public.daily_scores for insert with check (true);
 const SUPABASE_URL  = 'https://eledsvekpphdvhvsqneu.supabase.co';
 const SUPABASE_ANON = 'sb_publishable_KVhLKKac6j9wmVvPts6OcA_QbfIiSVz';   // public browser-safe key (safe to ship)
 const RemoteBoard = {
@@ -1129,6 +1159,32 @@ const RemoteBoard = {
       return await r.json();
     } catch(e){ console.warn('leaderboard read error', e); return null; }
   },
+  async submitDaily(entry){                             // post a run to the LIVE daily board (separate table from the global one)
+    if (!this.enabled()) return false;
+    const post = body => this._fetch('/rest/v1/daily_scores', { method:'POST',
+      headers:this._h({ 'Content-Type':'application/json', Prefer:'return=minimal' }), body:JSON.stringify(body) });
+    try {
+      let r = await post(entry);
+      if (!r.ok && entry && ('char' in entry)){ const rest = Object.assign({}, entry); delete rest.char; r = await post(rest); }
+      return r.ok;
+    } catch(e){ console.warn('daily submit error', e); return false; }
+  },
+  async dailyTop(day, n){                               // today's live ranking: highest scores for a given day key
+    if (!this.enabled()) return null;
+    try {
+      const r = await this._fetch('/rest/v1/daily_scores?day=eq.'+encodeURIComponent(day)+'&select=name,score,char&order=score.desc&limit='+(n||100), { headers:this._h() });
+      if (!r.ok) return null;
+      return await r.json();
+    } catch(e){ console.warn('daily read error', e); return null; }
+  },
+  async dailyRecent(n){                                 // a broad recent slice we group by day client-side to find each day's WINNER
+    if (!this.enabled()) return null;
+    try {
+      const r = await this._fetch('/rest/v1/daily_scores?select=name,score,char,day&order=score.desc&limit='+(n||500), { headers:this._h() });
+      if (!r.ok) return null;
+      return await r.json();
+    } catch(e){ console.warn('daily winners read error', e); return null; }
+  },
   async account(entry){                                 // best-effort: store an account profile (name + email)
     if (!this.enabled()) return false;
     try {
@@ -1140,7 +1196,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.285';
+const APP_VERSION = '1.286';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -3300,7 +3356,8 @@ function spawnBlock(){
     for (let c = S.cellIndex; c < S.cellIndex + len; c++) cells.push(c);
   }
 
-  const speed = (1.8 + S.layer*0.18 + RND()*0.15) * (dailyMode ? 2.5 : 1);   // Daily Challenge: blocks swing 2.5x faster
+  // Daily Challenge: EVERY block swings at one fixed speed — no layer ramp, no per-block randomness, so it's identical for everyone
+  const speed = dailyMode ? 4.8 : (1.8 + S.layer*0.18 + RND()*0.15);
   const color = layerColor(S.layer);                  // capstone matches the rest of the pyramid's stone
 
   let mesh;
@@ -3342,7 +3399,7 @@ function spawnBlock(){
       mesh.position.copy(center);                          // at slot LEVEL — never lifted above the wall
       mesh.position[perpAxis] = far;
       S.active = { mesh, center, axis, mode:'keystone', perpAxis, target, outward, seat, far,
-                   speed: speed * 1.25 * DDA.buildSpeed() * levelSpeed(), phase:Math.PI,   // sweep (adaptive + per-level)
+                   speed: dailyMode ? (speed * 1.25) : (speed * 1.25 * DDA.buildSpeed() * levelSpeed()), phase:Math.PI,   // daily = flat; else adaptive + per-level
                    capstone:false, len, cells, corner, n };
       addPlaceGuide(S.active);                             // glowing perfect-seat outline
     } else {
@@ -3362,7 +3419,7 @@ function spawnBlock(){
       // mid-wall pieces keep the flowing flush seat
       const seat = corner ? center[axis] : ((odir>0) ? sb.sLo : sb.sHi);   // perfect (flush) end
       const far  = (odir>0) ? sb.sHi : sb.sLo;             // far/opposite end — where the stone enters from
-      const oSpeed = speed * 1.25 * DDA.buildSpeed() * levelSpeed();   // steady sweep (adaptive + faster each level)
+      const oSpeed = dailyMode ? (speed * 1.25) : (speed * 1.25 * DDA.buildSpeed() * levelSpeed());   // daily = one flat speed; else adaptive + faster each level
       mesh.position[axis] = far;                           // SPAWN at the far/opposite end, then sweep to the seat
       S.active = { mesh, center, axis, speed:oSpeed, phase:Math.PI, mode:'open', odir, seat, far,
                    capstone:false, len, cells, corner, n };
@@ -6014,13 +6071,78 @@ function startDailyClock(){
 }
 function dayLabel(off){ const d = new Date(); d.setDate(d.getDate()-off);
   try { return d.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' }); } catch(e){ return dayKey(off); } }
-function showDaily(){ $('startScreen').classList.add('hidden'); $('dailyPanel').classList.remove('hidden'); renderDaily(); startDailyClock(); }
+let dailyView = 'today';
+function showDaily(){ $('startScreen').classList.add('hidden'); $('dailyPanel').classList.remove('hidden'); dailyTab('today'); startDailyClock(); }
 function renderDaily(){
   const be = $('dailyBest'); if (be) be.textContent = (Store.get('daily_'+todayKey(), 0) || 0).toLocaleString();
-  let html = '';
-  for (let i=0;i<7;i++){ const sc = Store.get('daily_'+dayKey(i), 0) || 0;
-    html += '<div class="dailyRow'+(i===0?' today':'')+'"><span class="dr-d">'+(i===0?'TODAY':dayLabel(i))+'</span><span class="dr-s">'+(sc>0?sc.toLocaleString():'—')+'</span></div>'; }
-  const h = $('dailyHist'); if (h) h.innerHTML = html;
+  if (dailyView === 'champs') renderDailyChamps(); else renderDailyToday();
+}
+function dailyTab(which){
+  dailyView = (which === 'champs') ? 'champs' : 'today';
+  const tT = $('dTabToday'), tC = $('dTabChamps');
+  if (tT) tT.classList.toggle('sel', dailyView === 'today');
+  if (tC) tC.classList.toggle('sel', dailyView === 'champs');
+  const bT = $('dailyToday'), bC = $('dailyChamps');
+  if (bT) bT.style.display = dailyView === 'today' ? '' : 'none';
+  if (bC) bC.style.display = dailyView === 'champs' ? '' : 'none';
+  renderDaily();
+}
+// TODAY'S live ranking — clearly shows today's highest score, with your row highlighted
+function renderDailyToday(){
+  const el = $('dailyToday'); if (!el) return;
+  const myBest = Store.get('daily_'+todayKey(), 0) || 0;
+  const localFallback = () => {
+    if (myBest > 0) el.innerHTML = '<div class="dailyLeader"><span class="dlCrown">👑</span><div><div class="dlName">'+escapeHtml((playerName||'YOU').toUpperCase().slice(0,12))+'</div><div class="dlSub">YOUR SCORE TODAY</div></div><b>'+myBest.toLocaleString()+'</b></div><div class="dailyEmpty">play online to see everyone’s scores</div>';
+    else el.innerHTML = '<div class="dailyEmpty">NO SCORE YET — BE TODAY’S FIRST CLIMBER!</div>';
+  };
+  if (!RemoteBoard.enabled()){ localFallback(); return; }
+  el.innerHTML = '<div class="dailyEmpty">loading today’s ranking…</div>';
+  const token = (renderDailyToday._t = (renderDailyToday._t||0) + 1);
+  RemoteBoard.dailyTop(todayKey(), 100).then(rows => {
+    if (token !== renderDailyToday._t || dailyView !== 'today') return;
+    if (!rows){ localFallback(); return; }
+    const best = {};
+    rows.forEach(s => { const k=(s.name||'ANON').toString().toUpperCase().slice(0,12); if (!(k in best) || (s.score||0) > best[k].score) best[k] = { name:k, score:s.score||0, char:s.char }; });
+    rows = Object.values(best).sort((a,b)=> b.score - a.score).slice(0,15);
+    if (!rows.length){ localFallback(); return; }
+    const lead = rows[0], myName = (playerName||'').toUpperCase();
+    let html = '<div class="dailyLeader"><span class="dlCrown">👑</span><div><div class="dlName">'+escapeHtml(lead.name)+'</div><div class="dlSub">TODAY’S LEADER</div></div><b>'+(lead.score||0).toLocaleString()+'</b></div>';
+    html += rows.map((s,i)=>{
+      const mine = myName && s.name === myName, rs = i<3 ? `color:${MEDAL[i]}` : '';
+      return '<div class="dailyRow'+(mine?' me':'')+'"><span class="drk" style="'+rs+'">'+(i+1)+'</span>'+lbAvatarHtml(s.char, mine)+
+        '<span class="drName">'+escapeHtml(s.name)+'</span><span class="drScore">'+(s.score||0).toLocaleString()+'</span></div>';
+    }).join('');
+    el.innerHTML = html;
+  });
+}
+// CHAMPIONS — the winner (top scorer) of each of the last 7 days
+function renderDailyChamps(){
+  const el = $('dailyChamps'); if (!el) return;
+  const localFallback = () => {
+    let any = false, html = '';
+    for (let i=0;i<7;i++){ const sc = Store.get('daily_'+dayKey(i), 0) || 0; if (sc>0) any = true;
+      html += '<div class="dailyRow'+(i===0?' today':'')+'"><span class="drk">'+(i===0?'★':'🏆')+'</span><span class="drDay">'+(i===0?'TODAY':dayLabel(i))+'</span><span class="drScore">'+(sc>0?sc.toLocaleString():'—')+'</span></div>'; }
+    el.innerHTML = (RemoteBoard.enabled()? '' : '') + html + (any?'':'<div class="dailyEmpty">no daily climbs logged yet</div>');
+  };
+  if (!RemoteBoard.enabled()){ localFallback(); return; }
+  el.innerHTML = '<div class="dailyEmpty">loading champions…</div>';
+  const token = (renderDailyChamps._t = (renderDailyChamps._t||0) + 1);
+  RemoteBoard.dailyRecent(500).then(rows => {
+    if (token !== renderDailyChamps._t || dailyView !== 'champs') return;
+    if (!rows){ localFallback(); return; }
+    const winner = {};   // day -> highest entry (rows are score-desc, so first seen per day is the winner)
+    rows.forEach(s => { const d = s.day; if (d && !(d in winner)) winner[d] = s; });
+    const myName = (playerName||'').toUpperCase();
+    let html = '';
+    for (let i=0;i<7;i++){ const dk = dayKey(i), w = winner[dk];
+      const mine = w && myName && (w.name||'').toUpperCase() === myName;
+      html += '<div class="dailyRow win'+(mine?' me':'')+(i===0?' today':'')+'"><span class="drk">'+(i===0?'★':'🏆')+'</span>'+
+        '<span class="drDay">'+(i===0?'TODAY':dayLabel(i))+'</span>'+
+        (w ? '<span class="drName" style="text-align:right">'+escapeHtml((w.name||'ANON').toUpperCase().slice(0,12))+'</span><span class="drScore">'+(w.score||0).toLocaleString()+'</span>'
+           : '<span class="drScore" style="opacity:.5">—</span>')+'</div>';
+    }
+    el.innerHTML = html;
+  });
 }
 function playDaily(){ dailyMode = true; $('dailyPanel').classList.add('hidden'); clearInterval(_dailyClockIv); startGame(); }
 function shareDaily(){
@@ -6327,7 +6449,17 @@ function endGame(won, how){
   recordScore({ score:S.score, daily:dailyMode, date:Date.now() });
   // push the run to the shared global board, and report whether it landed (so a missing name / offline is obvious)
   const bEl = $('finalBoard'); if (bEl) bEl.textContent = '';
-  if (RemoteBoard.enabled() && dailyMode && bEl) bEl.textContent = '◈ daily runs aren’t posted to the global board';
+  // DAILY runs go to their OWN live board (kept out of the global rankings)
+  if (RemoteBoard.enabled() && dailyMode && S.score > 0){
+    if (!playerName){
+      let nm = ''; try { nm = sanitizeName(window.prompt && window.prompt('Enter a name for the DAILY leaderboard (max 12):','')); } catch(e){}
+      if (nm){ playerName = nm; Store.set('name', playerName); }
+    }
+    if (bEl) bEl.textContent = '⏳ posting to the daily board…';
+    RemoteBoard.submitDaily({ name:(playerName||'ANON').slice(0,12), score:Math.round(S.score), char:curChar, day:todayKey() })
+      .then(ok => { if (bEl) bEl.textContent = ok ? ('◈ ' + Math.round(S.score).toLocaleString() + ' posted to today’s DAILY board')
+        : '◈ daily board offline — saved locally'; });
+  } else if (dailyMode && bEl){ bEl.textContent = '◈ daily score saved'; }
   if (RemoteBoard.enabled() && !dailyMode && S.score > 0){
     if (!playerName){
       let nm = ''; try { nm = sanitizeName(window.prompt && window.prompt('Enter a name for the GLOBAL leaderboard (max 12):','')); } catch(e){}
@@ -6383,6 +6515,8 @@ btn('levelsBack',    backHome);
 btn('homeDaily',     showDaily);
 btn('dailyPlayBtn',  playDaily);
 btn('dailyShare',    shareDaily);
+btn('dTabToday',     ()=>dailyTab('today'));
+btn('dTabChamps',    ()=>dailyTab('champs'));
 btn('dailyBack',     backHome);
 btn('mapBack',       backHome);
 btn('mapGo',         () => WorldMap.go());     // enter the focused era's level from the journey map
