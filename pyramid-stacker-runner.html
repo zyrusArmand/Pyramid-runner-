@@ -950,7 +950,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.283 · 2026.06.13</div>
+  <div id="appVersion">v1.284 · 2026.06.13</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1138,7 +1138,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.283';
+const APP_VERSION = '1.284';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1332,7 +1332,7 @@ const CHARACTERS = {
   frida:    { name:'FRIDA KAHLO',  cost:3333, swatch:'#b8344f', color:0xb8344f, skin:0xd9a066, style:'frida',    exclusive:true },
   american: { name:'FAT BOY MEMO', cost:3333, swatch:'#c0303a', color:0xf0c79a, skin:0xf0c79a, style:'american', exclusive:true },
   miah:     { name:'MIAH MAN',     cost:3333, swatch:'#22b0c2', color:0x1a1c22, skin:0xe0b486, style:'miah',     exclusive:true },
-  nzekro:   { name:'NZEKRO',       cost:3333, swatch:'#2a2a30', color:0x1a1a1f, skin:0x8a5a3a, style:'nzekro',   exclusive:true },
+  nzekro:   { name:'NZEKRO (THE HOBBYIST)', cost:3333, swatch:'#2a2a30', color:0x1a1a1f, skin:0x8a5a3a, style:'nzekro',   exclusive:true },
   nassar:   { name:'NASSAR',       cost:3333, swatch:'#1f7a8a', color:0x1f7a8a, skin:0x8f6034, style:'nassar',   exclusive:true },
 };
 CHAR_SPEC.forEach(s => {
