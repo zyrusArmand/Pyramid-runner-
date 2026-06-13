@@ -983,7 +983,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.309 · 2026.06.13</div>
+  <div id="appVersion">v1.310 · 2026.06.13</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1207,7 +1207,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.309';
+const APP_VERSION = '1.310';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -5398,7 +5398,7 @@ function makeEmoteFrida(){
   for (let j=0;j<3;j++){ const dz=new THREE.Mesh(new THREE.BoxGeometry(0.15,0.008,0.009), icingM); dz.position.set(0,0.07,(j-1)*0.04); dz.rotation.y=(j-1)*0.16; roll.add(dz); }   // light drizzle across
   for (let j=0;j<7;j++){ const a=j/7*Math.PI*2; const dr=new THREE.Mesh(new THREE.SphereGeometry(0.011,8,8), icingM); dr.scale.set(0.7,1.6,0.7); dr.position.set(Math.cos(a)*0.082,0.01,Math.sin(a)*0.082); roll.add(dr); }   // icing drips down the sides
   roll.position.set(0,0.024,0); tray.add(roll);
-  tray.rotation.x = -0.62;   // tip the tray toward the camera so the swirl top is clearly visible
+  tray.rotation.x = 0.62;   // tip the tray toward the camera so the swirl top is clearly visible
   tray.position.set(0.0,0.31,0.24); tray.scale.setScalar(0.001); tray.visible=false; grp.add(tray); grp.__tray = tray;
   // ---- SPARKLES that burst when the tray first appears ----
   const sparkles = []; for (let i=0;i<9;i++){ const sp = new THREE.Mesh(new THREE.SphereGeometry(0.01,8,6), new THREE.MeshStandardMaterial({ color:0xffe27a, emissive:0xffcf4a, emissiveIntensity:0.9 })); sp.visible=false; grp.add(sp); sparkles.push(sp); }
