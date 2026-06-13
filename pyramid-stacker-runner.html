@@ -950,7 +950,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.280 · 2026.06.12</div>
+  <div id="appVersion">v1.281 · 2026.06.13</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1138,7 +1138,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.280';
+const APP_VERSION = '1.281';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1333,6 +1333,7 @@ const CHARACTERS = {
   american: { name:'FAT BOY MEMO', cost:3333, swatch:'#c0303a', color:0xf0c79a, skin:0xf0c79a, style:'american', exclusive:true },
   miah:     { name:'MIAH MAN',     cost:3333, swatch:'#22b0c2', color:0x1a1c22, skin:0xe0b486, style:'miah',     exclusive:true },
   nzekro:   { name:'NZEKRO',       cost:3333, swatch:'#2a2a30', color:0x1a1a1f, skin:0x8a5a3a, style:'nzekro',   exclusive:true },
+  nassar:   { name:'NASSAR',       cost:3333, swatch:'#1f7a8a', color:0x1f7a8a, skin:0x6e4528, style:'nassar',   exclusive:true },
 };
 CHAR_SPEC.forEach(s => {
   const [era,tier,key,name,color,skin,head,glow,reuse] = s;
@@ -1459,7 +1460,7 @@ function makeRunner(){
   const gold   = () => new THREE.MeshStandardMaterial({ color:0xe8c45a, emissive:0x3a2600, metalness:0.75, roughness:0.28 });
   const blue   = () => new THREE.MeshStandardMaterial({ color:0x2b5bd0, emissive:0x0a1638, metalness:0.3, roughness:0.5 });
   const isEra  = style === 'era';                                  // era characters get bare skin limbs + boots (real-person read)
-  const humanLimbs = isEra || style==='frida' || style==='american';   // real-person skin limbs
+  const humanLimbs = isEra || style==='frida' || style==='american' || style==='nassar';   // real-person skin limbs
   const slim = (style==='frida' || style==='miah') ? 0.8 : 1;      // Frida & Miah are skinny
   const limbMat = humanLimbs ? skinMat : cMat;
   const shoeMat = new THREE.MeshStandardMaterial({ color: style==='american' ? 0xf0f0f0 : isEra ? 0x4e3a26 : ch.color, roughness:0.8, metalness: ch.metal?0.5:0.05 });
@@ -1863,6 +1864,53 @@ function makeRunner(){
     const ferrule = new THREE.Mesh(new THREE.CylinderGeometry(0.0085, 0.0085, 0.022, 12), metal); ferrule.position.y = -0.092; pb.add(ferrule);
     const bristle = new THREE.Mesh(new THREE.ConeGeometry(0.009, 0.03, 10), new THREE.MeshStandardMaterial({ color:0xc24a3a, roughness:0.6 })); bristle.position.y = -0.116; bristle.rotation.x = Math.PI; pb.add(bristle);
     pb.position.set(0, -0.08, 0.01); pb.rotation.x = 0.2; g.armR.elbow.add(pb);
+  } else if (style === 'nassar'){
+    // 🛹 NASSAR — an Egyptian gamer: teal graphic tee + dark jeans, gaming headset, a controller in hand, and a booster electric skateboard on his back
+    const shirtM = new THREE.MeshStandardMaterial({ color:0x1f7a8a, roughness:0.6 });   // matches the body/torso tee
+    const pantM  = new THREE.MeshStandardMaterial({ color:0x2c3140, roughness:0.75 });
+    const blackM = new THREE.MeshStandardMaterial({ color:0x16181e, roughness:0.5, metalness:0.12 });
+    const cyan   = new THREE.MeshStandardMaterial({ color:0x2ee6e0, emissive:0x0c6a66, emissiveIntensity:0.55, roughness:0.4 });
+    const mag    = new THREE.MeshStandardMaterial({ color:0xff3da6, emissive:0x6a0a3a, emissiveIntensity:0.55, roughness:0.4 });
+    const steel  = new THREE.MeshStandardMaterial({ color:0x9aa0a8, metalness:0.7, roughness:0.3 });
+    // 👕 SHIRT — short sleeves cap the upper arms so the forearms read bare; a small neon chest print
+    [g.armL, g.armR].forEach(a => { const sl = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.046, 0.09, 14), shirtM); sl.position.y = -0.045; a.add(sl); });
+    const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.07, 0.026, 16), shirtM); collar.position.y = 0.475; g.add(collar);
+    const print = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.05, 0.006), cyan); print.position.set(0, 0.4, 0.073); g.add(print);
+    // 👖 JEANS — cover both legs + a waistband
+    [g.legL, g.legR].forEach(l => { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.044, 0.2, 14), pantM); p.position.y = -0.085; l.add(p); });
+    const waistB = new THREE.Mesh(new THREE.CylinderGeometry(0.092, 0.094, 0.05, 18), pantM); waistB.position.y = 0.285; g.add(waistB);
+    // 💇 short cropped black hair
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.104, 20, 14, 0, 6.28, 0, 1.5), new THREE.MeshStandardMaterial({ color:0x120d09, roughness:0.85 }));
+    hair.scale.set(1, 0.9, 1); hair.position.y = 0.6; hair.castShadow = true; g.add(hair);
+    // 🎧 GAMING HEADSET — a band over the crown, two ear cups + neon pads, and a boom mic
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.114, 0.114, 0.03, 20, 1, true, 0, Math.PI), blackM); band.rotation.x = Math.PI/2; band.position.set(0, 0.6, 0); band.castShadow = true; g.add(band);
+    [-1,1].forEach(s => {
+      const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.034, 0.03, 16), blackM); cup.rotation.z = Math.PI/2; cup.position.set(s*0.104, 0.585, 0); cup.castShadow = true; g.add(cup);
+      const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.014, 16), cyan); pad.rotation.z = Math.PI/2; pad.position.set(s*0.12, 0.585, 0); g.add(pad);
+    });
+    const micArm = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.1, 8), blackM); micArm.position.set(-0.082, 0.565, 0.05); micArm.rotation.set(0, 0.6, 0.7); g.add(micArm);
+    const micTip = new THREE.Mesh(new THREE.SphereGeometry(0.013, 10, 8), mag); micTip.position.set(-0.04, 0.55, 0.088); g.add(micTip);
+    // 🎮 GAME CONTROLLER in the right hand — body, grips, d-pad + face buttons
+    const ctrl = new THREE.Group();
+    ctrl.add(new THREE.Mesh(new THREE.BoxGeometry(0.072, 0.03, 0.024), blackM));
+    [-1,1].forEach(s => { const grip = new THREE.Mesh(new THREE.SphereGeometry(0.017, 10, 8), blackM); grip.scale.set(1, 1.4, 1); grip.position.set(s*0.035, -0.012, 0); ctrl.add(grip); });
+    const dpad = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.005, 0.014), steel); dpad.position.set(-0.019, 0.016, 0.006); ctrl.add(dpad);
+    ctrl.add((()=>{ const b=new THREE.Mesh(new THREE.SphereGeometry(0.005,8,6), mag); b.position.set(0.016, 0.016, 0.007); return b; })());
+    ctrl.add((()=>{ const b=new THREE.Mesh(new THREE.SphereGeometry(0.005,8,6), cyan); b.position.set(0.027, 0.014, 0.007); return b; })());
+    ctrl.position.set(0, -0.07, 0.03); ctrl.rotation.x = -0.5; if (g.armR.wrist) g.armR.wrist.add(ctrl);
+    // 🛹 BOOSTER ELECTRIC SKATEBOARD strapped vertically on his back (grip-tape deck facing out, neon underglow + wheels, a motor hub)
+    const sk = new THREE.Group();
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.36, 0.022), new THREE.MeshStandardMaterial({ color:0x16181e, roughness:0.4, metalness:0.2 })); deck.castShadow = true; sk.add(deck);
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.34, 0.004), new THREE.MeshStandardMaterial({ color:0x0c0c10, roughness:0.95 })); grip.position.z = 0.013; sk.add(grip);   // grip tape faces outward
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.3, 0.006), cyan); stripe.position.set(0, 0, 0.016); sk.add(stripe);
+    const glow = new THREE.Mesh(new THREE.BoxGeometry(0.118, 0.3, 0.006), cyan); glow.position.z = -0.013; sk.add(glow);   // neon underglow behind
+    const motor = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.05, 14), new THREE.MeshStandardMaterial({ color:0x33373d, metalness:0.7, roughness:0.3 })); motor.rotation.z = Math.PI/2; motor.position.set(0, -0.1, -0.02); sk.add(motor);
+    [-0.12, 0.12].forEach(yy => {
+      const truck = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.018, 0.018), steel); truck.position.set(0, yy, -0.016); sk.add(truck);
+      [-0.04, 0.04].forEach(xx => { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.016, 14), mag); w.rotation.z = Math.PI/2; w.position.set(xx, yy, -0.03); w.castShadow = true; sk.add(w); });
+    });
+    const strap = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.42, 0.012), new THREE.MeshStandardMaterial({ color:0x24262c, roughness:0.6 })); strap.position.set(-0.02, 0.42, 0.02); strap.rotation.z = 0.3; g.add(strap);
+    sk.position.set(0.01, 0.42, -0.14); sk.rotation.set(0.1, 0, 0.2); g.add(sk);
   } else {
     // explorer (and the colour variants): a rounded pack + a soft sun hat
     const pack = new THREE.Mesh(new THREE.SphereGeometry(0.085, 18, 14),
@@ -4366,6 +4414,8 @@ function makeThrowProp(style){
     grp.add(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.024, 0.06, 14), new THREE.MeshStandardMaterial({ color:0xff8fb0, roughness:0.45 })));
   } else if (style === 'american'){
     grp.add(new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 10), new THREE.MeshStandardMaterial({ color:0xe0a44e, roughness:0.7 })));
+  } else if (style === 'nassar'){
+    grp.add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.028, 0.022), new THREE.MeshStandardMaterial({ color:0x16181e, roughness:0.5, metalness:0.1 })));   // hurls a controller
   } else {
     const m = new THREE.MeshStandardMaterial({ color:0xcbb079, roughness:0.95 });          // sandstone rubble chunk
     const c = new THREE.Mesh(new THREE.DodecahedronGeometry(0.032), m); c.scale.set(1, 0.8, 0.9); grp.add(c);
@@ -6144,7 +6194,7 @@ function renderShop(){
     // specials first, then the exclusives, then one labelled group per era
     ['explorer','ferro'].forEach(k => mkItem(k, charStatus(k)));
     { const exHdr = document.createElement('div'); exHdr.className='shopEraHdr'; exHdr.textContent='✦ EXCLUSIVE'; grid.appendChild(exHdr); }
-    ['ant','frida','american','miah','nzekro'].forEach(k => mkItem(k, charStatus(k)));
+    ['ant','frida','american','miah','nzekro','nassar'].forEach(k => mkItem(k, charStatus(k)));
     ERA_ORDER.forEach(era => {
       const eo = ERAS.find(e=>e.key===era), keys = CHAR_SPEC.filter(s=>s[0]===era).map(s=>s[2]);
       const hdr = document.createElement('div'); hdr.className='shopEraHdr'; hdr.textContent = eo ? eo.name : era.toUpperCase();
