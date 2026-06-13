@@ -983,7 +983,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.299 · 2026.06.13</div>
+  <div id="appVersion">v1.300 · 2026.06.13</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1207,7 +1207,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.299';
+const APP_VERSION = '1.300';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1790,9 +1790,11 @@ function makeRunner(){
     // four caster wheels around the rim
     [0,1,2,3].forEach(i => { const a = i*Math.PI/2 + 0.5, x = Math.cos(a)*0.088, y = 0.47 + Math.sin(a)*0.088;
       const cw = new THREE.Mesh(new THREE.SphereGeometry(0.013, 8, 8), darkM); cw.position.set(x, y, -0.11); cw.castShadow = true; g.add(cw); });
-    // long steel lance angling up over his shoulder + grip
-    const lance = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.5, 12), steelM); lance.position.set(0.05, 0.63, -0.08); lance.rotation.set(-0.55, 0, -0.26); lance.castShadow = true; g.add(lance);
-    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.09, 10), darkM); grip.position.set(0.115, 0.81, 0.0); grip.rotation.set(-0.55, 0, -0.26); g.add(grip);
+    // long steel lance angling up over his shoulder + grip — grouped so the power-wash emote can hide it (he takes it into his hands)
+    const backWand = new THREE.Group();
+    const lance = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.5, 12), steelM); lance.position.set(0.05, 0.63, -0.08); lance.rotation.set(-0.55, 0, -0.26); lance.castShadow = true; backWand.add(lance);
+    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.09, 10), darkM); grip.position.set(0.115, 0.81, 0.0); grip.rotation.set(-0.55, 0, -0.26); backWand.add(grip);
+    g.add(backWand); g.__antWand = backWand;
     // a strap across the chest holding it on
     const strap = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.34, 0.014), darkM); strap.position.set(-0.04, 0.45, 0.01); strap.rotation.z = 0.32; g.add(strap);
   } else if (style === 'frida'){
@@ -5320,18 +5322,26 @@ function previewEmote(){
   charPrev.emote = em;
   try { Sound.init(); (style==='miah'||style==='frida') ? (Sound.cap && Sound.cap()) : (Sound.step && Sound.step()); } catch(e){}
 }
-function makeEmoteSpray(){   // water spray for Ant Man's power-washer emote
+function makeEmoteSpray(){   // Ant Man's power-washer WAND + downward fan jet (grip at the group origin so it pivots in his hands)
   const grp = new THREE.Group();
-  const water = new THREE.MeshStandardMaterial({ color:0xbfe6ff, emissive:0x2a6a8a, transparent:true, opacity:0.5, roughness:0.3, depthWrite:false });
-  const cone = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.28, 12, 1, true), water); cone.rotation.x = Math.PI/2; cone.position.set(0, 0.33, 0.3); grp.add(cone); grp.__cone = cone;
-  for (let i=0;i<7;i++){ const d = new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 6), water); d.position.set((Math.random()-0.5)*0.09, 0.33 + (Math.random()-0.5)*0.06, 0.22 + Math.random()*0.22); grp.add(d); }
-  const noz = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.015, 0.07, 8), new THREE.MeshStandardMaterial({ color:0xcfd6dc, metalness:0.7, roughness:0.3 })); noz.rotation.x = Math.PI/2; noz.position.set(0, 0.33, 0.17); grp.add(noz);
+  const steelM = new THREE.MeshStandardMaterial({ color:0xcfd6dc, metalness:0.7, roughness:0.3 });
+  const darkM  = new THREE.MeshStandardMaterial({ color:0x23262b, metalness:0.5, roughness:0.4 });
+  const water  = new THREE.MeshStandardMaterial({ color:0xbfe6ff, emissive:0x2a6a8a, emissiveIntensity:0.4, transparent:true, opacity:0.5, roughness:0.3, depthWrite:false });
+  const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.07, 10), darkM); grp.add(grip);
+  const trig = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.028, 0.02), darkM); trig.position.set(0, -0.03, 0.024); grp.add(trig);
+  const lance = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.01, 0.4, 12), steelM); lance.position.y = -0.24; grp.add(lance);
+  const noz = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.012, 0.05, 10), steelM); noz.position.y = -0.45; grp.add(noz);
+  // FAN JET: cone narrow at the nozzle (top), widening DOWN toward the ground
+  const jet = new THREE.Mesh(new THREE.ConeGeometry(0.062, 0.26, 16, 1, true), water); jet.position.y = -0.58; jet.visible = false; grp.add(jet); grp.__jet = jet;
+  const drops = []; for (let i=0;i<9;i++){ const d = new THREE.Mesh(new THREE.SphereGeometry(0.009, 6, 6), water.clone()); d.visible = false; grp.add(d); drops.push(d); }
+  grp.__drops = drops;
   return grp;
 }
 function endEmote(r, g){
   if (r && r.emoteProps && g){ try { g.remove(r.emoteProps); } catch(e){} r.emoteProps = null; }
   if (r && r.emoteNotes && g){ try { g.remove(r.emoteNotes); } catch(e){} r.emoteNotes = null; }
   if (r) r.emote = null;
+  if (g && g.__antWand) g.__antWand.visible = true;   // put Ant Man's wand back on his back
   if (g){ if (g.armL) g.armL.rotation.set(0,0,0); if (g.armR) g.armR.rotation.set(0,0,0);
     if (g.armL && g.armL.wrist) g.armL.wrist.rotation.set(0,0,0); if (g.armR && g.armR.wrist) g.armR.wrist.rotation.set(0,0,0);   // un-flick the wrists
     g.rotation.z = 0; }   // reset so the run resumes cleanly
@@ -5468,13 +5478,26 @@ function playEmote(g, r, t, dt){
     if (!r.emoteNotes){ r.emoteNotes = makeMusicNotes(); g.add(r.emoteNotes); }
     animateMusicNotes(r.emoteNotes, t);
   } else if (style === 'ant'){
-    // grip the power-washer wand with the front legs and SPRAY (recoil + pulsing jet)
-    if (g.armL){ g.armL.rotation.x = -0.9; g.armL.rotation.z = 0.25; } bend(g.armL, -0.7);
-    if (g.armR){ g.armR.rotation.x = -0.9; g.armR.rotation.z = -0.25; } bend(g.armR, -0.7);
-    g.position.y += Math.sin(t*16) * 0.003;   // recoil from the blast
-    if (r.emoteProps){ const e = Math.min(1, t*6), pulse = 0.85 + 0.25*Math.sin(t*18);
-      r.emoteProps.scale.set(e*pulse, e, e*pulse);
-      if (r.emoteProps.__cone && r.emoteProps.__cone.material) r.emoteProps.__cone.material.opacity = 0.32 + 0.26*Math.abs(Math.sin(t*18)); }
+    // 🧼 take the power-washer off his back and POWER-WASH THE GROUND: swing the wand down, aim the jet at the floor, sweep side to side
+    const W = r.emoteProps;
+    if (g.__antWand) g.__antWand.visible = false;     // the wand has left his back — it's in his hands now
+    // grip the wand with both front legs, reaching down-forward
+    if (g.armL){ g.armL.rotation.x = -1.0; g.armL.rotation.z = 0.34; } bend(g.armL, -0.85);
+    if (g.armR){ g.armR.rotation.x = -1.0; g.armR.rotation.z = -0.34; } bend(g.armR, -0.85);
+    if (W){
+      const k = Math.min(1, t/0.6), e = k*k*(3-2*k), lp = (a,b)=>a+(b-a)*e;   // smoothstep the pull-down from the shoulder
+      W.position.set(lp(0.085, 0.03), lp(0.66, 0.42), lp(-0.05, 0.12));
+      W.rotation.set(lp(-2.2, -0.8), 0, lp(0.3, 0));                          // from stowed-on-back to aimed-at-the-ground
+      const firing = t > 0.55;
+      if (W.__jet && W.__jet.material){ W.__jet.visible = firing;
+        W.__jet.material.opacity = firing ? (0.34 + 0.26*Math.abs(Math.sin(t*20))) : 0;
+        const pulse = 0.9 + 0.2*Math.sin(t*22); W.__jet.scale.set(pulse, 1, pulse); }
+      if (W.__drops){ W.__drops.forEach((d,i)=>{ if (!firing){ d.visible=false; return; } d.visible=true;
+        const ph = (t*3 + i/W.__drops.length)%1, ang = i*2.4, rad = 0.05*(0.4+ph);   // scatter outward from where the jet hits
+        d.position.set(Math.cos(ang)*rad, -0.72 + ph*0.02, Math.sin(ang)*rad);
+        if (d.material) d.material.opacity = (1-ph)*0.6; }); }
+      if (firing){ g.rotation.y += Math.sin(t*2.6)*0.2; g.position.y += Math.sin(t*22)*0.0025; }   // sweep a wide patch + recoil
+    }
   } else if (style === 'american'){
     // bring the burger up to his mouth and CHOMP, with a happy bob
     if (g.armR){ g.armR.rotation.z = 0.9; g.armR.rotation.x = -0.9; } bend(g.armR, -1.4 + Math.max(0, Math.sin(t*7))*0.5);   // forearm folds up to the mouth
