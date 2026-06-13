@@ -983,7 +983,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.296 · 2026.06.13</div>
+  <div id="appVersion">v1.297 · 2026.06.13</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1207,7 +1207,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.296';
+const APP_VERSION = '1.297';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -5741,12 +5741,12 @@ function followCam(dt, falling){
   const A = r.tiles[r.idx].pos, B = r.tiles[Math.min(r.idx+1,r.tiles.length-1)].pos;
   let dir = B.clone().sub(A); dir.y = 0;
   if (dir.lengthSq() < 0.0001) dir.set(0,0,1); else dir.normalize();
-  // a LOW, CLOSE chase cam — right at the climber's heels and down near his level, tilted up the slope. The closeness +
-  // low angle make him loom large on screen (his actual size is unchanged) while you still see what's coming ahead.
-  const want = g.position.clone().addScaledVector(dir, -0.72); want.y = g.position.y + 0.12;
+  // a LOW, CLOSE, UP-TILTED chase cam — down near the climber's feet and right at his heels, aimed UP at him and the slope.
+  // the low vantage + upward tilt make him tower on screen and feel close (his actual size is unchanged).
+  const want = g.position.clone().addScaledVector(dir, -0.7); want.y = g.position.y + 0.03;
   camera.position.lerp(want, Math.min(1, dt*4));
-  const look = g.position.clone().addScaledVector(dir, 0.9);
-  camera.lookAt(look.x, look.y + 0.28, look.z);
+  const look = g.position.clone().addScaledVector(dir, 0.82);
+  camera.lookAt(look.x, look.y + 0.46, look.z);
   applyShake();
 }
 
