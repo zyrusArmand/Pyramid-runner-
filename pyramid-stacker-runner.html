@@ -983,7 +983,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.303 · 2026.06.13</div>
+  <div id="appVersion">v1.304 · 2026.06.13</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1207,7 +1207,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.303';
+const APP_VERSION = '1.304';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -5292,7 +5292,7 @@ function slowmo(){ S.timeScale = 0.32; }      // brief bullet-time, eased back t
 
 // ---- EMOTES: tap the 🎭 button to stop, turn to the camera, and do a little character routine ----
 function emoteDur(){ const s = character().style;
-  return s==='nzekro' ? 4.6 : s==='miah' ? 3.4 : s==='ant' ? 3.0 : s==='american' ? 3.2 : s==='frida' ? 2.6 : 2.0; }
+  return s==='nzekro' ? 4.6 : s==='miah' ? 3.4 : s==='ant' ? 3.0 : s==='american' ? 3.2 : s==='frida' ? 6.0 : 2.0; }
 function startEmote(){
   const r = S.run, g = S.runner;
   if (!r || !g || r.emote || r.falling || r.dead || r.celebrating || r.awaitStart || r.startDelay > 0) return;
@@ -5303,6 +5303,7 @@ function startEmote(){
     if (style === 'miah'){ r.emoteProps = makeEmoteGuitar(); g.add(r.emoteProps); }
     else if (style === 'ant'){ r.emoteProps = makeEmoteSpray(); g.add(r.emoteProps); }
     else if (style === 'nzekro'){ r.emoteProps = makeEmoteCanvas(); g.add(r.emoteProps); }
+    else if (style === 'frida'){ r.emoteProps = makeEmoteFrida(); g.add(r.emoteProps); }
   } catch(e){}
   try { (style==='miah' || style==='frida') ? (Sound.cap && Sound.cap()) : (Sound.step && Sound.step()); } catch(e){}
 }
@@ -5316,6 +5317,7 @@ function previewEmote(){
     if (style==='miah'){ em.emoteProps = makeEmoteGuitar(); g.add(em.emoteProps); }
     else if (style==='ant'){ em.emoteProps = makeEmoteSpray(); g.add(em.emoteProps); }
     else if (style==='nzekro'){ em.emoteProps = makeEmoteCanvas(); g.add(em.emoteProps); }
+    else if (style==='frida'){ em.emoteProps = makeEmoteFrida(); g.add(em.emoteProps); }
   } catch(e){}
   curChar = save;
   charPrev.emote = em;
@@ -5342,6 +5344,45 @@ function makeEmoteSpray(){   // Ant Man's SURFACE-CLEANER power washer — a fla
   const fan = new THREE.Mesh(new THREE.CylinderGeometry(R*1.3, R*1.3, 0.008, 28), water); fan.position.y = 0.004; fan.visible = false; grp.add(fan); grp.__jet = fan;
   const drops = []; for (let i=0;i<10;i++){ const d = new THREE.Mesh(new THREE.SphereGeometry(0.009, 6, 6), water.clone()); d.visible = false; grp.add(d); drops.push(d); }
   grp.__drops = drops;
+  return grp;
+}
+// 🍮 Frida's "what's cooking" emote: a puffy thought-cloud with a pot + 3 loading dots, then a tray of Cinnabon rolls pops into her hands
+function makeEmoteFrida(){
+  const grp = new THREE.Group();
+  const cloudM = new THREE.MeshStandardMaterial({ color:0xffffff, emissive:0xe3e9f2, emissiveIntensity:0.35, roughness:0.9 });
+  // ---- COOKING THOUGHT-CLOUD in front of her face/torso ----
+  const cloud = new THREE.Group();
+  [[0,0,0,0.092],[0.075,0.02,0,0.07],[-0.075,0.016,0,0.068],[0.045,0.062,0,0.06],[-0.05,0.06,0,0.058],[0,0.078,0,0.055],[0.098,-0.02,0,0.05],[-0.098,-0.018,0,0.05],[0,-0.055,0.005,0.058]]
+    .forEach(p => { const s = new THREE.Mesh(new THREE.SphereGeometry(p[3],14,12), cloudM); s.position.set(p[0],p[1],p[2]); cloud.add(s); });
+  // a little thought-tail of bubbles trailing down toward her chest
+  [[-0.02,-0.12,0.02,0.024],[0.0,-0.085,0.014,0.018]].forEach(p => { const s = new THREE.Mesh(new THREE.SphereGeometry(p[3],10,8), cloudM); s.position.set(p[0],p[1],p[2]); cloud.add(s); });
+  // a small cooking POT bubbling inside the cloud
+  const pot = new THREE.Group();
+  pot.add(new THREE.Mesh(new THREE.CylinderGeometry(0.032,0.028,0.03,16), new THREE.MeshStandardMaterial({ color:0xcf3b2a, roughness:0.4, metalness:0.2 })));
+  const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,0.006,16), new THREE.MeshStandardMaterial({ color:0x8a1f14 })); rim.position.y=0.016; pot.add(rim);
+  const stew = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.005,16), new THREE.MeshStandardMaterial({ color:0xf2b34a, emissive:0x6a3a00, emissiveIntensity:0.3 })); stew.position.y=0.018; pot.add(stew);
+  [-1,1].forEach(s => { const h = new THREE.Mesh(new THREE.BoxGeometry(0.012,0.006,0.006), new THREE.MeshStandardMaterial({color:0x8a1f14})); h.position.set(s*0.038,0.006,0); pot.add(h); });
+  pot.position.set(0,-0.012,0.05); cloud.add(pot);
+  const steam = []; for (let i=0;i<3;i++){ const w = new THREE.Mesh(new THREE.SphereGeometry(0.013,8,8), cloudM.clone()); w.material.transparent=true; w.position.set((i-1)*0.018,0.03,0.05); cloud.add(w); steam.push(w); }
+  grp.__steam = steam;
+  // 3 loading DOTS
+  const dots = []; for (let i=0;i<3;i++){ const d = new THREE.Mesh(new THREE.SphereGeometry(0.012,10,8), new THREE.MeshStandardMaterial({ color:0x6a5240, roughness:0.6 })); d.position.set((i-1)*0.032,-0.052,0.07); d.visible=false; cloud.add(d); dots.push(d); }
+  grp.__dots = dots;
+  cloud.position.set(0.02,0.55,0.22); cloud.scale.setScalar(0.001); grp.add(cloud); grp.__cloud = cloud;
+  // ---- TRAY of 3 CINNABON ROLLS (held in her hands), hidden until cooking is done ----
+  const tray = new THREE.Group();
+  tray.add(new THREE.Mesh(new THREE.BoxGeometry(0.17,0.012,0.08), new THREE.MeshStandardMaterial({ color:0xb8bcc4, metalness:0.6, roughness:0.3 })));
+  [[0,0,0.04],[0,0,-0.04]].forEach(p => { const lp = new THREE.Mesh(new THREE.BoxGeometry(0.17,0.016,0.006), new THREE.MeshStandardMaterial({ color:0x9aa0a8, metalness:0.6, roughness:0.3 })); lp.position.set(p[0],0.004,p[2]); tray.add(lp); });
+  for (let i=0;i<3;i++){ const roll = new THREE.Group();
+    roll.add(new THREE.Mesh(new THREE.CylinderGeometry(0.027,0.027,0.024,18), new THREE.MeshStandardMaterial({ color:0xc8893f, roughness:0.6 })));   // golden bun
+    const swirl = new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.018,0.0012,16), new THREE.MeshStandardMaterial({ color:0x7a4a22 })); swirl.position.y=0.0125; roll.add(swirl);   // cinnamon swirl hint
+    const icing = new THREE.Mesh(new THREE.SphereGeometry(0.025,14,12), new THREE.MeshStandardMaterial({ color:0xf4ecd8, roughness:0.5 })); icing.scale.set(1,0.42,1); icing.position.y=0.018; roll.add(icing);   // cream-cheese icing
+    roll.position.set((i-1)*0.052,0.018,0); tray.add(roll);
+  }
+  tray.position.set(0.0,0.33,0.2); tray.scale.setScalar(0.001); tray.visible=false; grp.add(tray); grp.__tray = tray;
+  // ---- SPARKLES that burst when the tray first appears ----
+  const sparkles = []; for (let i=0;i<8;i++){ const sp = new THREE.Mesh(new THREE.SphereGeometry(0.008,8,6), new THREE.MeshStandardMaterial({ color:0xffe27a, emissive:0xffcf4a, emissiveIntensity:0.9 })); sp.visible=false; grp.add(sp); sparkles.push(sp); }
+  grp.__sparkles = sparkles;
   return grp;
 }
 function endEmote(r, g){
@@ -5534,11 +5575,33 @@ function playEmote(g, r, t, dt){
       g.position.y += Math.abs(Math.sin(t*3)) * 0.004;
     }
   } else if (style === 'frida'){
-    // a graceful pose — raise the cup like a toast, other arm out, gentle sway
-    if (g.armR){ g.armR.rotation.x = -1.5; g.armR.rotation.z = -0.1; } bend(g.armR, -1.1);   // cup raised by the bent forearm
-    if (g.armL){ g.armL.rotation.x = -0.3; g.armL.rotation.z = -0.7; } bend(g.armL, -0.5);
-    g.rotation.z = Math.sin(t*2.3) * 0.06;
-    g.position.y += Math.sin(t*2.3) * 0.003;
+    // 🍮 "what's cooking?" — a thought-cloud bubbles away (3 dots, 1s apart), then a tray of Cinnabon rolls pops into her hands
+    const F = r.emoteProps, cooking = t < 3.0;
+    if (cooking){
+      // hands clasped at her chest, watching the pot, a gentle sway
+      if (g.armR){ g.armR.rotation.x = -0.6; g.armR.rotation.z = -0.45; } bend(g.armR, -1.4);
+      if (g.armL){ g.armL.rotation.x = -0.6; g.armL.rotation.z = 0.45; } bend(g.armL, -1.4);
+      g.rotation.z = Math.sin(t*2.0) * 0.04;
+    } else {
+      // present the warm tray — both forearms up, hands under it
+      if (g.armR){ g.armR.rotation.x = -0.95; g.armR.rotation.z = -0.28; } bend(g.armR, -1.35);
+      if (g.armL){ g.armL.rotation.x = -0.95; g.armL.rotation.z = 0.28; } bend(g.armL, -1.35);
+      g.position.y += Math.abs(Math.sin(t*3)) * 0.003;
+    }
+    if (F){
+      const eb = p => { const c1=1.70158, c3=c1+1, x=p-1; return 1 + c3*x*x*x + c1*x*x; };   // easeOutBack for a poppy reveal
+      if (F.__cloud){ const popIn = Math.min(1, t*5), popOut = cooking ? 1 : Math.max(0, 1-(t-3.0)*6), s = popIn*popOut;
+        F.__cloud.scale.setScalar(Math.max(0.001, s)); F.__cloud.visible = s>0.01; F.__cloud.position.y = 0.55 + Math.sin(t*3)*0.006; }
+      if (F.__steam) F.__steam.forEach((w,i)=>{ const ph=((t*1.3 + i/3)%1); w.position.y=0.03+ph*0.06; w.scale.setScalar(Math.max(0.2,1-ph*0.7)); if (w.material) w.material.opacity = cooking ? (1-ph) : 0; });
+      // DOTS appear one per second, only while cooking
+      if (F.__dots) F.__dots.forEach((d,i)=>{ const at = 0.8 + i*1.0, on = cooking && t>=at; d.visible = on; if (on) d.scale.setScalar(Math.min(1,(t-at)*7)); });
+      // TRAY pops in once the cooking is done, then is carried
+      if (F.__tray){ if (cooking){ F.__tray.visible=false; } else { F.__tray.visible=true;
+        F.__tray.scale.setScalar(Math.max(0.001, eb(Math.min(1,(t-3.05)/0.45)))); F.__tray.position.y = 0.33 + Math.sin(t*3)*0.004; } }
+      // SPARKLES burst outward when the tray first appears (~3.0–3.9s)
+      if (F.__sparkles) F.__sparkles.forEach((sp,i)=>{ if (cooking){ sp.visible=false; return; } const life=Math.min(1,(t-3.0)/0.9); if (life>=1){ sp.visible=false; return; } sp.visible=true;
+        const a=i/F.__sparkles.length*Math.PI*2, rad=0.05+life*0.13; sp.position.set(Math.cos(a)*rad, 0.33+Math.sin(a)*rad*0.8, 0.21); sp.scale.setScalar(0.5+(1-life)*1.3); if (sp.material) sp.material.emissiveIntensity = 0.9*(1-life); });
+    }
   } else {
     // default: a friendly wave
     if (g.armR){ g.armR.rotation.x = -2.3; g.armR.rotation.z = -0.3; } bend(g.armR, -0.4 + Math.sin(t*9)*0.5);
