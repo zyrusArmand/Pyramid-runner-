@@ -983,7 +983,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.308 · 2026.06.13</div>
+  <div id="appVersion">v1.309 · 2026.06.13</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1207,7 +1207,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.308';
+const APP_VERSION = '1.309';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -5493,10 +5493,10 @@ function makeEmoteGuitar(){
 function makeEmoteCanvas(){
   const grp = new THREE.Group();
   const legM = new THREE.MeshStandardMaterial({ color:0x5a3d22, roughness:0.75 });
-  // a REAL tripod easel: three legs meet at an apex near the top and splay OPEN down to the floor
-  const apexY = 0.46, legLen = 0.54;
+  // a REAL tripod easel: three legs meet at an apex that sits BEHIND/below the canvas top (so no mast crosses the painting) and splay OPEN to the floor
+  const apexY = 0.41, legLen = 0.54;
   const mkLeg = (yaw, splay) => {
-    const pivot = new THREE.Group(); pivot.position.set(0, apexY, 0); pivot.rotation.y = yaw;     // which way the leg points
+    const pivot = new THREE.Group(); pivot.position.set(0, apexY, -0.02); pivot.rotation.y = yaw;     // apex tucked behind the canvas plane
     const tilt  = new THREE.Group(); tilt.rotation.x = splay; pivot.add(tilt);                    // how far it splays from vertical
     const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.013, legLen, 10), legM); leg.position.y = -legLen/2; leg.castShadow = true; tilt.add(leg);
     const foot = new THREE.Mesh(new THREE.SphereGeometry(0.014, 8, 6), legM); foot.position.y = -legLen; foot.castShadow = true; tilt.add(foot);
