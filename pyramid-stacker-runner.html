@@ -983,7 +983,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.298 · 2026.06.13</div>
+  <div id="appVersion">v1.299 · 2026.06.13</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1207,7 +1207,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.298';
+const APP_VERSION = '1.299';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -5218,27 +5218,35 @@ function updateRun(dt){
       if (g.legL.elbow){ g.legL.elbow.rotation.x = 0.5; g.legR.elbow.rotation.x = 0.6; g.armL.elbow.rotation.x = -0.4; g.armR.elbow.rotation.x = -0.4; } }
     else {
       const a = Math.sin(r.stride), b = Math.sin(r.stride + Math.PI);
-      // a controlled STAIR-STEP gait: lift the lead thigh only moderately and fold the knee to clear the step;
-      // the trailing leg pushes back just a little — no wild forward/back kicking that clips through hazards
-      g.legL.rotation.x = Math.max(0,a)*0.5 - Math.max(0,-a)*0.16;
-      g.legR.rotation.x = Math.max(0,b)*0.5 - Math.max(0,-b)*0.16;
-      g.armL.rotation.x = -a*0.5;  g.armR.rotation.x = -b*0.5;       // arms pump opposite, gentler
-      g.armL.rotation.z = 0.12; g.armR.rotation.z = -0.12;
+      // a real BOUNDING stair-run: the lead thigh drives up high while its knee folds to clear the step, the trailing
+      // leg extends and pushes off behind, and the arms pump HARD with bent elbows opposite the legs — like a person
+      // taking the stairs two at a time. Body bobs and counter-rotates at the shoulders/hips for life.
+      g.legL.rotation.x = Math.max(0,a)*0.92 - Math.max(0,-a)*0.42;   // drive forward/up, push back behind
+      g.legR.rotation.x = Math.max(0,b)*0.92 - Math.max(0,-b)*0.42;
+      g.legL.rotation.z = 0.05; g.legR.rotation.z = -0.05;
+      g.armL.rotation.x = -a*0.95; g.armR.rotation.x = -b*0.95;       // big opposite arm pump
+      g.armL.rotation.z = 0.16; g.armR.rotation.z = -0.16;
       if (g.legL.elbow){
-        g.legL.elbow.rotation.x = Math.max(0, a) * 1.35;             // KNEE folds to lift the foot over the step
-        g.legR.elbow.rotation.x = Math.max(0, b) * 1.35;
-        g.armL.elbow.rotation.x = -0.5 + a*0.25;                     // ELBOW bent ~90°, swings a touch
-        g.armR.elbow.rotation.x = -0.5 + b*0.25;
+        g.legL.elbow.rotation.x = Math.max(0,a)*1.7 + Math.max(0,-a)*0.55;   // knee snaps up high on the drive, tucks on recovery
+        g.legR.elbow.rotation.x = Math.max(0,b)*1.7 + Math.max(0,-b)*0.55;
+        g.armL.elbow.rotation.x = -1.15 + a*0.55;                     // elbows held ~90° and pumping
+        g.armR.elbow.rotation.x = -1.15 + b*0.55;
       }
-      g.position.y += Math.abs(Math.sin(r.stride)) * 0.012;          // gentler up/down bob
+      g.position.y += Math.abs(a) * 0.02;                             // stronger drive-bob on each step
+      r.__run = Math.cos(r.stride);                                   // stride phase for the torso twist/sway below
     }
   }
 
   // face direction of travel
   const dir = B.clone().sub(A); dir.y = 0;
   if (dir.lengthSq() > 0.0001) g.rotation.y = Math.atan2(dir.x, dir.z);
-  // a roll somersaults the whole body forward/back around the lateral axis
-  g.rotation.x = r.rolling ? r.rollDir * Math.min(r.rollT/r.rollDur, 1) * Math.PI*2 : 0;
+  // a roll somersaults the whole body forward/back around the lateral axis; otherwise lean FORWARD into the climb while running
+  const runActive = !r.jumping && !r.sliding && !r.rolling && !r.dead;
+  g.rotation.x = r.rolling ? r.rollDir * Math.min(r.rollT/r.rollDur, 1) * Math.PI*2 : (runActive ? 0.15 : 0);   // forward lean up the stairs
+  if (runActive){
+    g.rotation.y += (r.__run||0) * 0.08;     // shoulders/hips counter-rotate with each stride
+    g.rotation.z = -(r.__run||0) * 0.05;     // subtle lateral sway
+  }
 
   // progress HUD
   S.peakY = Math.max(S.peakY||0, base.y);
@@ -5730,10 +5738,10 @@ function followCam(dt, falling){
   if (dir.lengthSq() < 0.0001) dir.set(0,0,1); else dir.normalize();
   // a LOW, CLOSE, UP-TILTED chase cam — down near the climber's feet and right at his heels, aimed UP at him and the slope.
   // the low vantage + upward tilt make him tower on screen and feel close (his actual size is unchanged).
-  const want = g.position.clone().addScaledVector(dir, -0.7); want.y = g.position.y + 0.03;
+  const want = g.position.clone().addScaledVector(dir, -0.68); want.y = g.position.y - 0.02;
   camera.position.lerp(want, Math.min(1, dt*4));
-  const look = g.position.clone().addScaledVector(dir, 0.82);
-  camera.lookAt(look.x, look.y + 0.46, look.z);
+  const look = g.position.clone().addScaledVector(dir, 0.8);
+  camera.lookAt(look.x, look.y + 0.52, look.z);
   applyShake();
 }
 
