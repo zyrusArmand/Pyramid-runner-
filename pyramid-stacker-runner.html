@@ -983,7 +983,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.297 · 2026.06.13</div>
+  <div id="appVersion">v1.298 · 2026.06.13</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1207,7 +1207,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.297';
+const APP_VERSION = '1.298';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1951,28 +1951,15 @@ function makeRunner(){
     // 👖 JEANS — cover both legs + a waistband
     [g.legL, g.legR].forEach(l => { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.044, 0.2, 14), pantM); p.position.y = -0.085; l.add(p); });
     const waistB = new THREE.Mesh(new THREE.CylinderGeometry(0.092, 0.094, 0.05, 18), pantM); waistB.position.y = 0.285; g.add(waistB);
-    // (no hair — clean shaved head under the headset)
-    // 🎧 on-ear HEADPHONES (cups + neon pads) worn at the ears, under the cap, plus a boom mic
-    [-1,1].forEach(s => {
-      const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.033, 0.03, 16), blackM); cup.rotation.z = Math.PI/2; cup.position.set(s*0.103, 0.57, 0); cup.castShadow = true; g.add(cup);
-      const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.014, 16), cyan); pad.rotation.z = Math.PI/2; pad.position.set(s*0.118, 0.57, 0); g.add(pad);
-    });
-    // the BAND that actually joins the two cups — arcs around the back of the head (clear of the cap), so the headset reads as connected
-    for (let i=0;i<=9;i++){ const t=i/9, b=Math.PI*t;
-      const bd = new THREE.Mesh(new THREE.SphereGeometry(0.013, 10, 8), blackM);
-      bd.position.set(-Math.cos(b)*0.104, 0.572 + Math.sin(b)*0.04, -0.052 - Math.sin(b)*0.052); bd.castShadow = true; g.add(bd); }
-    const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.125, 8), blackM); boom.position.set(-0.068, 0.55, 0.052); boom.rotation.set(1.18, 0, 0.45); g.add(boom);
-    const foam = new THREE.Mesh(new THREE.SphereGeometry(0.013, 10, 8), new THREE.MeshStandardMaterial({ color:0x202228, roughness:0.95 })); foam.position.set(-0.024, 0.542, 0.1); g.add(foam);
-    // 🧢 BLACK FLAT CAP (ivy/newsboy) — a low rounded crown, fuller toward the front, draping over the brow with a short stiff peak
-    const capM   = new THREE.MeshStandardMaterial({ color:0x141519, roughness:0.62, metalness:0.04 });
-    const capM2  = new THREE.MeshStandardMaterial({ color:0x101116, roughness:0.7 });   // a touch darker for the panels/seam
-    const crown  = new THREE.Mesh(new THREE.SphereGeometry(0.128, 28, 20, 0, 6.2832, 0, 1.5), capM); crown.scale.set(1.04, 0.62, 1.16); crown.position.set(0, 0.646, 0.012); crown.castShadow = true; g.add(crown);   // larger + higher → rests ON TOP of the head, not merging into it
-    const slouch = new THREE.Mesh(new THREE.SphereGeometry(0.094, 20, 14), capM); slouch.scale.set(1.14, 0.5, 0.95); slouch.position.set(0, 0.632, 0.082); slouch.castShadow = true; g.add(slouch);   // the fuller front that drapes forward
-    const peak   = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.012, 22, 1, false, -Math.PI/2, Math.PI), capM2); peak.scale.set(1, 1, 0.6); peak.rotation.x = -0.3; peak.position.set(0, 0.614, 0.118); peak.castShadow = true; g.add(peak);   // short stiff brim
-    const seam   = new THREE.Mesh(new THREE.CylinderGeometry(0.128, 0.128, 0.022, 28, 1, true), capM2); seam.scale.set(1.04, 1, 1.16); seam.position.set(0, 0.61, 0.012); g.add(seam);   // headband where the cap meets the head (sits at the brow)
-    // a couple of stitched panel ridges over the crown for a tailored, real-cap read
-    [-0.042, 0.042].forEach(px => { const rib = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.006, 0.19), capM2); rib.position.set(px, 0.684, 0.012); rib.rotation.x = 0.15; g.add(rib); });
-    const btn = new THREE.Mesh(new THREE.SphereGeometry(0.011, 10, 8), capM); btn.position.set(0, 0.71, 0.012); g.add(btn);   // crown button
+    // (no hair, no headphones — clean shaved head under the cap)
+    // 🧢 BLACK FLAT CAP (ivy) — a clean smooth dome resting on the crown, a soft front drape + a short brim
+    const capM   = new THREE.MeshStandardMaterial({ color:0x17181d, roughness:0.6, metalness:0.05 });
+    const capM2  = new THREE.MeshStandardMaterial({ color:0x101116, roughness:0.72 });   // a touch darker for the band/brim
+    const crown  = new THREE.Mesh(new THREE.SphereGeometry(0.118, 30, 22), capM); crown.scale.set(1.06, 0.62, 1.22); crown.position.set(0, 0.642, 0.016); crown.castShadow = true; g.add(crown);   // full flattened dome → covers the head cleanly, no merge
+    const drape  = new THREE.Mesh(new THREE.SphereGeometry(0.072, 20, 16), capM); drape.scale.set(1.32, 0.72, 0.72); drape.position.set(0, 0.616, 0.092); drape.castShadow = true; g.add(drape);   // the ivy-cap slouch toward the front
+    const band   = new THREE.Mesh(new THREE.CylinderGeometry(0.117, 0.117, 0.024, 28, 1, true), capM2); band.scale.set(1.06, 1, 1.2); band.position.set(0, 0.604, 0.016); g.add(band);   // headband ring at the brow
+    const brim   = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.012, 26, 1, false, -Math.PI/2, Math.PI), capM2); brim.scale.set(1.05, 1, 0.62); brim.rotation.x = -0.34; brim.position.set(0, 0.6, 0.132); brim.castShadow = true; g.add(brim);   // short stiff peak
+    const btn    = new THREE.Mesh(new THREE.SphereGeometry(0.012, 10, 8), capM); btn.position.set(0, 0.688, 0.018); g.add(btn);   // crown button
     // 🎮 GAME CONTROLLER in the right hand — body, grips, d-pad + face buttons
     const ctrl = new THREE.Group();
     ctrl.add(new THREE.Mesh(new THREE.BoxGeometry(0.072, 0.03, 0.024), blackM));
