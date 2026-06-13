@@ -454,7 +454,15 @@
   .sbtn:active { transform:scale(.95); }
   .sbtn.buy { border-color:#ffe08a; color:#3a2410; background:linear-gradient(180deg,#ffe79a,#e2a93f); }
   .sbtn.equip { border-color:#9fe9c0; color:#9fe9c0; background:rgba(159,233,192,.1); }
-  .sbtn.emote { border-color:#c9a8ff; color:#d8c2ff; background:rgba(201,168,255,.12); }
+  .sbtn.emote { position:relative; overflow:hidden; border-color:#d8b15a; color:#ffe7ad;
+    background:linear-gradient(180deg,#2a4486 0%,#1a2950 100%);
+    box-shadow:inset 0 1px 0 rgba(255,236,180,.32), inset 0 -2px 7px rgba(0,0,0,.4), 0 2px 10px rgba(0,0,0,.4);
+    text-shadow:0 1px 2px rgba(0,0,0,.55); }
+  .sbtn.emote .seGlyph { color:#ffd86a; margin-right:5px; }
+  .sbtn.emote::after { content:''; position:absolute; inset:0; pointer-events:none;
+    background:linear-gradient(115deg,transparent 38%,rgba(255,240,200,.3) 50%,transparent 62%);
+    transform:translateX(-130%); animation:emoteSheen 3.4s ease-in-out infinite; }
+  @keyframes emoteSheen { 0%,58% { transform:translateX(-130%); } 82%,100% { transform:translateX(130%); } }
   .sbtn.disabled { opacity:.4; pointer-events:none; filter:grayscale(.4); }
   #shopGrid { display:flex; flex-wrap:wrap; gap:9px; justify-content:center; max-width:330px; max-height:46vh; overflow-y:auto; padding:2px 2px 8px; }
   .shopEraHdr { flex-basis:100%; text-align:center; font-family:'Cinzel',serif; font-weight:700; font-size:12px; letter-spacing:3px;
@@ -923,7 +931,7 @@
     <div id="shopItemName">EXPLORER</div>
     <div id="shopItemPerk"></div>
     <div id="shopBtnRow">
-      <div class="sbtn emote" id="shopEmoteBtn">🎭 EMOTE</div>
+      <div class="sbtn emote" id="shopEmoteBtn"><span class="seGlyph">✦</span>EMOTE</div>
       <div class="sbtn buy" id="shopBuyBtn">PURCHASE</div>
       <div class="sbtn equip" id="shopEquipBtn">EQUIP</div>
     </div>
@@ -972,7 +980,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.287 · 2026.06.13</div>
+  <div id="appVersion">v1.288 · 2026.06.13</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1196,7 +1204,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.287';
+const APP_VERSION = '1.288';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
