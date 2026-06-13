@@ -454,6 +454,7 @@
   .sbtn:active { transform:scale(.95); }
   .sbtn.buy { border-color:#ffe08a; color:#3a2410; background:linear-gradient(180deg,#ffe79a,#e2a93f); }
   .sbtn.equip { border-color:#9fe9c0; color:#9fe9c0; background:rgba(159,233,192,.1); }
+  .sbtn.emote { border-color:#c9a8ff; color:#d8c2ff; background:rgba(201,168,255,.12); }
   .sbtn.disabled { opacity:.4; pointer-events:none; filter:grayscale(.4); }
   #shopGrid { display:flex; flex-wrap:wrap; gap:9px; justify-content:center; max-width:330px; max-height:46vh; overflow-y:auto; padding:2px 2px 8px; }
   .shopEraHdr { flex-basis:100%; text-align:center; font-family:'Cinzel',serif; font-weight:700; font-size:12px; letter-spacing:3px;
@@ -902,6 +903,7 @@
     <div id="shopItemName">EXPLORER</div>
     <div id="shopItemPerk"></div>
     <div id="shopBtnRow">
+      <div class="sbtn emote" id="shopEmoteBtn">🎭 EMOTE</div>
       <div class="sbtn buy" id="shopBuyBtn">PURCHASE</div>
       <div class="sbtn equip" id="shopEquipBtn">EQUIP</div>
     </div>
@@ -950,7 +952,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.284 · 2026.06.13</div>
+  <div id="appVersion">v1.285 · 2026.06.13</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1138,7 +1140,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.284';
+const APP_VERSION = '1.285';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -2044,6 +2046,7 @@ function updateCharPreview(){
   initCharPreview();
   if (!charPrev) return;
   if (charPrev.runner) charPrev.sc.remove(charPrev.runner);
+  charPrev.emote = null;          // drop any in-progress emote when the model is rebuilt
   // build the model for the PREVIEWED item by briefly standing in the selection (without equipping it)
   let g;
   if (shopTab==='chars'){ const save = curChar; curChar = selChar || curChar; g = makeRunner(); curChar = save; }
@@ -5181,6 +5184,21 @@ function startEmote(){
   } catch(e){}
   try { (style==='miah' || style==='frida') ? (Sound.cap && Sound.cap()) : (Sound.step && Sound.step()); } catch(e){}
 }
+// play the previewed character's emote on the spinning shop model (no game running)
+function previewEmote(){
+  if (shopTab!=='chars' || !charPrev || !charPrev.runner || charPrev.emote) return;
+  const g = charPrev.runner;
+  const save = curChar; curChar = selChar || curChar;          // so character()/emoteDur match the PREVIEWED char
+  const style = character().style, em = { t:0, dur: emoteDur(), emoteProps:null };
+  try {
+    if (style==='miah'){ em.emoteProps = makeEmoteGuitar(); g.add(em.emoteProps); }
+    else if (style==='ant'){ em.emoteProps = makeEmoteSpray(); g.add(em.emoteProps); }
+    else if (style==='nzekro'){ em.emoteProps = makeEmoteCanvas(); g.add(em.emoteProps); }
+  } catch(e){}
+  curChar = save;
+  charPrev.emote = em;
+  try { Sound.init(); (style==='miah'||style==='frida') ? (Sound.cap && Sound.cap()) : (Sound.step && Sound.step()); } catch(e){}
+}
 function makeEmoteSpray(){   // water spray for Ant Man's power-washer emote
   const grp = new THREE.Group();
   const water = new THREE.MeshStandardMaterial({ color:0xbfe6ff, emissive:0x2a6a8a, transparent:true, opacity:0.5, roughness:0.3, depthWrite:false });
@@ -5219,13 +5237,22 @@ function makeEmoteGuitar(){
 function makeEmoteCanvas(){
   const grp = new THREE.Group();
   const legM = new THREE.MeshStandardMaterial({ color:0x5a3d22, roughness:0.75 });
-  // tripod easel: two splayed front legs + a rear support leg
-  const mkLeg = (x, z, tiltX, tiltZ) => { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.5, 10), legM);
-    leg.position.set(x, 0.1, z); leg.rotation.set(tiltX, 0, tiltZ); leg.castShadow = true; grp.add(leg); };
-  mkLeg(-0.07, 0.03, 0,  0.16);
-  mkLeg( 0.07, 0.03, 0, -0.16);
-  mkLeg( 0,   -0.08, -0.3, 0);
-  const tray = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.012, 0.022), legM); tray.position.set(0, 0.18, 0.03); grp.add(tray);
+  // a REAL tripod easel: three legs meet at an apex near the top and splay OPEN down to the floor
+  const apexY = 0.46, legLen = 0.54;
+  const mkLeg = (yaw, splay) => {
+    const pivot = new THREE.Group(); pivot.position.set(0, apexY, 0); pivot.rotation.y = yaw;     // which way the leg points
+    const tilt  = new THREE.Group(); tilt.rotation.x = splay; pivot.add(tilt);                    // how far it splays from vertical
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.013, legLen, 10), legM); leg.position.y = -legLen/2; leg.castShadow = true; tilt.add(leg);
+    const foot = new THREE.Mesh(new THREE.SphereGeometry(0.014, 8, 6), legM); foot.position.y = -legLen; foot.castShadow = true; tilt.add(foot);
+    grp.add(pivot); return pivot;
+  };
+  mkLeg(-0.55, 0.34);     // front-left leg splays out to the left
+  mkLeg( 0.55, 0.34);     // front-right leg splays out to the right
+  mkLeg( Math.PI, 0.42);  // rear support leg kicks out behind (the kickstand)
+  // the ledge that holds the canvas, spanning the two front legs
+  const tray = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.012, 0.024), legM); tray.position.set(0, 0.2, 0.05); grp.add(tray);
+  // a cross-brace tying the front legs together (real easels have one)
+  const brace = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.01, 0.012), legM); brace.position.set(0, 0.04, 0.06); grp.add(brace);
   // the canvas board — its painted face points at NZekro (-z) while he works, then rotates to face the camera
   const board = new THREE.Group();
   const frame = new THREE.Mesh(new THREE.BoxGeometry(0.21, 0.23, 0.014), new THREE.MeshStandardMaterial({ color:0x7a5530, roughness:0.6 })); frame.castShadow = true; board.add(frame);
@@ -6214,6 +6241,7 @@ function renderShop(){
   $('shopItemName').textContent = it.name + (isChar && it.tier!=null ? ' · ' + TIER_LABEL[it.tier] : '');
   { const pe = $('shopItemPerk'); if (pe) pe.textContent = isChar ? perkText(sel) : ''; }
   const buyBtn = $('shopBuyBtn'), eqBtn = $('shopEquipBtn');
+  { const emBtn = $('shopEmoteBtn'); if (emBtn) emBtn.style.display = isChar ? '' : 'none'; }   // preview the character's emote (chars only)
   if (st==='worn' || st==='owned'){
     buyBtn.style.display = 'none'; eqBtn.style.display = '';
     eqBtn.textContent = st==='worn' ? '✓ EQUIPPED' : 'EQUIP';
@@ -6367,6 +6395,7 @@ btn('goalsBack',     backHome);
 btn('settingsBack',  backHome);
 btn('tabChars',      ()=>{ shopTab='chars';  renderShop(); });
 btn('tabStones',     ()=>{ shopTab='stones'; renderShop(); });
+btn('shopEmoteBtn',  previewEmote);
 btn('shopBuyBtn',    purchaseSel);
 btn('shopEquipBtn',  equipSel);
 btn('dailyBtn',      ()=>{ dailyMode = !dailyMode; renderSettings(); });
@@ -6599,10 +6628,21 @@ function animate(){
   }
   if (composer) composer.render(); else renderer.render(scene, camera);
 
-  // shop character preview: spin briskly to show the model off from all sides
+  // shop character preview: spin briskly to show the model off — or, if an emote was tapped, face the camera and perform it
   if (charPrevOn && charPrev && charPrev.runner){
-    charPrev.runner.rotation.y += dt * 1.4;
-    charPrev.rend.render(charPrev.sc, charPrev.cam);
+    const cp = charPrev, g = cp.runner;
+    if (cp.emote){
+      cp.emote.t += dt;
+      g.rotation.y += (0 - g.rotation.y) * Math.min(1, dt*9);    // turn to face the camera (+z)
+      g.rotation.x = 0; g.rotation.z = 0; g.position.set(0, 0, 0);   // reset base each frame (playEmote adds a small bob)
+      const save = curChar; curChar = selChar || curChar;
+      try { playEmote(g, cp.emote, cp.emote.t, dt); } catch(e){}
+      curChar = save;
+      if (cp.emote.t >= cp.emote.dur){ try { endEmote(cp.emote, g); } catch(e){} cp.emote = null; }
+    } else {
+      g.rotation.y += dt * 1.4;
+    }
+    cp.rend.render(cp.sc, cp.cam);
   }
 }
 // initial idle camera
