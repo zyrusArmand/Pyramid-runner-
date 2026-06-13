@@ -983,7 +983,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.291 · 2026.06.13</div>
+  <div id="appVersion">v1.292 · 2026.06.13</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1207,7 +1207,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.291';
+const APP_VERSION = '1.292';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -5350,21 +5350,49 @@ function animateMusicNotes(grp, t){
 }
 // build a little held guitar for Miah's strum emote
 function makeEmoteGuitar(){
-  // built straight (neck cleanly out of the body), then the WHOLE group is angled across the chest so it reads right
+  // a natural-finish acoustic DREADNOUGHT: spruce top + mahogany sides, rosette, black pickguard, bridge w/ pins,
+  // rosewood fretboard w/ frets+markers, a 3+3 tuner headstock and 6 strings. Built deck-forward (+z), then angled across the chest.
   const gtr = new THREE.Group();
-  const wood = new THREE.MeshStandardMaterial({ color:0xe6cf94, roughness:0.45 });
-  const dark = new THREE.MeshStandardMaterial({ color:0x140a06 });
-  const lower = new THREE.Mesh(new THREE.SphereGeometry(0.062, 18, 14), wood); lower.scale.set(1, 1, 0.3); lower.position.y = -0.02; lower.castShadow = true; gtr.add(lower);
-  const upper = new THREE.Mesh(new THREE.SphereGeometry(0.046, 18, 14), wood); upper.scale.set(1, 1, 0.3); upper.position.y = 0.07; gtr.add(upper);
-  const rosette = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.005, 14), new THREE.MeshStandardMaterial({ color:0x7a3414 })); rosette.rotation.x = Math.PI/2; rosette.position.set(0, 0.012, 0.018); gtr.add(rosette);
-  const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.012, 14), dark); hole.rotation.x = Math.PI/2; hole.position.set(0, 0.012, 0.02); gtr.add(hole);
-  const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.012, 0.01), new THREE.MeshStandardMaterial({ color:0x241509 })); bridge.position.set(0, -0.05, 0.02); gtr.add(bridge);
-  const neck = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.2, 0.018), new THREE.MeshStandardMaterial({ color:0x6a4326 })); neck.position.set(0, 0.21, 0.006); gtr.add(neck);
-  const fretb = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.2, 0.008), dark); fretb.position.set(0, 0.21, 0.016); gtr.add(fretb);
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.05, 0.015), dark); head.position.set(0, 0.325, 0.004); gtr.add(head);
-  const str = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.32, 0.002), new THREE.MeshStandardMaterial({ color:0xeaeaea, metalness:0.5 })); str.position.set(0, 0.13, 0.02); gtr.add(str);
-  // hold it angled across the chest with the broad face (deck) toward the camera
-  gtr.position.set(0.109, 0.30, 0.11); gtr.rotation.set(0.12, 0, 0.95);   // body at the lower-right ribs, neck lies more horizontal up-left so the headstock sits IN the fretting hand
+  const top   = new THREE.MeshStandardMaterial({ color:0xe9d7a6, roughness:0.4 });    // pale spruce top
+  const side  = new THREE.MeshStandardMaterial({ color:0x6b4526, roughness:0.5 });    // mahogany sides/back
+  const fbM   = new THREE.MeshStandardMaterial({ color:0x2a1810, roughness:0.5 });    // rosewood fretboard / headplate
+  const neckW = new THREE.MeshStandardMaterial({ color:0x6a4326, roughness:0.5 });    // neck wood
+  const dark  = new THREE.MeshStandardMaterial({ color:0x0a0805, roughness:0.4 });    // sound hole + pickguard
+  const cream = new THREE.MeshStandardMaterial({ color:0xeee4c4, roughness:0.5 });    // binding / pins / markers
+  const steel = new THREE.MeshStandardMaterial({ color:0xd8d8de, metalness:0.6, roughness:0.3 });
+  const flat = 0.3, surfZ = 0.025;                       // body flatten in z + front-deck surface
+  // BODY — figure-8: darker sides set back + slightly larger so they rim the edges, spruce top in front
+  const lowerB = new THREE.Mesh(new THREE.SphereGeometry(0.066, 20, 16), side); lowerB.scale.set(1, 1.06, flat*1.06); lowerB.position.set(0, -0.03, -0.004); lowerB.castShadow = true; gtr.add(lowerB);
+  const upperB = new THREE.Mesh(new THREE.SphereGeometry(0.052, 20, 16), side); upperB.scale.set(1, 1, flat*1.06); upperB.position.set(0, 0.062, -0.004); gtr.add(upperB);
+  const lowerT = new THREE.Mesh(new THREE.SphereGeometry(0.063, 20, 16), top); lowerT.scale.set(1, 1.06, flat); lowerT.position.set(0, -0.03, 0.006); gtr.add(lowerT);
+  const upperT = new THREE.Mesh(new THREE.SphereGeometry(0.049, 20, 16), top); upperT.scale.set(1, 1, flat); upperT.position.set(0, 0.062, 0.006); gtr.add(upperT);
+  const waistT = new THREE.Mesh(new THREE.SphereGeometry(0.044, 16, 12), top); waistT.scale.set(1, 0.8, flat); waistT.position.set(0, 0.02, 0.006); gtr.add(waistT);
+  // SOUND HOLE + rosette ring
+  const rosette = new THREE.Mesh(new THREE.CylinderGeometry(0.023, 0.023, 0.004, 22), new THREE.MeshStandardMaterial({ color:0x4a2a14, roughness:0.5 })); rosette.rotation.x = Math.PI/2; rosette.position.set(0, 0.012, surfZ-0.002); gtr.add(rosette);
+  const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.02, 22), dark); hole.rotation.x = Math.PI/2; hole.position.set(0, 0.012, surfZ-0.007); gtr.add(hole);
+  // black teardrop PICKGUARD (treble side, just below the hole)
+  const pick = new THREE.Mesh(new THREE.SphereGeometry(0.027, 14, 10), dark); pick.scale.set(0.78, 1.15, 0.1); pick.position.set(0.037, -0.024, surfZ-0.001); pick.rotation.z = 0.4; gtr.add(pick);
+  // BRIDGE + saddle + 6 pins
+  const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.046, 0.014, 0.008), new THREE.MeshStandardMaterial({ color:0x241509, roughness:0.5 })); bridge.position.set(0, -0.052, surfZ-0.002); gtr.add(bridge);
+  const saddle = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.004, 0.006), cream); saddle.position.set(0, -0.047, surfZ); gtr.add(saddle);
+  for (let i=0;i<6;i++){ const pin = new THREE.Mesh(new THREE.SphereGeometry(0.0035, 6, 6), cream); pin.position.set((i-2.5)*0.0076, -0.057, surfZ); gtr.add(pin); }
+  // NECK + rosewood FRETBOARD with frets, dot markers + nut
+  const neck = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.205, 0.02), neckW); neck.position.set(0, 0.205, 0.004); gtr.add(neck);
+  const board = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.205, 0.01), fbM); board.position.set(0, 0.205, 0.016); gtr.add(board);
+  for (let i=1;i<=7;i++){ const fret = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.0024, 0.004), steel); fret.position.set(0, 0.12 + i*0.024, 0.0215); gtr.add(fret); }
+  [0.176, 0.248].forEach(y => { const dot = new THREE.Mesh(new THREE.CircleGeometry(0.003, 8), cream); dot.position.set(0, y, 0.0225); gtr.add(dot); });
+  const nut = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.005, 0.012), cream); nut.position.set(0, 0.31, 0.016); gtr.add(nut);
+  // HEADSTOCK with a dark headplate + 3+3 tuners (posts + pearl buttons)
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.058, 0.012), neckW); head.position.set(0, 0.346, 0.005); head.rotation.x = -0.12; gtr.add(head);
+  const headFace = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.05, 0.006), fbM); headFace.position.set(0, 0.346, 0.012); headFace.rotation.x = -0.12; gtr.add(headFace);
+  [-1,1].forEach(s => { for (let i=0;i<3;i++){ const y = 0.328 + i*0.016;
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.0024, 0.0024, 0.008, 6), steel); post.rotation.x = Math.PI/2; post.position.set(s*0.016, y, 0.018); gtr.add(post);
+    const btn = new THREE.Mesh(new THREE.SphereGeometry(0.005, 8, 6), cream); btn.scale.set(1, 1, 0.6); btn.position.set(s*0.026, y, 0.018); gtr.add(btn);
+  }});
+  // 6 STRINGS — from the bridge up over the hole to the nut
+  for (let i=0;i<6;i++){ const sstr = new THREE.Mesh(new THREE.CylinderGeometry(0.0006, 0.0006, 0.37, 4), steel); sstr.position.set((i-2.5)*0.0042, 0.13, surfZ+0.003); gtr.add(sstr); }
+  // hold it angled across the chest with the broad face (deck) toward the camera; body at the lower-right ribs, headstock up in the fretting hand
+  gtr.position.set(0.109, 0.30, 0.11); gtr.rotation.set(0.12, 0, 0.95);
   return gtr;
 }
 // a pop-up easel + canvas for NZekro's painting emote — painted face starts toward him, then spins to the viewer
