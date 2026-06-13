@@ -1836,10 +1836,8 @@ function makeRunner(){
     const black = new THREE.MeshStandardMaterial({ color:0x16161a, roughness:0.6, metalness:0.05 });
     const metal = new THREE.MeshStandardMaterial({ color:0x2c2f36, roughness:0.35, metalness:0.7 });
     const wood  = new THREE.MeshStandardMaterial({ color:0x9a6a32, roughness:0.6 });
-    // tidy crew-neck collar + short cropped hair so he reads as a casual creative
+    // tidy crew-neck collar (no hair — clean shaved head)
     const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.066, 0.084, 0.03, 16), black); collar.position.y = 0.47; g.add(collar);
-    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.103, 20, 14, 0, 6.28, 0, 1.5), new THREE.MeshStandardMaterial({ color:0x1b1410, roughness:0.85 }));
-    hair.scale.set(1, 0.9, 1); hair.position.y = 0.605; hair.castShadow = true; g.add(hair);
     // 📷 CAMERA ON A NECK STRAP — a black strap looping the neck down to a camera body resting on his chest
     [-1,1].forEach(s => { const strap = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.2, 0.012), new THREE.MeshStandardMaterial({ color:0x0c0c0e, roughness:0.7 }));
       strap.position.set(s*0.05, 0.42, 0.058); strap.rotation.z = -s*0.28; g.add(strap); });
