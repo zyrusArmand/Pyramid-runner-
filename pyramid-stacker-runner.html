@@ -983,7 +983,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.305 · 2026.06.13</div>
+  <div id="appVersion">v1.306 · 2026.06.13</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1207,7 +1207,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.305';
+const APP_VERSION = '1.306';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -5357,25 +5357,34 @@ function makeEmoteFrida(){
   const tail  = [[-0.03,-0.12,0.026],[-0.005,-0.088,0.018]];
   [...puffs, ...tail].forEach(p => { const c = new THREE.Mesh(new THREE.CircleGeometry(p[2]*1.16, 22), edge); c.position.set(p[0],p[1],-0.004); cloud.add(c); });   // outline behind
   [...puffs, ...tail].forEach(p => { const c = new THREE.Mesh(new THREE.CircleGeometry(p[2], 22), white); c.position.set(p[0],p[1],0); cloud.add(c); });          // white fill on top
-  // a flat little POT icon
-  const potIcon = new THREE.Mesh(new THREE.BoxGeometry(0.075,0.046,0.004), new THREE.MeshBasicMaterial({ color:0xcf3b2a })); potIcon.position.set(0,-0.012,0.012); cloud.add(potIcon);
-  const stewIcon = new THREE.Mesh(new THREE.BoxGeometry(0.07,0.014,0.004), new THREE.MeshBasicMaterial({ color:0xf2b34a })); stewIcon.position.set(0,0.013,0.014); cloud.add(stewIcon);
+  // a flat 2D POT cooking icon (rounded body + side handles + lid + knob)
+  const potR = new THREE.MeshBasicMaterial({ color:0xd23a2a }), potD = new THREE.MeshBasicMaterial({ color:0x7c1b12 });
+  const pbody = new THREE.Mesh(new THREE.BoxGeometry(0.072,0.038,0.004), potR); pbody.position.set(0,-0.014,0.012); cloud.add(pbody);
+  const pbase = new THREE.Mesh(new THREE.CircleGeometry(0.036,22), potR); pbase.scale.set(1,0.64,1); pbase.position.set(0,-0.03,0.012); cloud.add(pbase);
+  [-1,1].forEach(s => { const hd = new THREE.Mesh(new THREE.CircleGeometry(0.012,14), potD); hd.position.set(s*0.044,-0.012,0.011); cloud.add(hd); });   // side handles
+  const plid = new THREE.Mesh(new THREE.CircleGeometry(0.046,24), potD); plid.scale.set(1,0.34,1); plid.position.set(0,0.01,0.013); cloud.add(plid);   // lid
+  const pknob = new THREE.Mesh(new THREE.CircleGeometry(0.009,12), potD); pknob.position.set(0,0.022,0.014); cloud.add(pknob);   // lid knob
   const steam = []; for (let i=0;i<3;i++){ const w = new THREE.Mesh(new THREE.CircleGeometry(0.015,12), new THREE.MeshBasicMaterial({ color:0xeef2f8, transparent:true })); w.position.set((i-1)*0.022,0.04,0.013); cloud.add(w); steam.push(w); }
   grp.__steam = steam;
   // 3 loading DOTS (flat)
   const dots = []; for (let i=0;i<3;i++){ const d = new THREE.Mesh(new THREE.CircleGeometry(0.014,14), new THREE.MeshBasicMaterial({ color:0x4a3320 })); d.position.set((i-1)*0.036,0.072,0.014); d.visible=false; cloud.add(d); dots.push(d); }
   grp.__dots = dots;
   cloud.position.set(0.03,0.6,0.28); cloud.scale.setScalar(0.001); grp.add(cloud); grp.__cloud = cloud;
-  // ---- BIG TRAY of 3 CINNABON ROLLS (carried in her hands), hidden until cooking is done ----
+  // ---- a TRAY carrying ONE big, very detailed CINNABON roll, hidden until cooking is done ----
   const tray = new THREE.Group();
-  tray.add(new THREE.Mesh(new THREE.BoxGeometry(0.3,0.016,0.14), new THREE.MeshStandardMaterial({ color:0xc2c6ce, metalness:0.6, roughness:0.3 })));
-  [[0,0.07],[0,-0.07]].forEach(p => { const lp = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.022,0.008), new THREE.MeshStandardMaterial({ color:0x9aa0a8, metalness:0.6, roughness:0.3 })); lp.position.set(p[0],0.006,p[1]); tray.add(lp); });
-  for (let i=0;i<3;i++){ const roll = new THREE.Group();
-    roll.add(new THREE.Mesh(new THREE.CylinderGeometry(0.046,0.046,0.04,20), new THREE.MeshStandardMaterial({ color:0xc8893f, emissive:0x3a1e08, emissiveIntensity:0.25, roughness:0.6 })));   // golden bun
-    [0.03,0.018].forEach((rr,j) => { const sw = new THREE.Mesh(new THREE.CylinderGeometry(rr,rr,0.0016,18), new THREE.MeshStandardMaterial({ color: j? 0x9a5a28 : 0x7a4a22 })); sw.position.y=0.021+j*0.001; roll.add(sw); });   // cinnamon swirl rings
-    const icing = new THREE.Mesh(new THREE.SphereGeometry(0.044,16,12), new THREE.MeshStandardMaterial({ color:0xf6efdc, emissive:0x40361f, emissiveIntensity:0.2, roughness:0.5 })); icing.scale.set(1,0.45,1); icing.position.y=0.026; roll.add(icing);   // cream-cheese icing
-    roll.position.set((i-1)*0.092,0.028,0); tray.add(roll);
-  }
+  tray.add(new THREE.Mesh(new THREE.BoxGeometry(0.24,0.016,0.2), new THREE.MeshStandardMaterial({ color:0xc2c6ce, metalness:0.6, roughness:0.3 })));
+  [[0,0.1],[0,-0.1]].forEach(p => { const lp = new THREE.Mesh(new THREE.BoxGeometry(0.24,0.024,0.008), new THREE.MeshStandardMaterial({ color:0x9aa0a8, metalness:0.6, roughness:0.3 })); lp.position.set(p[0],0.008,p[1]); tray.add(lp); });
+  const doughM = new THREE.MeshStandardMaterial({ color:0xd6a052, roughness:0.6, emissive:0x3a230a, emissiveIntensity:0.22 });
+  const cinnM  = new THREE.MeshStandardMaterial({ color:0x7a4420, roughness:0.6 });
+  const icingM = new THREE.MeshStandardMaterial({ color:0xf7f0dd, roughness:0.45, emissive:0x46381e, emissiveIntensity:0.18 });
+  const roll = new THREE.Group();
+  roll.add(new THREE.Mesh(new THREE.CylinderGeometry(0.085,0.08,0.052,30), doughM));                       // the roll body
+  [0.079,0.064,0.05,0.037,0.025,0.014].forEach((rr,j)=>{ const ring=new THREE.Mesh(new THREE.CylinderGeometry(rr,rr,0.006,28), j%2? cinnM : doughM); ring.position.y=0.026+j*0.0018; roll.add(ring); });   // concentric cinnamon swirl
+  const core = new THREE.Mesh(new THREE.CylinderGeometry(0.008,0.008,0.008,12), cinnM); core.position.y=0.038; roll.add(core);                  // swirl centre
+  const pool = new THREE.Mesh(new THREE.SphereGeometry(0.052,18,14), icingM); pool.scale.set(1,0.3,1); pool.position.y=0.04; roll.add(pool);     // pooled cream-cheese icing
+  for (let j=0;j<4;j++){ const dz=new THREE.Mesh(new THREE.BoxGeometry(0.155,0.01,0.013), icingM); dz.position.set(0,0.045,(j-1.5)*0.03); dz.rotation.y=(j-1.5)*0.12; roll.add(dz); }   // icing drizzle across the top
+  for (let j=0;j<7;j++){ const a=j/7*Math.PI*2; const dr=new THREE.Mesh(new THREE.SphereGeometry(0.011,8,8), icingM); dr.scale.set(0.7,1.5,0.7); dr.position.set(Math.cos(a)*0.08,0.014,Math.sin(a)*0.08); roll.add(dr); }   // icing drips down the sides
+  roll.position.set(0,0.026,0); tray.add(roll);
   tray.position.set(0.0,0.31,0.24); tray.scale.setScalar(0.001); tray.visible=false; grp.add(tray); grp.__tray = tray;
   // ---- SPARKLES that burst when the tray first appears ----
   const sparkles = []; for (let i=0;i<9;i++){ const sp = new THREE.Mesh(new THREE.SphereGeometry(0.01,8,6), new THREE.MeshStandardMaterial({ color:0xffe27a, emissive:0xffcf4a, emissiveIntensity:0.9 })); sp.visible=false; grp.add(sp); sparkles.push(sp); }
