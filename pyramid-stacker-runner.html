@@ -950,7 +950,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.282 · 2026.06.13</div>
+  <div id="appVersion">v1.283 · 2026.06.13</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1138,7 +1138,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.282';
+const APP_VERSION = '1.283';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1872,23 +1872,31 @@ function makeRunner(){
     const cyan   = new THREE.MeshStandardMaterial({ color:0x2ee6e0, emissive:0x0c6a66, emissiveIntensity:0.55, roughness:0.4 });
     const mag    = new THREE.MeshStandardMaterial({ color:0xff3da6, emissive:0x6a0a3a, emissiveIntensity:0.55, roughness:0.4 });
     const steel  = new THREE.MeshStandardMaterial({ color:0x9aa0a8, metalness:0.7, roughness:0.3 });
-    // 👕 SHIRT — a clean tee: rounded short sleeves cap the shoulders (forearms stay bare), a crew collar + a neon chest stripe
-    [g.armL, g.armR].forEach(a => { const sl = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.043, 0.075, 16), shirtM); sl.position.y = -0.03; sl.castShadow = true; a.add(sl); });
+    // 👕 SHIRT — a clean tee: rounded deltoid sleeve caps give a natural shoulder (forearms stay bare), a crew collar + neon chest stripe
+    [g.armL, g.armR].forEach(a => { const sl = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 12), shirtM); sl.scale.set(1, 0.92, 1); sl.position.y = -0.035; sl.castShadow = true; a.add(sl); });
     const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.066, 0.024, 18), shirtM); collar.position.y = 0.49; g.add(collar);
     const chestStripe = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.014, 0.006), cyan); chestStripe.position.set(0, 0.405, 0.073); g.add(chestStripe);
     // 👖 JEANS — cover both legs + a waistband
     [g.legL, g.legR].forEach(l => { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.044, 0.2, 14), pantM); p.position.y = -0.085; l.add(p); });
     const waistB = new THREE.Mesh(new THREE.CylinderGeometry(0.092, 0.094, 0.05, 18), pantM); waistB.position.y = 0.285; g.add(waistB);
     // (no hair — clean shaved head under the headset)
-    // 🎧 GAMING HEADSET — a band over the crown, two ear cups + neon pads, and a boom mic
-    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.114, 0.114, 0.03, 20, 1, true, 0, Math.PI), blackM); band.rotation.x = Math.PI/2; band.position.set(0, 0.6, 0); band.castShadow = true; g.add(band);
+    // 🎧 on-ear HEADPHONES (cups + neon pads) worn at the ears, under the cap, plus a boom mic
     [-1,1].forEach(s => {
-      const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.034, 0.03, 16), blackM); cup.rotation.z = Math.PI/2; cup.position.set(s*0.104, 0.585, 0); cup.castShadow = true; g.add(cup);
-      const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.014, 16), cyan); pad.rotation.z = Math.PI/2; pad.position.set(s*0.12, 0.585, 0); g.add(pad);
+      const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.033, 0.03, 16), blackM); cup.rotation.z = Math.PI/2; cup.position.set(s*0.103, 0.57, 0); cup.castShadow = true; g.add(cup);
+      const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.014, 16), cyan); pad.rotation.z = Math.PI/2; pad.position.set(s*0.118, 0.57, 0); g.add(pad);
     });
-    // boom mic: a slim arm sweeping from the LEFT ear cup forward to a foam tip in front of the mouth
-    const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.125, 8), blackM); boom.position.set(-0.068, 0.556, 0.052); boom.rotation.set(1.18, 0, 0.45); g.add(boom);
-    const foam = new THREE.Mesh(new THREE.SphereGeometry(0.013, 10, 8), new THREE.MeshStandardMaterial({ color:0x202228, roughness:0.95 })); foam.position.set(-0.024, 0.548, 0.1); g.add(foam);
+    const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.125, 8), blackM); boom.position.set(-0.068, 0.55, 0.052); boom.rotation.set(1.18, 0, 0.45); g.add(boom);
+    const foam = new THREE.Mesh(new THREE.SphereGeometry(0.013, 10, 8), new THREE.MeshStandardMaterial({ color:0x202228, roughness:0.95 })); foam.position.set(-0.024, 0.542, 0.1); g.add(foam);
+    // 🧢 BLACK FLAT CAP (ivy/newsboy) — a low rounded crown, fuller toward the front, draping over the brow with a short stiff peak
+    const capM   = new THREE.MeshStandardMaterial({ color:0x141519, roughness:0.62, metalness:0.04 });
+    const capM2  = new THREE.MeshStandardMaterial({ color:0x101116, roughness:0.7 });   // a touch darker for the panels/seam
+    const crown  = new THREE.Mesh(new THREE.SphereGeometry(0.119, 26, 18, 0, 6.2832, 0, 1.42), capM); crown.scale.set(1.05, 0.6, 1.2); crown.position.set(0, 0.628, 0.012); crown.castShadow = true; g.add(crown);
+    const slouch = new THREE.Mesh(new THREE.SphereGeometry(0.088, 20, 14), capM); slouch.scale.set(1.18, 0.5, 0.95); slouch.position.set(0, 0.616, 0.074); slouch.castShadow = true; g.add(slouch);   // the fuller front that drapes forward
+    const peak   = new THREE.Mesh(new THREE.CylinderGeometry(0.094, 0.094, 0.012, 22, 1, false, -Math.PI/2, Math.PI), capM2); peak.scale.set(1, 1, 0.6); peak.rotation.x = -0.28; peak.position.set(0, 0.602, 0.108); peak.castShadow = true; g.add(peak);   // short stiff brim
+    const seam   = new THREE.Mesh(new THREE.CylinderGeometry(0.119, 0.119, 0.02, 26, 1, true), capM2); seam.scale.set(1.05, 1, 1.2); seam.position.set(0, 0.59, 0.012); g.add(seam);   // headband band where the cap meets the head
+    // a couple of stitched panel ridges over the crown for a tailored, real-cap read
+    [-0.04, 0.04].forEach(px => { const rib = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.006, 0.18), capM2); rib.position.set(px, 0.662, 0.012); rib.rotation.x = 0.15; g.add(rib); });
+    const btn = new THREE.Mesh(new THREE.SphereGeometry(0.011, 10, 8), capM); btn.position.set(0, 0.69, 0.012); g.add(btn);   // crown button
     // 🎮 GAME CONTROLLER in the right hand — body, grips, d-pad + face buttons
     const ctrl = new THREE.Group();
     ctrl.add(new THREE.Mesh(new THREE.BoxGeometry(0.072, 0.03, 0.024), blackM));
