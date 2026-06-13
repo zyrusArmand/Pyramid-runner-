@@ -983,7 +983,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.289 · 2026.06.13</div>
+  <div id="appVersion">v1.290 · 2026.06.13</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1207,7 +1207,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.289';
+const APP_VERSION = '1.290';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -5277,10 +5277,39 @@ function makeEmoteSpray(){   // water spray for Ant Man's power-washer emote
 }
 function endEmote(r, g){
   if (r && r.emoteProps && g){ try { g.remove(r.emoteProps); } catch(e){} r.emoteProps = null; }
+  if (r && r.emoteNotes && g){ try { g.remove(r.emoteNotes); } catch(e){} r.emoteNotes = null; }
   if (r) r.emote = null;
   if (g){ if (g.armL) g.armL.rotation.set(0,0,0); if (g.armR) g.armR.rotation.set(0,0,0);
     if (g.armL && g.armL.wrist) g.armL.wrist.rotation.set(0,0,0); if (g.armR && g.armR.wrist) g.armR.wrist.rotation.set(0,0,0);   // un-flick the wrists
     g.rotation.z = 0; }   // reset so the run resumes cleanly
+}
+// little eighth-notes that float up out of the sound hole while Miah strums (added to the runner so they rise straight up)
+function makeMusicNotes(){
+  const grp = new THREE.Group();
+  grp.position.set(0.099, 0.305, 0.131);    // at the sound hole
+  for (let i=0;i<7;i++){
+    const note = new THREE.Group();
+    const m = new THREE.MeshBasicMaterial({ color: (i%2) ? 0xffd86a : 0xffe7ad, transparent:true, opacity:0, depthWrite:false });
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.016, 10, 8), m); head.scale.set(1.25, 0.92, 0.5); note.add(head);
+    const stem = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.046, 0.004), m); stem.position.set(0.014, 0.026, 0); note.add(stem);
+    const flag = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.006, 0.004), m); flag.position.set(0.021, 0.045, 0); flag.rotation.z = -0.5; note.add(flag);
+    note.visible = false; grp.add(note);
+  }
+  return grp;
+}
+function animateMusicNotes(grp, t){
+  const N = grp.children.length;
+  for (let i=0;i<N;i++){
+    const note = grp.children[i];
+    if (t < 0.35){ note.visible = false; continue; }    // wait for the guitar to pop in
+    const life = ((t*0.85 + i/N) % 1);                  // staggered 0..1 loops
+    note.visible = true;
+    note.position.set(Math.sin(life*7 + i*1.7)*0.045, life*0.34, 0);   // rise + gentle sideways wobble
+    const op = Math.max(0, Math.sin(life*Math.PI)) * 0.95;             // fade in, then out
+    note.children.forEach(c => { if (c.material) c.material.opacity = op; });
+    const sc = 0.55 + life*0.8; note.scale.set(sc, sc, sc);
+    note.rotation.z = Math.sin(life*6.28 + i)*0.35;
+  }
 }
 // build a little held guitar for Miah's strum emote
 function makeEmoteGuitar(){
@@ -5298,7 +5327,7 @@ function makeEmoteGuitar(){
   const head = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.05, 0.015), dark); head.position.set(0, 0.325, 0.004); gtr.add(head);
   const str = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.32, 0.002), new THREE.MeshStandardMaterial({ color:0xeaeaea, metalness:0.5 })); str.position.set(0, 0.13, 0.02); gtr.add(str);
   // hold it angled across the chest with the broad face (deck) toward the camera
-  gtr.position.set(0.05, 0.335, 0.115); gtr.rotation.set(0.12, 0, 0.5);   // body rests at the lower-right ribs, neck up-left — sound hole sits right under the strumming hand
+  gtr.position.set(0.109, 0.30, 0.11); gtr.rotation.set(0.12, 0, 0.95);   // body at the lower-right ribs, neck lies more horizontal up-left so the headstock sits IN the fretting hand
   return gtr;
 }
 // a pop-up easel + canvas for NZekro's painting emote — painted face starts toward him, then spins to the viewer
@@ -5347,14 +5376,16 @@ function playEmote(g, r, t, dt){
   if (g.legL){ g.legL.rotation.set(0, 0, 0.05);  if (g.legL.elbow) g.legL.elbow.rotation.x = 0.06;
                g.legR.rotation.set(0, 0, -0.05); if (g.legR.elbow) g.legR.elbow.rotation.x = 0.06; }
   if (style === 'miah'){
-    // left hand frets the neck up by the headstock (elbow folded)
+    // left hand frets the neck — the headstock is positioned to sit right in this hand
     if (g.armL){ g.armL.rotation.x = -0.7; g.armL.rotation.z = -0.5; } bend(g.armL, -1.7);
-    // STRUM: the right arm hangs almost straight down ONTO the sound hole (elbow relaxed/down, not crossed in),
-    // and brushes DIAGONALLY across the strings with a wrist flick — not a vertical bob floating above the guitar
+    // STRUM: the right arm drops almost straight onto the sound hole and brushes diagonally across the strings with a wrist flick
     const sw = Math.sin(t*8);
-    if (g.armR){ g.armR.rotation.x = -0.72 + sw*0.14; g.armR.rotation.z = -0.16 + sw*0.12; } bend(g.armR, -0.5 + sw*0.06);
+    if (g.armR){ g.armR.rotation.x = -0.70 + sw*0.13; g.armR.rotation.z = -0.10 + sw*0.12; } bend(g.armR, -0.45 + sw*0.06);
     if (g.armR && g.armR.wrist) g.armR.wrist.rotation.z = sw*0.7;
     if (r.emoteProps){ const e = Math.min(1, t*5); r.emoteProps.scale.set(e, e, e); }   // guitar pops in cleanly
+    // 🎵 music notes drift up out of the sound hole as he strums
+    if (!r.emoteNotes){ r.emoteNotes = makeMusicNotes(); g.add(r.emoteNotes); }
+    animateMusicNotes(r.emoteNotes, t);
   } else if (style === 'ant'){
     // grip the power-washer wand with the front legs and SPRAY (recoil + pulsing jet)
     if (g.armL){ g.armL.rotation.x = -0.9; g.armL.rotation.z = 0.25; } bend(g.armL, -0.7);
