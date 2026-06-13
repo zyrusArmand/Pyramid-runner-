@@ -972,7 +972,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.286 · 2026.06.13</div>
+  <div id="appVersion">v1.287 · 2026.06.13</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1196,7 +1196,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.286';
+const APP_VERSION = '1.287';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -5287,7 +5287,7 @@ function makeEmoteGuitar(){
   const head = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.05, 0.015), dark); head.position.set(0, 0.325, 0.004); gtr.add(head);
   const str = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.32, 0.002), new THREE.MeshStandardMaterial({ color:0xeaeaea, metalness:0.5 })); str.position.set(0, 0.13, 0.02); gtr.add(str);
   // hold it angled across the chest with the broad face (deck) toward the camera
-  gtr.position.set(0.0, 0.36, 0.16); gtr.rotation.set(0.12, 0, 0.5);   // sits where the strumming hand reaches the strings
+  gtr.position.set(0.05, 0.335, 0.115); gtr.rotation.set(0.12, 0, 0.5);   // body rests at the lower-right ribs, neck up-left — sound hole sits right under the strumming hand
   return gtr;
 }
 // a pop-up easel + canvas for NZekro's painting emote — painted face starts toward him, then spins to the viewer
@@ -5336,13 +5336,13 @@ function playEmote(g, r, t, dt){
   if (g.legL){ g.legL.rotation.set(0, 0, 0.05);  if (g.legL.elbow) g.legL.elbow.rotation.x = 0.06;
                g.legR.rotation.set(0, 0, -0.05); if (g.legR.elbow) g.legR.elbow.rotation.x = 0.06; }
   if (style === 'miah'){
-    // left hand frets the neck up-left (elbow folded)
-    if (g.armL){ g.armL.rotation.x = -0.75; g.armL.rotation.z = -0.7; } bend(g.armL, -1.7);
-    // STRUM: the right arm reaches IN across the body so the hand sits over the sound hole (NEGATIVE z = inward, like
-    // the run gait's tucked right elbow), then sweeps diagonally with a WRIST flick — a real strum, not a knock to the side
-    const sw = Math.sin(t*7);
-    if (g.armR){ g.armR.rotation.x = -0.92 + sw*0.12; g.armR.rotation.z = -0.5 + sw*0.18; } bend(g.armR, -1.45 + sw*0.32);
-    if (g.armR && g.armR.wrist) g.armR.wrist.rotation.z = sw*0.6;
+    // left hand frets the neck up by the headstock (elbow folded)
+    if (g.armL){ g.armL.rotation.x = -0.7; g.armL.rotation.z = -0.5; } bend(g.armL, -1.7);
+    // STRUM: the right arm hangs almost straight down ONTO the sound hole (elbow relaxed/down, not crossed in),
+    // and brushes DIAGONALLY across the strings with a wrist flick — not a vertical bob floating above the guitar
+    const sw = Math.sin(t*8);
+    if (g.armR){ g.armR.rotation.x = -0.72 + sw*0.14; g.armR.rotation.z = -0.16 + sw*0.12; } bend(g.armR, -0.5 + sw*0.06);
+    if (g.armR && g.armR.wrist) g.armR.wrist.rotation.z = sw*0.7;
     if (r.emoteProps){ const e = Math.min(1, t*5); r.emoteProps.scale.set(e, e, e); }   // guitar pops in cleanly
   } else if (style === 'ant'){
     // grip the power-washer wand with the front legs and SPRAY (recoil + pulsing jet)
