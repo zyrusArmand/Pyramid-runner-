@@ -983,7 +983,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.294 · 2026.06.13</div>
+  <div id="appVersion">v1.295 · 2026.06.13</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1207,7 +1207,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.294';
+const APP_VERSION = '1.295';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -2000,19 +2000,20 @@ function makeRunner(){
     const blackM = new THREE.MeshStandardMaterial({ color:0x101014, roughness:0.3 });
     const mouthM = new THREE.MeshStandardMaterial({ color:0x6e1b26, roughness:0.5 });
     const cheekM = new THREE.MeshBasicMaterial({ color:0xff9ab0, transparent:true, opacity:0.5 });
-    // ROUND BODY (replaces the humanoid torso) — a big green egg, head merges in on top
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.142, 26, 22), skinG); body.scale.set(1.1, 1.18, 1.02); body.position.set(0, 0.355, 0); body.castShadow = true; g.add(body);
-    // reshape the base HEAD into a wide frog head that blends into the body, with the face down-front
-    head.material = skinG; head.scale.set(1.36, 1.05, 1.2); head.position.set(0, 0.5, 0.012); head.castShadow = true;
-    // cream belly/throat on the lower front
-    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.12, 22, 18), bellyM); belly.scale.set(0.72, 0.82, 0.6); belly.position.set(0, 0.32, 0.082); g.add(belly);
-    // big bulging eyes sitting up on the crown
+    // SLEEK BODY (replaces the humanoid torso) — a slimmer green egg, taller than wide, head blends in on top
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.134, 28, 24), skinG); body.scale.set(0.96, 1.26, 0.9); body.position.set(0, 0.365, 0); body.castShadow = true; g.add(body);
+    // reshape the base HEAD into a frog head that blends into the body, with the face down-front
+    head.material = skinG; head.scale.set(1.26, 1.04, 1.14); head.position.set(0, 0.515, 0.012); head.castShadow = true;
+    // trim cream belly/throat on the lower front
+    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.11, 24, 20), bellyM); belly.scale.set(0.58, 0.86, 0.46); belly.position.set(0, 0.33, 0.07); g.add(belly);
+    // big eyes on the crown, with a soft green upper EYELID for a friendlier, polished look
     [-1,1].forEach(s => {
-      const bulge = new THREE.Mesh(new THREE.SphereGeometry(0.052, 18, 16), skinG); bulge.position.set(s*0.06, 0.595, 0.022); bulge.castShadow = true; g.add(bulge);
-      const ball  = new THREE.Mesh(new THREE.SphereGeometry(0.039, 16, 14), whiteM); ball.position.set(s*0.062, 0.6, 0.05); g.add(ball);
-      const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.021, 12, 10), blackM); pupil.scale.set(0.85, 1.1, 1); pupil.position.set(s*0.066, 0.597, 0.078); g.add(pupil);
-      const shine = new THREE.Mesh(new THREE.SphereGeometry(0.0075, 8, 6), whiteM); shine.position.set(s*0.057, 0.612, 0.092); g.add(shine);
-      const cheek = new THREE.Mesh(new THREE.CircleGeometry(0.025, 16), cheekM); cheek.position.set(s*0.098, 0.46, 0.082); cheek.rotation.y = s*0.5; g.add(cheek);
+      const bulge = new THREE.Mesh(new THREE.SphereGeometry(0.05, 20, 16), skinG); bulge.position.set(s*0.057, 0.6, 0.022); bulge.castShadow = true; g.add(bulge);
+      const ball  = new THREE.Mesh(new THREE.SphereGeometry(0.037, 18, 16), whiteM); ball.position.set(s*0.059, 0.602, 0.05); g.add(ball);
+      const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.02, 14, 12), blackM); pupil.scale.set(0.85, 1.12, 1); pupil.position.set(s*0.062, 0.598, 0.08); g.add(pupil);
+      const shine = new THREE.Mesh(new THREE.SphereGeometry(0.0072, 8, 6), whiteM); shine.position.set(s*0.054, 0.614, 0.092); g.add(shine);
+      const lid = new THREE.Mesh(new THREE.SphereGeometry(0.041, 16, 12, 0, Math.PI*2, 0, Math.PI*0.52), skinG); lid.position.set(s*0.059, 0.603, 0.05); lid.rotation.x = -0.55; lid.castShadow = true; g.add(lid);
+      const cheek = new THREE.Mesh(new THREE.CircleGeometry(0.023, 18), cheekM); cheek.position.set(s*0.092, 0.47, 0.084); cheek.rotation.y = s*0.5; g.add(cheek);
     });
     // wide friendly grin across the front + nostrils
     const mouth = new THREE.Mesh(new THREE.SphereGeometry(0.062, 18, 14), mouthM); mouth.scale.set(1.05, 0.3, 0.34); mouth.position.set(0, 0.448, 0.116); g.add(mouth);
@@ -2023,8 +2024,8 @@ function makeRunner(){
       const spot = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8), spotM); spot.scale.set(1,1,0.5); spot.position.set(p[0],p[1],p[2]); g.add(spot);
     });
     // little front legs (arms) tucked at the body sides, and webbed feet/hands
-    g.armL.position.set(-0.118, 0.40, 0.05); g.armR.position.set(0.118, 0.40, 0.05);
-    g.legL.position.set(-0.072, 0.27, 0); g.legR.position.set(0.072, 0.27, 0);
+    g.armL.position.set(-0.104, 0.40, 0.05); g.armR.position.set(0.104, 0.40, 0.05);
+    g.legL.position.set(-0.062, 0.27, 0); g.legR.position.set(0.062, 0.27, 0);
     [g.legL, g.legR].forEach(L => { if (!L || !L.wrist) return;
       [-1,0,1].forEach(t => { const toe = new THREE.Mesh(new THREE.SphereGeometry(0.027, 10, 8), skinG); toe.scale.set(0.74, 0.5, 1.25); toe.position.set(t*0.03, -0.012, 0.075); toe.castShadow = true; L.wrist.add(toe); }); });
     [g.armL, g.armR].forEach(A => { if (!A || !A.wrist) return;
