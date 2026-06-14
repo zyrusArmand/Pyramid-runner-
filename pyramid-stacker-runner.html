@@ -1121,7 +1121,8 @@ let firstTime = !Store.get('tut', 0);             // show the onboarding hints o
 // Find them in Supabase → Project Settings → API:  "Project URL"  and the public "anon" key (safe in a static page).
 // One-time table setup (run in Supabase → SQL editor):
 //   create table if not exists public.scores (id bigint generated always as identity primary key,
-//     name text not null, score integer not null, level integer, height real, created_at timestamptz default now());
+//     name text not null, score integer not null, level integer, height real, char text, created_at timestamptz default now());
+//   alter table public.scores add column if not exists char text;   -- IMPORTANT: without this column, every player shows the default avatar (their character isn't saved)
 //   grant select, insert on table public.scores to anon, authenticated;     -- the public roles must be allowed to read+write
 //   alter table public.scores enable row level security;
 //   drop policy if exists "public read" on public.scores;
