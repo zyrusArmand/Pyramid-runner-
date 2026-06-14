@@ -983,7 +983,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.310 · 2026.06.13</div>
+  <div id="appVersion">v1.311 · 2026.06.13</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1207,7 +1207,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.310';
+const APP_VERSION = '1.311';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1401,7 +1401,7 @@ const CHARACTERS = {
   frida:    { name:'FRIDA KAHLO',  cost:3333, swatch:'#b8344f', color:0xb8344f, skin:0xd9a066, style:'frida',    exclusive:true },
   american: { name:'FAT BOY MEMO', cost:3333, swatch:'#c0303a', color:0xf0c79a, skin:0xf0c79a, style:'american', exclusive:true },
   miah:     { name:'MIAH MAN',     cost:3333, swatch:'#22b0c2', color:0x1a1c22, skin:0xe0b486, style:'miah',     exclusive:true },
-  nzekro:   { name:'NZEKRO (THE HOBBYIST)', cost:3333, swatch:'#2a2a30', color:0x1a1a1f, skin:0x8a5a3a, style:'nzekro',   exclusive:true },
+  nzekro:   { name:'NZEKRO (THE HOBBYIST)', cost:3333, swatch:'#6e7178', color:0x6e7178, skin:0xa06d42, style:'nzekro',   exclusive:true },
   nassar:   { name:'NASSAR',       cost:3333, swatch:'#1f7a8a', color:0x1f7a8a, skin:0x8f6034, style:'nassar',   exclusive:true },
   thailand: { name:'MR.THAILAND',  cost:3333, swatch:'#57b94a', color:0x57b94a, skin:0x57b94a, style:'thailand', exclusive:true },
 };
@@ -1912,6 +1912,11 @@ function makeRunner(){
     const wood  = new THREE.MeshStandardMaterial({ color:0x9a6a32, roughness:0.6 });
     // tidy crew-neck collar (no hair — clean shaved head)
     const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.066, 0.084, 0.03, 16), black); collar.position.y = 0.47; g.add(collar);
+    // 👖 gray TEE up top, dark TROUSERS below (cover the legs + pelvis + a waistband)
+    const pant = new THREE.MeshStandardMaterial({ color:0x22242c, roughness:0.72 });
+    [g.legL, g.legR].forEach(l => { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.044, 0.22, 14), pant); p.position.y = -0.09; p.castShadow = true; l.add(p); });
+    pelvis.material = pant;
+    const waistB = new THREE.Mesh(new THREE.CylinderGeometry(0.092, 0.094, 0.05, 18), pant); waistB.position.y = 0.285; g.add(waistB);
     // 📷 CAMERA ON A NECK STRAP — a black strap looping the neck down to a camera body resting on his chest
     [-1,1].forEach(s => { const strap = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.2, 0.012), new THREE.MeshStandardMaterial({ color:0x0c0c0e, roughness:0.7 }));
       strap.position.set(s*0.05, 0.42, 0.058); strap.rotation.z = -s*0.28; g.add(strap); });
@@ -1923,13 +1928,16 @@ function makeRunner(){
     const vf = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.016, 0.022), new THREE.MeshStandardMaterial({ color:0x141519, roughness:0.6 })); vf.position.set(-0.02, 0.035, 0); cam.add(vf);
     const shutter = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.008, 10), new THREE.MeshStandardMaterial({ color:0xb33030, roughness:0.4 })); shutter.position.set(0.046, 0.033, 0); cam.add(shutter);
     cam.position.set(0, 0.33, 0.085); cam.rotation.x = 0.12; g.add(cam);   // rests on the (shallower) chest
-    // 🏋️ KETTLEBELL hanging from the LEFT hand — cast-iron bell + a squared handle
+    // 🏋️ KETTLEBELL hanging from the LEFT hand — a round cast-iron BELL with a clear arched handle (open window) on top
+    const kbM = new THREE.MeshStandardMaterial({ color:0x2a2d34, roughness:0.4, metalness:0.6 });
     const kb = new THREE.Group();
-    const bell = new THREE.Mesh(new THREE.SphereGeometry(0.05, 18, 14), metal); bell.scale.set(1, 0.92, 1); bell.castShadow = true; kb.add(bell);
-    const flat = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.012, 16), metal); flat.position.y = -0.045; kb.add(flat);
-    [-1,1].forEach(s => { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.05, 10), metal); post.position.set(s*0.026, 0.05, 0); post.rotation.z = -s*0.22; kb.add(post); });
-    const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.05, 10), metal); bar.rotation.z = Math.PI/2; bar.position.y = 0.072; kb.add(bar);
-    kb.position.set(0, -0.18, 0.01); g.armL.elbow.add(kb);
+    const bell = new THREE.Mesh(new THREE.SphereGeometry(0.058, 20, 16), kbM); bell.scale.set(1, 0.94, 1); bell.castShadow = true; kb.add(bell);
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.036, 0.012, 18), kbM); base.position.y = -0.054; kb.add(base);   // flat bottom (so it could stand)
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.026, 0.018, 14), kbM); neck.position.y = 0.052; kb.add(neck);   // shoulder under the handle
+    // the ARCHED HANDLE — an inverted U with an open window beneath, so it clearly reads as a kettlebell
+    for (let i=0;i<=9;i++){ const a = Math.PI*(i/9), x = -Math.cos(a)*0.03, y = 0.064 + Math.sin(a)*0.032;
+      const bead = new THREE.Mesh(new THREE.SphereGeometry(0.0095, 10, 8), kbM); bead.position.set(x, y, 0); bead.castShadow = true; kb.add(bead); }
+    kb.position.set(0, -0.2, 0.01); g.armL.elbow.add(kb);
     // 🖌️ PAINTBRUSH in the RIGHT hand — wooden handle, metal ferrule, loaded bristle tip
     const pb = new THREE.Group();
     const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.009, 0.14, 12), wood); handle.position.y = -0.02; pb.add(handle);
@@ -2137,7 +2145,7 @@ function initCharPreview(){
   rend.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
   const sc = new THREE.Scene();
   const cam = new THREE.PerspectiveCamera(38, 1, 0.1, 12);
-  cam.position.set(0, 0.46, 1.5); cam.lookAt(0, 0.32, 0);
+  cam.position.set(0, 0.44, 1.15); cam.lookAt(0, 0.4, 0);   // closer in, framed around the chest
   sc.add(new THREE.HemisphereLight(0xfff2dc, 0x35243f, 1.15));
   const dl = new THREE.DirectionalLight(0xffffff, 0.85); dl.position.set(1.4, 2.2, 1.8); sc.add(dl);
   charPrev = { rend, sc, cam, runner:null };
@@ -5504,7 +5512,7 @@ function makeEmoteCanvas(){
   };
   mkLeg(-0.55, 0.34);     // front-left leg splays out to the left
   mkLeg( 0.55, 0.34);     // front-right leg splays out to the right
-  mkLeg( Math.PI, 0.42);  // rear support leg kicks out behind (the kickstand)
+  grp.__rearLeg = mkLeg( Math.PI, 0.42);  // rear support leg (kickstand) — hidden when the canvas turns to face the viewer
   // the ledge that holds the canvas, spanning the two front legs
   const tray = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.012, 0.024), legM); tray.position.set(0, 0.2, 0.05); grp.add(tray);
   // a cross-brace tying the front legs together (real easels have one)
@@ -5574,6 +5582,7 @@ function playEmote(g, r, t, dt){
     // 🎨 the easel pops out, he paints the pyramid he just built, then spins the canvas to the viewer
     const P = r.emoteProps;
     if (P){ const pop = Math.min(1, t*4); P.scale.set(pop, pop, pop); }
+    if (P && P.__rearLeg) P.__rearLeg.visible = (t < 2.7);   // drop the rear/center leg once the canvas turns around (no wood through the painting)
     if (t < 2.7){
       // PAINTING — dab the brush across the canvas while the pyramid fills in block by block
       if (g.armR){ g.armR.rotation.x = -1.0; g.armR.rotation.z = 0.18 + Math.sin(t*14)*0.16; } bend(g.armR, -1.0 + Math.sin(t*14)*0.28);
