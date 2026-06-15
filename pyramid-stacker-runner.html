@@ -986,7 +986,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.320 · 2026.06.15</div>
+  <div id="appVersion">v1.321 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1232,7 +1232,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.320';
+const APP_VERSION = '1.321';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -3509,7 +3509,7 @@ function spawnBlock(){
   }
 
   // Daily Challenge: EVERY block swings at one fixed speed — no layer ramp, no per-block randomness, so it's identical for everyone
-  const speed = dailyMode ? 4.8 : (1.8 + S.layer*0.18 + RND()*0.15);
+  const speed = dailyMode ? 4.8 : (1.8 + S.layer*0.18);   // deterministic: base + a steady per-layer step (no random jitter)
   const color = layerColor(S.layer);                  // capstone matches the rest of the pyramid's stone
 
   let mesh;
