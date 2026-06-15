@@ -1007,7 +1007,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.330 · 2026.06.15</div>
+  <div id="appVersion">v1.331 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1253,7 +1253,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.330';
+const APP_VERSION = '1.331';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4107,6 +4107,7 @@ function addSmoothRamps(tiles){
   for (let i=0; i<tiles.length-1; i++){
     const t = tiles[i], t2 = tiles[i+1];
     if (t.gap || t2.gap || t.crumbled || t2.crumbled) continue;   // real hole → no fill, stays deadly
+    if (t.weak || t2.weak) continue;                              // sloppily-placed course → the smooth ramp never forms; the raw step stays exposed
     const frac = (t.pos.y - baseY) / span;
     const col = tileColor(t);
     [-1,0,1].forEach(lane => {
@@ -4140,7 +4141,7 @@ function addLaneGuides(tiles){
     m.position.set(x, y, z); m.baseOp = op; scene.add(m); guides.push(m);
   };
   for (let i=0; i<tiles.length-1; i++){
-    const t = tiles[i], t2 = tiles[i+1]; if (t.gap || t.crumbled) continue;   // missing/broken block → no highlight (you must jump it or fall through)
+    const t = tiles[i], t2 = tiles[i+1]; if (t.gap || t.crumbled || t.weak) continue;   // missing/broken/sloppy block → no highlight (smooth ramp only lights up where you stacked clean)
     const frac = (t.pos.y - baseY) / span;
     [-1,0,1].forEach(lane => {
       const d = lane*LANE_W;
@@ -4151,7 +4152,7 @@ function addLaneGuides(tiles){
       seg(lane, A.x + d, A.y + 0.016, (A.z + B.z)/2, w, 0.006, Math.max(0.06, Math.abs(A.z - B.z) + 0.035));
       // SLOPED connector bridging this tread up to the next — overlaps both ends so the trail is one continuous lit
       // line. Skipped when the next tile is a hole/broken block, leaving a clear dark break the player must clear.
-      if (!B.gap && !B.crumbled){
+      if (!B.gap && !B.crumbled && !B.weak){
         const dy = B.y - A.y, dz = B.z - A.z, len = Math.hypot(dy, dz) || 0.05, ang = Math.atan2(-dy, dz);
         const op = lane===0 ? 0.34 : 0.22;
         const conn = new THREE.Mesh(new THREE.BoxGeometry(w*0.9, 0.008, len*1.2),
@@ -5466,7 +5467,7 @@ function updateRun(dt){
   if (fwd.lengthSq() < 1e-4) fwd.set(0,0,1); else fwd.normalize();
   const perp = new THREE.Vector3(-fwd.z, 0, fwd.x);          // right-hand perpendicular
   const laneTarget = r.lane * LANE_W;                          // stay on the ledge (matches pillar lanes)
-  r.laneX += (laneTarget - r.laneX) * Math.min(1, dt*10);
+  r.laneX += (laneTarget - r.laneX) * Math.min(1, dt*22);      // snappy lane changes — quick, decisive left/right shifts
 
   g.position.set(base.x + perp.x*r.laneX, base.y + r.yOff, base.z + perp.z*r.laneX);
   g.scale.set(sx*RUN_SCALE, sy*RUN_SCALE, sx*RUN_SCALE);
