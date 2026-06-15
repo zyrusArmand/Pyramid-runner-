@@ -983,7 +983,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.312 · 2026.06.15</div>
+  <div id="appVersion">v1.313 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1208,7 +1208,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.312';
+const APP_VERSION = '1.313';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -6202,6 +6202,22 @@ function renderOwner(d){
   const kvList = (obj) => '<div style="padding:4px 8px">' + Object.keys(obj).sort((a,b)=>obj[b]-obj[a]).map(k=>'• '+escapeHtml(k)+': '+n(obj[k])).join('<br>') + '</div>';
   if (d.nav){ h += sect('Screens opened (visits)') + kvList(d.nav); }
   if (d.quit_screens){ h += sect('Where players were when they left') + kvList(d.quit_screens); }
+  if (d.roster && d.roster.length){
+    const sid = id => (id||'?').replace(/^p_/,'').slice(0,8);
+    const ago = ts => { if (!ts) return '—'; const ms = Date.now() - new Date(ts).getTime(); if (ms < 60000) return 'now';
+      const m = Math.floor(ms/60000); if (m < 60) return m+'m'; const hr = Math.floor(m/60); if (hr < 24) return hr+'h'; return Math.floor(hr/24)+'d'; };
+    h += sect('Per-player ('+d.roster.length+')');
+    h += '<div style="max-height:340px;overflow:auto;border:1px solid rgba(243,200,120,.14);border-radius:10px">';
+    d.roster.forEach(p => {
+      h += '<div style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.05)">'
+        + '<div style="color:#ffe6b0;font-weight:700;font-size:12px">'+escapeHtml(sid(p.player))+' · '+escapeHtml(p.chr||'?')
+          +'<span style="float:right;opacity:.5;font-weight:400">'+ago(p.last_seen)+' ago</span></div>'
+        + '<div style="opacity:.72;font-size:10.5px;margin-top:2px">L'+n(p.max_level||1)+' · '+n(p.runs||0)+' runs · '+n(p.wins||0)+'W/'+n(p.deaths||0)+'D · '
+          +n(Math.round((p.play_sec||0)/60))+'m played · '+n(p.sessions||0)+' sess · '+n(p.days||0)+'d active · '+n(p.purchases||0)+' buys · '+n(p.emotes||0)+' emotes</div>'
+        + '</div>';
+    });
+    h += '</div>';
+  }
   h += '<div style="opacity:.4;font-size:10px;margin-top:16px">snapshot · app v'+escapeHtml(APP_VERSION)+'</div>';
   $('ownerBody').innerHTML = h;
 }
