@@ -1007,7 +1007,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.331 · 2026.06.15</div>
+  <div id="appVersion">v1.332 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1253,7 +1253,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.331';
+const APP_VERSION = '1.332';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -5156,7 +5156,7 @@ function startRun(){
   const rel = relicEffects();                            // stacked roguelike relics this session
   S.run = { tiles, idx:0, t:0, speed:4.0, jumping:false, jumpT:0, jumpDur:0.42, jumpH:0.42,
             falling:false, fallV:0, yOff:0, startDelay:0.6, awaitStart:true,
-            lane:0, laneX:0, sliding:false, slideT:0, slideDur:0.5,
+            lane:0, laneX:0, sliding:false, slideT:0, slideDur:0.5, stumble:0,
             rolling:false, rollT:0, rollDur:0.5, rollDir:1, rollCD:0,
             magnet:0, shield:0, slow:0, bubble:null, hazardMul, dressed:false,
             gMult:1, gMultT:0, gMultMax:1,                      // golden-block score multiplier (+ peak reached this run)
@@ -5369,7 +5369,9 @@ function updateRun(dt){
   if (r.reflexCD > 0) r.reflexCD -= dt;            // near-miss slow-mo cooldown
 
   // advance along the path — the climb steadily quickens to keep the pressure on
+  if (r.stumble > 0) r.stumble = Math.max(0, r.stumble - dt);
   r.speed = (3.1 + Math.min(r.idx * 0.028, 2.3)) * DDA.runSpeed() * levelSpeed() * (dailyMode ? 2.5 : 1);   // adaptive + faster each level; Daily Challenge runs 2.5x hot
+  if (r.stumble > 0) r.speed *= 0.42;                  // tripped on an exposed sloppy step → lurch + lose momentum
   setSpeedFx(Math.max(0, (r.speed - 4.3) / 4) * 0.42);   // edge speed-streaks fade in as the climb accelerates
   r.t += r.speed * dt / 1;
   while (r.t >= 1){
@@ -5385,6 +5387,12 @@ function updateRun(dt){
     if (r.invuln <= 0 && tileUnsafe(r.tiles[r.idx])){
       if (!r.jumping){ crumbleTile(r.tiles[r.idx]); startFall(); return; }
       else slowmo();                                                   // clutch jump over a crack/gap
+    }
+    // sloppily-stacked course has no smooth ramp — running onto the exposed step makes you STUMBLE (slow + lose momentum),
+    // unless you jump it. Fires once on entering a weak run, not on every one of its sub-steps.
+    if (r.invuln <= 0 && r.tiles[r.idx].weak && !r.jumping){
+      const prev = r.tiles[r.idx-1];
+      if (!(prev && prev.weak)) stumbleRun(r);
     }
     const ob = r.tiles[r.idx].ob;
     if (r.invuln <= 0 && ob){
@@ -6133,6 +6141,16 @@ function crumbleTile(t){
   if (t.marker){ scene.remove(t.marker); t.marker = null; }
   const m = t.mesh;
   if (m && !m.__fell){ m.__fell = true; crumbleStone(m); }
+}
+
+// tripped on an exposed (sloppily-stacked) step — a brief stumble: hampers speed, breaks the gold chain, chips score, juice.
+function stumbleRun(r){
+  if (r.stumble > 0) return;                            // already stumbling — don't re-trigger across the same course
+  r.stumble = 0.55;
+  if (r.gMult > 1){ r.gMult = 1; r.gMultT = 0; updateMultHud(); }   // lose the golden multiplier you were riding
+  S.score = Math.max(0, (S.score|0) - 10); updateHUD();
+  try { showPop('STUMBLE!'); shake(0.2); Sound.land && Sound.land();
+        spawnDust(S.runner.position.clone(), 0xc9a368, 9, 1.7, 1.2); } catch(e){}
 }
 
 // pull back to frame the WHOLE finished pyramid while the rating + START CLIMB button are shown
