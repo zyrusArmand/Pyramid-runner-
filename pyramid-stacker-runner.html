@@ -1008,7 +1008,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.338 · 2026.06.15</div>
+  <div id="appVersion">v1.339 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1254,7 +1254,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.338';
+const APP_VERSION = '1.339';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -3584,6 +3584,7 @@ function spawnBlock(){
     mesh.position[axis] = center[axis] + amp;
     S.active = { mesh, center, axis, speed, phase:Math.PI/2, mode:'sym', amp,
                  capstone:true, len, cells, corner, n:1 };
+    addPlaceGuide(S.active);                             // same glowing perfect-seat outline as every other stone
   } else {
     const n = nForLayer(S.layer);
     const odir = (S.wall===0 || S.wall===3) ? 1 : -1;     // toward unfilled cells
@@ -7343,11 +7344,13 @@ function animate(){
     } else if (a.mode==='sym'){
       a.mesh.position[a.axis] = a.center[a.axis] + Math.sin(a.phase)*a.amp;
     }
-    if (a.mode === 'open' || a.mode === 'keystone'){
+    if (a.mode === 'open' || a.mode === 'keystone' || a.mode === 'sym'){
       const ax = (a.mode==='keystone') ? a.perpAxis : a.axis;
       // hard guarantee: clamp the LIVE position every frame so a swinging stone can NEVER overlap a placed one
-      const safe = clampPlacement(a, a.mesh.position[ax], ax);
-      if (safe !== null) a.mesh.position[ax] = safe;
+      if (a.mode !== 'sym'){                                        // the capstone is alone on its layer — nothing to clamp against
+        const safe = clampPlacement(a, a.mesh.position[ax], ax);
+        if (safe !== null) a.mesh.position[ax] = safe;
+      }
       // light the perfect-seat outline (and the stone) GREEN the instant it reaches the flush seat for a PERFECT
       const near = Math.abs(a.mesh.position[ax] - (a.seat !== undefined ? a.seat : a.center[ax])) / 1.3 < perfectThreshold();
       if (S.keyGuide){
