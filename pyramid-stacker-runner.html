@@ -983,7 +983,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.315 · 2026.06.15</div>
+  <div id="appVersion">v1.316 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1197,6 +1197,27 @@ const RemoteBoard = {
       return await r.json();
     } catch(e){ console.warn('daily winners read error', e); return null; }
   },
+  async saveProfile(entry){                             // upsert a public profile (name → uploaded avatar + character) so EVERY board can show it
+    if (!this.enabled() || !entry || !entry.name) return false;
+    try {
+      const r = await this._fetch('/rest/v1/profiles', { method:'POST',
+        headers:this._h({ 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=minimal' }), body:JSON.stringify(entry) });
+      return r.ok;
+    } catch(e){ return false; }
+  },
+  async profiles(names){                                // look up avatars/characters for the names shown on a board
+    if (!this.enabled() || !names || !names.length) return {};
+    try {
+      const uniq = Array.from(new Set(names.map(n => String(n||'').toUpperCase().slice(0,12)).filter(Boolean)));
+      if (!uniq.length) return {};
+      const raw = '(' + uniq.map(n => '"' + n.replace(/["\\,()]/g,'') + '"').join(',') + ')';
+      const r = await this._fetch('/rest/v1/profiles?select=name,avatar,char&name=in.' + encodeURIComponent(raw), { headers:this._h() });
+      if (!r.ok) return {};
+      const rows = await r.json(), map = {};
+      rows.forEach(x => { map[(x.name||'').toUpperCase()] = x; });
+      return map;
+    } catch(e){ return {}; }
+  },
   async account(entry){                                 // best-effort: store an account profile (name + email)
     if (!this.enabled()) return false;
     try {
@@ -1208,7 +1229,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.315';
+const APP_VERSION = '1.316';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -5773,10 +5794,19 @@ function runAd(done, kind){
 function recordScore(entry){ scores.push(entry); scores.sort((a,b)=>b.score-a.score); scores = scores.slice(0,10); Store.set('scores', scores); }
 const MEDAL = ['#ffd86a','#d6d6d6','#cd8b54'];
 // small character portrait (or your own uploaded photo) for a leaderboard row
-function lbAvatarHtml(charKey, mine){
+// upload this player's public profile (uploaded photo + character) keyed by leaderboard name, so every board can show it
+function pushProfile(){
+  try {
+    if (!RemoteBoard.enabled()) return;
+    const nm = (playerName || '').toUpperCase().slice(0, 12);
+    if (!nm || nm === 'ANON') return;
+    RemoteBoard.saveProfile({ name: nm, avatar: Store.get('avatar', null), char: curChar });
+  } catch(e){}
+}
+function lbAvatarHtml(charKey, mine, photo){
   let img = null;
   try {
-    if (mine) img = Store.get('avatar', null);                 // your row shows your uploaded photo if you have one
+    img = mine ? Store.get('avatar', null) : (photo || null);  // uploaded photo: yours from this device, others from their public profile
     if (!img){ const k = mine ? curChar : ((charKey && CHARACTERS[charKey]) ? charKey : 'explorer'); img = characterThumb(k); }
   } catch(e){ img = null; }
   return img ? `<img class="lbav" src="${img}" alt="">` : `<span class="lbav lbavPh"></span>`;
@@ -5786,7 +5816,7 @@ function renderLeaderboard(){
   if (RemoteBoard.enabled()){
     lb.innerHTML = '<div class="lbttl">GLOBAL TOP RUNS</div><div class="lbrow"><span class="lbrank">·</span><b>loading…</b></div>';
     const token = (renderLeaderboard._t = (renderLeaderboard._t||0) + 1);   // ignore a stale fetch if reopened fast
-    RemoteBoard.top(120).then(rows => {
+    RemoteBoard.top(120).then(async rows => {
       if (token !== renderLeaderboard._t) return;
       if (!rows){ renderLocalBoard(lb, 'TOP RUNS · OFFLINE'); return; }
       // keep only each player's BEST score (we post several times per run), then take the top 12
@@ -5794,12 +5824,14 @@ function renderLeaderboard(){
       rows.forEach(s => { const k=(s.name||'ANON').toString().toUpperCase().slice(0,12); if (!(k in best) || (s.score||0) > best[k].score) best[k] = { name:k, score:s.score||0, char:s.char }; });
       rows = Object.values(best).sort((a,b)=> b.score - a.score).slice(0,12);
       if (!rows.length){ lb.innerHTML = '<div class="lbttl">GLOBAL TOP RUNS</div><div class="lbttl">BE THE FIRST — PLAY A RUN!</div>'; return; }
+      const profs = await RemoteBoard.profiles(rows.map(s => s.name));
+      if (token !== renderLeaderboard._t) return;
       lb.innerHTML = '<div class="lbttl">GLOBAL TOP RUNS</div>' + rows.map((s,i)=>{
         const rankStyle = i<3 ? `color:${MEDAL[i]};border-color:${MEDAL[i]}` : '';
-        const nm = escapeHtml((s.name||'ANON').toString().toUpperCase().slice(0,12));
-        const mine = playerName && nm === playerName.toUpperCase();
+        const key = (s.name||'ANON').toString().toUpperCase().slice(0,12), nm = escapeHtml(key), pr = profs[key];
+        const mine = playerName && key === playerName.toUpperCase();
         return `<div class="lbrow${i===0?' top':''}${mine?' me':''}"><span class="lbrank" style="${rankStyle}">${i+1}</span>`+
-          lbAvatarHtml(s.char, mine) + `<span class="lbname">${nm}</span><b>${(s.score||0).toLocaleString()}</b></div>`;
+          lbAvatarHtml(s.char || (pr&&pr.char), mine, pr&&pr.avatar) + `<span class="lbname">${nm}</span><b>${(s.score||0).toLocaleString()}</b></div>`;
       }).join('');
     });
     return;
@@ -6321,6 +6353,7 @@ function createAccount(){
   if (!ownedChars.includes('ferro')){ ownedChars.push('ferro'); Store.set('ownedChars', ownedChars); granted = true; }
   curChar = 'ferro'; Store.set('char', 'ferro');       // unlock + wear the FERRO character as a welcome
   RemoteBoard.account({ name, email });                // best-effort cloud save of the profile
+  pushProfile();
   if (Sound.buy) Sound.buy();
   renderProfile(); renderHome();
   showAcctMsg(granted ? '✓ FERRO skin unlocked & equipped!' : (fresh ? '✓ Account created!' : '✓ Account updated.'));
@@ -6333,12 +6366,12 @@ function handleAvatarFile(file){
     const img = new Image();
     img.onload = () => {
       try {
-        const sz = 256, cv = document.createElement('canvas'); cv.width = cv.height = sz;
+        const sz = 128, cv = document.createElement('canvas'); cv.width = cv.height = sz;   // small square → keeps the shared profile lean
         const cx = cv.getContext('2d'), s = Math.min(img.width, img.height);
         cx.drawImage(img, (img.width-s)/2, (img.height-s)/2, s, s, 0, 0, sz, sz);
-        Store.set('avatar', cv.toDataURL('image/jpeg', 0.85));
+        Store.set('avatar', cv.toDataURL('image/jpeg', 0.82));
       } catch(err){ Store.set('avatar', e.target.result); }
-      renderProfile(); renderHome();
+      renderProfile(); renderHome(); pushProfile();
     };
     img.onerror = () => { Store.set('avatar', e.target.result); renderProfile(); };
     img.src = e.target.result;
@@ -6351,7 +6384,7 @@ function handleAvatarFile(file){
     av.addEventListener('click', () => { if (up.click) up.click(); });
     up.addEventListener('change', e => { handleAvatarFile(e.target.files && e.target.files[0]); up.value = ''; });
   }
-  if (rs && rs.addEventListener) rs.addEventListener('click', e => { e.stopPropagation(); Store.set('avatar', null); renderProfile(); });
+  if (rs && rs.addEventListener) rs.addEventListener('click', e => { e.stopPropagation(); Store.set('avatar', null); renderProfile(); pushProfile(); });
 })();
 function renderGoals(){
   ensureMissions();
@@ -6449,18 +6482,20 @@ function renderDailyToday(){
   if (!RemoteBoard.enabled()){ localFallback(); return; }
   el.innerHTML = '<div class="dailyEmpty">loading today’s ranking…</div>';
   const token = (renderDailyToday._t = (renderDailyToday._t||0) + 1);
-  RemoteBoard.dailyTop(todayKey(), 100).then(rows => {
+  RemoteBoard.dailyTop(todayKey(), 100).then(async rows => {
     if (token !== renderDailyToday._t || dailyView !== 'today') return;
     if (!rows){ localFallback(); return; }
     const best = {};
     rows.forEach(s => { const k=(s.name||'ANON').toString().toUpperCase().slice(0,12); if (!(k in best) || (s.score||0) > best[k].score) best[k] = { name:k, score:s.score||0, char:s.char }; });
     rows = Object.values(best).sort((a,b)=> b.score - a.score).slice(0,15);
     if (!rows.length){ localFallback(); return; }
+    const profs = await RemoteBoard.profiles(rows.map(s => s.name));
+    if (token !== renderDailyToday._t || dailyView !== 'today') return;
     const lead = rows[0], myName = (playerName||'').toUpperCase();
     let html = '<div class="dailyLeader"><span class="dlCrown">👑</span><div><div class="dlName">'+escapeHtml(lead.name)+'</div><div class="dlSub">TODAY’S LEADER</div></div><b>'+(lead.score||0).toLocaleString()+'</b></div>';
     html += rows.map((s,i)=>{
-      const mine = myName && s.name === myName, rs = i<3 ? `color:${MEDAL[i]}` : '';
-      return '<div class="dailyRow'+(mine?' me':'')+'"><span class="drk" style="'+rs+'">'+(i+1)+'</span>'+lbAvatarHtml(s.char, mine)+
+      const mine = myName && s.name === myName, rs = i<3 ? `color:${MEDAL[i]}` : '', pr = profs[s.name];
+      return '<div class="dailyRow'+(mine?' me':'')+'"><span class="drk" style="'+rs+'">'+(i+1)+'</span>'+lbAvatarHtml(s.char || (pr&&pr.char), mine, pr&&pr.avatar)+
         '<span class="drName">'+escapeHtml(s.name)+'</span><span class="drScore">'+(s.score||0).toLocaleString()+'</span></div>';
     }).join('');
     el.innerHTML = html;
@@ -6757,7 +6792,7 @@ function equipSel(){
   const isChar = shopTab==='chars';
   const own = isChar ? ownedChars : ownedStones, key = isChar ? selChar : selStone;
   if (!key || !own.includes(key)) return;
-  if (isChar){ curChar = key; Store.set('char', key); } else { curStone = key; Store.set('stone', key); }
+  if (isChar){ curChar = key; Store.set('char', key); pushProfile(); } else { curStone = key; Store.set('stone', key); }
   Sound.blip(660,0.08,'sine',0.12);
   renderShop();
 }
@@ -6774,6 +6809,7 @@ function postScore(force){
   if (!force && sc <= _runPostedScore){ rec('skipped: already posted this score'); return Promise.resolve(null); }
   _runPostedScore = sc;
   rec('posting…');
+  pushProfile();   // make sure this player's public profile (photo + character) exists for their leaderboard row
   return RemoteBoard.submit({ name:(playerName||'ANON').slice(0,12), score:sc, level:Math.round(gameLevel)||1, height:Math.round((S.peakY||0)*10)/10, char:curChar })
     .then(ok => { rec(ok ? 'POSTED OK' : 'FAILED', ok ? '' : (RemoteBoard.lastError||'')); return ok; });
 }
@@ -6917,7 +6953,7 @@ btn('menuFromOver',  goMenu);
 (function(){ const ni = $('nameInput'), sv = $('nameSave'); if (!ni || !ni.addEventListener) return;
   const live   = () => { playerName = sanitizeName(ni.value); Store.set('name', playerName); };
   const commit = () => { live(); ni.value = playerName; if (ni.blur) ni.blur();
-    if (playerName){ showPop('NAME SAVED'); const w = $('lbName'); if (w) w.style.display = 'none'; renderLeaderboard(); } };
+    if (playerName){ showPop('NAME SAVED'); pushProfile(); const w = $('lbName'); if (w) w.style.display = 'none'; renderLeaderboard(); } };
   ni.addEventListener('input', live);
   ni.addEventListener('change', commit);
   ni.addEventListener('blur', live);
@@ -6928,8 +6964,8 @@ btn('menuFromOver',  goMenu);
 (function(){ const sn = $('setNameInput'); if (!sn || !sn.addEventListener) return;
   const save = () => { playerName = sanitizeName(sn.value); Store.set('name', playerName); };
   sn.addEventListener('input', save);
-  sn.addEventListener('change', () => { save(); sn.value = playerName; });
-  sn.addEventListener('blur', () => { save(); sn.value = playerName; });
+  sn.addEventListener('change', () => { save(); sn.value = playerName; pushProfile(); });
+  sn.addEventListener('blur', () => { save(); sn.value = playerName; pushProfile(); });
   sn.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); save(); sn.value = playerName; if (sn.blur) sn.blur(); showPop('NAME SAVED'); } });
 })();
 btn('retryBtn',      ()=>startGame(gameLevel));   // retry the level you just died on
