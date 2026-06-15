@@ -983,7 +983,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.311 · 2026.06.13</div>
+  <div id="appVersion">v1.312 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1208,7 +1208,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.311';
+const APP_VERSION = '1.312';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1229,13 +1229,71 @@ const Analytics = {
         body: JSON.stringify(row) }).then(()=>{}).catch(()=>{});
     } catch(e){}
   },
+  // a send that survives the page being backgrounded/closed (sendBeacon → keepalive fetch). apikey rides in the query string
+  // because sendBeacon can't set headers.
+  _beacon(type, fields){
+    if (!this.enabled() || !type) return;
+    try {
+      const f = fields || {};
+      const row = { player: playerId, type, app_v: APP_VERSION,
+        level: (f.level==null?null:f.level), value: (f.value==null?null:f.value), meta: (f.meta||null) };
+      const body = JSON.stringify(row);
+      const url = SUPABASE_URL + '/rest/v1/events?apikey=' + encodeURIComponent(SUPABASE_ANON);
+      if (navigator.sendBeacon){ try { if (navigator.sendBeacon(url, new Blob([body], { type:'application/json' }))) return; } catch(e){} }
+      fetch(url, { method:'POST', keepalive:true,
+        headers: RemoteBoard._h({ 'Content-Type':'application/json', Prefer:'return=minimal' }), body }).catch(()=>{});
+    } catch(e){}
+  },
   _opened: false,
-  open(){                                                  // once per launch → drives installs / DAU / retention
+  session: null,
+  open(){                                                  // once per launch → installs / DAU / retention / sessions
     if (this._opened) return; this._opened = true;
     try {
-      if (!Store.get('installed_at', 0)){ Store.set('installed_at', Date.now()); this.track('install', { level: 1 }); }
-      Store.set('last_open', Date.now());
-      this.track('open', { level: resumeLevel });
+      const now = Date.now(), inst = Store.get('installed_at', 0) || 0;
+      if (!inst){ Store.set('installed_at', now); this.track('install', { level: 1 }); }
+      Store.set('last_open', now);
+      const sessN = (Store.get('sessions', 0) || 0) + 1; Store.set('sessions', sessN);
+      this.session = { id: 's_' + now.toString(36), start: now, runs: 0, wins: 0, deaths: 0,
+        playMs: 0, runStart: 0, maxLevel: resumeLevel || 1, coins: 0, purchases: 0, nav: {}, lastScreen: 'home', flushed: 0 };
+      this.track('open', { level: resumeLevel, meta: {
+        sess: sessN,
+        daysInstalled: Math.floor((now - (inst || now)) / 86400000),
+        best: bestScore || 0, maxLevel: maxLevel || 1, coins: bank || 0,
+        chars: (typeof ownedChars !== 'undefined' ? ownedChars.length : 0),
+        ref: (document.referrer || '').slice(0, 80),
+        ua: (navigator.userAgent || '').slice(0, 140),
+        scr: (typeof screen !== 'undefined' && screen.width) ? (screen.width + 'x' + screen.height) : '',
+        lang: (navigator.language || '') } });
+    } catch(e){}
+  },
+  // a screen/panel was opened — builds a per-session funnel + records WHERE the player is (for quit/exit analysis)
+  nav(screen){
+    try { const s = this.session; if (s){ s.nav[screen] = (s.nav[screen] || 0) + 1; s.lastScreen = screen; } } catch(e){}
+    this.track('nav', { meta: { screen } });
+  },
+  runStart(){ try { const s = this.session; if (s){ s.runs++; s.runStart = Date.now(); s.lastScreen = 'run'; } } catch(e){} },
+  runEnd(won, level){ try { const s = this.session; if (s){ if (s.runStart) s.playMs += (Date.now() - s.runStart); s.runStart = 0;
+    won ? s.wins++ : s.deaths++; if (level) s.maxLevel = Math.max(s.maxLevel, level); s.lastScreen = 'gameover'; } } catch(e){} },
+  runSecs(){ const s = this.session; return (s && s.runStart) ? Math.round((Date.now() - s.runStart) / 1000) : null; },
+  bump(field, n){ try { const s = this.session; if (s) s[field] = (s[field] || 0) + (n == null ? 1 : n); } catch(e){} },
+  // a cumulative SESSION summary, sent when the app is backgrounded/closed. Several may land per real session
+  // (one per background) — group by meta.id and take the largest to get the true totals.
+  flush(reason){
+    try {
+      const s = this.session; if (!s) return;
+      const now = Date.now();
+      if (reason !== 'end' && now - (s.flushed || 0) < 4000) return;   // throttle rapid tab-switching
+      let play = s.playMs; if (s.runStart) play += (now - s.runStart);
+      const secs = Math.round((now - s.start) / 1000);
+      if (secs < 2 && s.runs === 0 && !Object.keys(s.nav).length) return;
+      s.flushed = now;
+      this._beacon('session', { value: secs, level: s.maxLevel, meta: {
+        id: s.id, reason: reason || 'hide',
+        mins: Math.round(secs / 6) / 10, secs,
+        playMins: Math.round(play / 6000) / 10, playSecs: Math.round(play / 1000),
+        runs: s.runs, wins: s.wins, deaths: s.deaths, maxLevel: s.maxLevel,
+        coins: s.coins, purchases: s.purchases || 0,
+        lastScreen: s.lastScreen, nav: s.nav } });
     } catch(e){}
   }
 };
@@ -5308,6 +5366,7 @@ function startEmote(){
   r.emote = { t:0, dur: emoteDur() };
   r.invuln = Math.max(r.invuln, 0.2);                       // tiny grace as you stop
   const style = character().style;
+  try { Analytics.track('emote', { level: gameLevel, meta:{ char: curChar, style } }); } catch(e){}
   try {
     if (style === 'miah'){ r.emoteProps = makeEmoteGuitar(); g.add(r.emoteProps); }
     else if (style === 'ant'){ r.emoteProps = makeEmoteSpray(); g.add(r.emoteProps); }
@@ -5912,6 +5971,7 @@ function startGame(atLevel){
   // atLevel set → restart that exact level (retry / in-game restart); otherwise CONTINUE from saved progress
   gameLevel = dailyMode ? 1 : Math.max(1, atLevel || resumeLevel);
   Analytics.track('play', { level: gameLevel, meta:{ daily: !!dailyMode, char: curChar } });
+  Analytics.runStart();                          // start the play-time clock for this run
   applyBiome(gameLevel);                        // biome for the level you're resuming at
   checkDailyStreak();                          // first game of the day → streak bump + bonus coins
   $('ratingOverlay').classList.remove('show'); $('nextLevelWrap').classList.remove('show'); $('relicPicker').classList.remove('show'); $('introOverlay').classList.remove('show'); $('featureIntro').classList.remove('show'); $('multHud').classList.add('hidden');
@@ -6128,6 +6188,9 @@ function renderOwner(d){
   h += card('Sessions', d.sessions) + card('Plays', d.plays);
   h += card('Levels cleared', d.levels_cleared) + card('Wins', d.wins);
   h += card('Deaths', d.deaths) + card('Avg level reached', d.avg_level);
+  h += sect('Time spent');
+  h += card('Avg session', d.avg_session_min!=null?(d.avg_session_min+'m'):null, 'minutes / session') + card('Avg active play', d.avg_play_min!=null?(d.avg_play_min+'m'):null, 'in-run minutes / session');
+  h += card('Avg run length', d.avg_run_sec!=null?(d.avg_run_sec+'s'):null) + card('Emotes used', d.emotes);
   h += sect('Monetization');
   h += card('Ads watched', d.ads) + card('Purchases', d.purchases);
   h += card('Coins spent', d.coins_spent) + card('IAP revenue', d.iap_revenue!=null?('$'+d.iap_revenue):null);
@@ -6136,6 +6199,9 @@ function renderOwner(d){
   h += card('Good', p.good, pct(p.good)) + card('Miss', p.miss, pct(p.miss));
   if (d.deaths_by_reason){ h += sect('Top death reasons');
     h += '<div style="padding:4px 8px">' + Object.keys(d.deaths_by_reason).map(k=>'• '+escapeHtml(k)+': '+n(d.deaths_by_reason[k])).join('<br>') + '</div>'; }
+  const kvList = (obj) => '<div style="padding:4px 8px">' + Object.keys(obj).sort((a,b)=>obj[b]-obj[a]).map(k=>'• '+escapeHtml(k)+': '+n(obj[k])).join('<br>') + '</div>';
+  if (d.nav){ h += sect('Screens opened (visits)') + kvList(d.nav); }
+  if (d.quit_screens){ h += sect('Where players were when they left') + kvList(d.quit_screens); }
   h += '<div style="opacity:.4;font-size:10px;margin-top:16px">snapshot · app v'+escapeHtml(APP_VERSION)+'</div>';
   $('ownerBody').innerHTML = h;
 }
@@ -6159,7 +6225,7 @@ function resetProgress(){
 }
 // ---------- PROFILE: name, avatar, stats, currency, e-mail sign-up (free FERRO skin) ----------
 function showAcctMsg(t, good){ const m = $('acctMsg'); if (m){ m.textContent = t; m.style.color = (good===false) ? '#ffae8a' : '#8fe0b0'; } }
-function showProfile(){ $('startScreen').classList.add('hidden'); $('profilePanel').classList.remove('hidden'); renderProfile(); }
+function showProfile(){ Analytics.nav('profile'); $('startScreen').classList.add('hidden'); $('profilePanel').classList.remove('hidden'); renderProfile(); }
 function renderProfile(){
   if (account && !ownedChars.includes('ferro')){ ownedChars.push('ferro'); Store.set('ownedChars', ownedChars); }   // signed-up players own FERRO
   const ch = (typeof CHARACTERS!=='undefined' && CHARACTERS[curChar]) ? CHARACTERS[curChar] : null;
@@ -6281,9 +6347,9 @@ function renderGoals(){
   });
   const al = $('achList'); if (al) al.innerHTML = ah;
 }
-function showLeader(){ $('howtoPanel').classList.add('hidden'); $('startScreen').classList.add('hidden'); $('leaderPanel').classList.remove('hidden'); renderLeader(); }
+function showLeader(){ Analytics.nav('leaderboard'); $('howtoPanel').classList.add('hidden'); $('startScreen').classList.add('hidden'); $('leaderPanel').classList.remove('hidden'); renderLeader(); }
 // LEVEL SELECT — replay any level you've reached (1 … maxLevel), grouped by era
-function showLevels(){ $('startScreen').classList.add('hidden'); $('levelsPanel').classList.remove('hidden'); renderLevels(); }
+function showLevels(){ Analytics.nav('levels'); $('startScreen').classList.add('hidden'); $('levelsPanel').classList.remove('hidden'); renderLevels(); }
 function renderLevels(){
   const grid = $('levelsGrid'); if (!grid) return;
   const top = Math.max(1, maxLevel), lastEra = Math.floor((top-1)/10);
@@ -6317,7 +6383,7 @@ function startDailyClock(){
 function dayLabel(off){ const d = new Date(); d.setDate(d.getDate()-off);
   try { return d.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' }); } catch(e){ return dayKey(off); } }
 let dailyView = 'today';
-function showDaily(){ $('startScreen').classList.add('hidden'); $('dailyPanel').classList.remove('hidden'); dailyTab('today'); startDailyClock(); }
+function showDaily(){ Analytics.nav('daily'); $('startScreen').classList.add('hidden'); $('dailyPanel').classList.remove('hidden'); dailyTab('today'); startDailyClock(); }
 function renderDaily(){
   const be = $('dailyBest'); if (be) be.textContent = (Store.get('daily_'+todayKey(), 0) || 0).toLocaleString();
   if (dailyView === 'champs') renderDailyChamps(); else renderDailyToday();
@@ -6396,10 +6462,10 @@ function shareDaily(){
                        : 'Take on today\'s PYRAMID STACKER Daily Challenge ◈ — same seeded climb for everyone!';
   try { if (navigator.share) navigator.share({ text: txt }); else if (navigator.clipboard) { navigator.clipboard.writeText(txt); showHint('COPIED — paste it to a friend', 2200); } } catch(e){}
 }
-function showShop(tab){ if (tab) shopTab = tab; $('howtoPanel').classList.add('hidden'); selChar = curChar; selStone = curStone; $('startScreen').classList.add('hidden'); $('shopPanel').classList.remove('hidden'); renderShop(); }
-function showGoals(){ goalsNew = false; $('startScreen').classList.add('hidden'); $('goalsPanel').classList.remove('hidden'); renderGoals(); }
-function showSettings(){ $('startScreen').classList.add('hidden'); $('settingsPanel').classList.remove('hidden'); renderSettings(); }
-function showHow(){ $('howtoPanel').classList.remove('hidden'); howTab('play'); }
+function showShop(tab){ Analytics.nav('shop'); if (tab) shopTab = tab; $('howtoPanel').classList.add('hidden'); selChar = curChar; selStone = curStone; $('startScreen').classList.add('hidden'); $('shopPanel').classList.remove('hidden'); renderShop(); }
+function showGoals(){ Analytics.nav('goals'); goalsNew = false; $('startScreen').classList.add('hidden'); $('goalsPanel').classList.remove('hidden'); renderGoals(); }
+function showSettings(){ Analytics.nav('settings'); $('startScreen').classList.add('hidden'); $('settingsPanel').classList.remove('hidden'); renderSettings(); }
+function showHow(){ Analytics.nav('howto'); $('howtoPanel').classList.remove('hidden'); howTab('play'); }
 function howTab(which){
   const play = which !== 'about';
   $('howPlay').style.display = play ? 'flex' : 'none';
@@ -6408,7 +6474,7 @@ function howTab(which){
   $('howTabAbout').classList.toggle('sel', !play);
 }
 function closeHow(){ $('howtoPanel').classList.add('hidden'); Store.set('how', 1); }
-function backHome(){ charPrevOn = false; WorldMap.close(); $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden'); $('goalsPanel').classList.add('hidden'); $('settingsPanel').classList.add('hidden'); $('profilePanel').classList.add('hidden'); $('mapPanel').classList.add('hidden'); $('levelsPanel').classList.add('hidden'); $('dailyPanel').classList.add('hidden'); $('startScreen').classList.remove('hidden'); renderHome(); }
+function backHome(){ Analytics.nav('home'); charPrevOn = false; WorldMap.close(); $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden'); $('goalsPanel').classList.add('hidden'); $('settingsPanel').classList.add('hidden'); $('profilePanel').classList.add('hidden'); $('mapPanel').classList.add('hidden'); $('levelsPanel').classList.add('hidden'); $('dailyPanel').classList.add('hidden'); $('startScreen').classList.remove('hidden'); renderHome(); }
 
 // ---------- JOURNEY MAP: an atmospheric trail of floating era-islands you swipe through ----------
 const WorldMap = (function(){
@@ -6550,7 +6616,7 @@ const WorldMap = (function(){
     resize
   };
 })();
-function showMap(){ $('startScreen').classList.add('hidden'); $('mapPanel').classList.remove('hidden'); WorldMap.open(); }
+function showMap(){ Analytics.nav('map'); $('startScreen').classList.add('hidden'); $('mapPanel').classList.remove('hidden'); WorldMap.open(); }
 function renderLeader(){
   $('lbBest').textContent   = (bestScore||0).toLocaleString();
   $('lbHeight').textContent = (bestHeight||0).toFixed(0)+'m';
@@ -6641,7 +6707,7 @@ function purchaseSel(){
     if (st==='lock-boss'){ showPop('REACH LEVEL ' + it.unlock + ' FIRST'); return; }
   }
   if (bank >= it.cost){ bank -= it.cost; Store.set('coins', bank); own.push(key); Store.set(ownedKey, own); Sound.buy(); showPop('UNLOCKED — TAP EQUIP'); if (isChar) checkAchievements();
-    Analytics.track('purchase', { value: it.cost, meta:{ kind:isChar?'char':'stone', item:key, currency:'coins' } }); CloudSave.queue(); }
+    Analytics.track('purchase', { value: it.cost, meta:{ kind:isChar?'char':'stone', item:key, currency:'coins' } }); Analytics.bump('purchases'); CloudSave.queue(); }
   else { Sound.blip(150,0.16,'sawtooth',0.14); showPop('NEED MORE DEBEN'); }
   renderShop();
 }
@@ -6677,9 +6743,11 @@ function endGame(won, how){
   setSpeedFx(0);
   S.gameOver = true; S.won = won; S.phase = 'over';
   DDA.note(won ? 0.9 : (how==='collapsed' ? 0.15 : 0.3));   // run outcome feeds the adaptive skill estimate
-  // ---- analytics: run outcome + this run's placement quality ----
-  Analytics.track(won ? 'win' : 'death', { level: gameLevel, value: S.score||0, meta:{ reason: how||'', height: Math.round((S.peakY||0)*10)/10 } });
+  // ---- analytics: run outcome + duration + this run's placement quality ----
+  const _runSecs = Analytics.runSecs();
+  Analytics.track(won ? 'win' : 'death', { level: gameLevel, value: S.score||0, meta:{ reason: how||'', height: Math.round((S.peakY||0)*10)/10, dur: _runSecs, daily: !!dailyMode, char: curChar, coins: S.coins||0 } });
   if (S.tally){ Analytics.track('placements', { level: gameLevel, meta: S.tally }); }
+  Analytics.runEnd(won, gameLevel); Analytics.bump('coins', S.coins||0);   // close the play-time clock + tally session coins
   CloudSave.queue();
   $('reviveScreen').classList.add('hidden'); $('menuBtn').style.display = 'none'; $('restartBtn').style.display='none';
   $('hud').style.display = 'none'; $('coinHud').classList.add('hidden'); $('multHud').classList.add('hidden'); $('featureIntro').classList.remove('show');
@@ -7033,6 +7101,11 @@ $('meterWrap').style.opacity = '0';
 renderHome();          // populate best scores & coin bank on the home screen
 if (!Store.get('how', 0)) showHow();   // first-ever launch → show the how-to-play card once
 try { Analytics.open(); } catch(e){}   // log the session (installs / DAU / retention)
+// when the player backgrounds or closes the tab, send a session summary (minutes played, runs, where they left off, etc.)
+try {
+  document.addEventListener('visibilitychange', ()=>{ if (document.visibilityState === 'hidden') Analytics.flush('hide'); });
+  window.addEventListener('pagehide', ()=> Analytics.flush('end'));
+} catch(e){}
 animate();
 requestAnimationFrame(()=>{ const l=$('loader'); if (l){ l.classList.add('hidden'); setTimeout(()=>l.style.display='none', 600); } });   // reveal once ready
 
