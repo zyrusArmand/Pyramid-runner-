@@ -983,7 +983,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.317 · 2026.06.15</div>
+  <div id="appVersion">v1.318 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1229,7 +1229,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.317';
+const APP_VERSION = '1.318';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -2229,7 +2229,7 @@ function initCharPreview(){
   rend.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
   const sc = new THREE.Scene();
   const cam = new THREE.PerspectiveCamera(38, 1, 0.1, 12);
-  cam.position.set(0, 0.44, 1.15); cam.lookAt(0, 0.4, 0);   // closer in, framed around the chest
+  cam.position.set(0, 0.5, 1.8); cam.lookAt(0, 0.33, 0);   // pulled back to frame the whole character
   sc.add(new THREE.HemisphereLight(0xfff2dc, 0x35243f, 1.15));
   const dl = new THREE.DirectionalLight(0xffffff, 0.85); dl.position.set(1.4, 2.2, 1.8); sc.add(dl);
   charPrev = { rend, sc, cam, runner:null };
@@ -5501,7 +5501,7 @@ function makeEmoteFrida(){
 function endEmote(r, g){
   if (r && r.emoteProps && g){ try { g.remove(r.emoteProps); } catch(e){} r.emoteProps = null; }
   if (r && r.emoteNotes && g){ try { g.remove(r.emoteNotes); } catch(e){} r.emoteNotes = null; }
-  if (r) r.emote = null;
+  if (r){ r.emote = null; r.__antBX = undefined; r.__antBY = undefined; r.__antBZ = undefined; }
   if (g && g.__antWand) g.__antWand.visible = true;   // put Ant Man's wand back on his back
   if (g){ if (g.armL) g.armL.rotation.set(0,0,0); if (g.armR) g.armR.rotation.set(0,0,0);
     if (g.armL && g.armL.wrist) g.armL.wrist.rotation.set(0,0,0); if (g.armR && g.armR.wrist) g.armR.wrist.rotation.set(0,0,0);   // un-flick the wrists
@@ -5639,12 +5639,22 @@ function playEmote(g, r, t, dt){
     if (!r.emoteNotes){ r.emoteNotes = makeMusicNotes(); g.add(r.emoteNotes); }
     animateMusicNotes(r.emoteNotes, t);
   } else if (style === 'ant'){
-    // 🧼 set the SURFACE-CLEANER down on the ground and POWER-WASH, pushing it across in a sweep; water fans out from under the head
+    // 🧼 set the SURFACE-CLEANER down, WALK LEFT cleaning a straight strip, then PUSH the machine back & forth a couple of times (no body spin)
     const W = r.emoteProps;
     if (g.__antWand) g.__antWand.visible = false;     // taken off his back
-    // both front legs hold the lance grip, reaching forward
-    if (g.armL){ g.armL.rotation.x = -0.5; g.armL.rotation.z = 0.32; } bend(g.armL, -0.7);
+    if (g.armL){ g.armL.rotation.x = -0.5; g.armL.rotation.z = 0.32; } bend(g.armL, -0.7);   // both front legs hold the lance
     if (g.armR){ g.armR.rotation.x = -0.5; g.armR.rotation.z = -0.32; } bend(g.armR, -0.7);
+    if (r.__antBX === undefined){ r.__antBX = g.position.x; r.__antBY = g.position.y; r.__antBZ = g.position.z; }   // base pose (works in shop + run)
+    let dx = 0, dz = 0, by = 0;
+    if (t >= 0.5 && t < 1.9){            // WALK LEFT in a straight line, cleaning as he goes
+      const w = (t - 0.5) / 1.4, step = Math.sin((t - 0.5) * 9);
+      dx = -0.34 * w; by = Math.abs(step) * 0.006;
+      g.legL.rotation.x = step * 0.5; g.legR.rotation.x = -step * 0.5;
+      if (g.legL.elbow){ g.legL.elbow.rotation.x = Math.max(0, step) * 0.6; g.legR.elbow.rotation.x = Math.max(0, -step) * 0.6; }
+    } else if (t >= 1.9){               // hold at the left and PUSH the machine forward/back a couple of times
+      dx = -0.34; dz = Math.sin((t - 1.9) * 5.2) * 0.12;
+    }
+    g.position.set(r.__antBX + dx, r.__antBY + by, r.__antBZ + dz);
     if (W){
       const drop = Math.max(0, 0.09 * (1 - Math.min(1, t/0.5)));   // lower it onto the ground over ~0.5s
       W.position.set(0.04, drop, 0.42);
@@ -5656,7 +5666,6 @@ function playEmote(g, r, t, dt){
         const ph = (t*3 + i/W.__drops.length)%1, ang = i*2.4, rad = 0.085 + ph*0.06;   // scatter outward along the floor from under the head
         d.position.set(Math.cos(ang)*rad, 0.004 + Math.sin(ph*Math.PI)*0.018, Math.sin(ang)*rad);
         if (d.material) d.material.opacity = (1-ph)*0.55; }); }
-      if (firing){ g.rotation.y += Math.sin(t*2.4)*0.22; g.position.y += Math.sin(t*20)*0.0014; }   // push the head across in a wide sweep
     }
   } else if (style === 'american'){
     // bring the burger up to his mouth and CHOMP, with a happy bob
