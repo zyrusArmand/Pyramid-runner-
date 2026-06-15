@@ -1008,7 +1008,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.335 · 2026.06.15</div>
+  <div id="appVersion">v1.336 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1254,7 +1254,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.335';
+const APP_VERSION = '1.336';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4066,13 +4066,13 @@ function climbPath(){
     const fi = fis[L], placed = fi.slot ? fi.slot.placed : false;
     const weak = fi.slot ? !!fi.slot.weak : false, mesh = fi.slot ? fi.slot.mesh : null;
     if (!placed){
-      tiles.push({ pos:new THREE.Vector3(climbX, fi.y + LAYER_HEIGHT*0.5, fi.H + zHalf - 0.2), gap:true, weak:false, mesh, crumbled:false });
+      tiles.push({ pos:new THREE.Vector3(climbX, fi.y + LAYER_HEIGHT*0.5, fi.H + zHalf - 0.2), gap:true, weak:false, mesh, crumbled:false, halfW:fi.H });
       continue;
     }
     for (let i=0; i<N; i++){
       const ty = fi.y - h/2 + stepH*(i+1) + 0.015;           // tread top
       const tz = fi.H + zHalf - i*inset - 0.02;              // tread front edge, receding up the slope
-      tiles.push({ pos:new THREE.Vector3(climbX, ty, tz), gap:false, weak, mesh, crumbled:false });
+      tiles.push({ pos:new THREE.Vector3(climbX, ty, tz), gap:false, weak, mesh, crumbled:false, halfW:fi.H });   // half-width of the pyramid here (for cutting side lanes that run off the edge)
     }
   }
   const lastX = climbX;                                          // straight climb — capstone eases from the same axis
@@ -4087,9 +4087,9 @@ function climbPath(){
       const ty = cap.pos.y - ch/2 + ch*f + 0.02;               // step up, a hair above the surface
       const tx = lastX + (cap.pos.x - lastX) * f;               // ease x from where the layer climb ended to the capstone's true centre
       const tz = cap.pos.z + w/2 + 0.015;                       // stand just in FRONT of this course's face → never clips into the next
-      tiles.push({ pos:new THREE.Vector3(tx, ty, tz), gap:false, weak:false, mesh:cap.mesh, crumbled:false });
+      tiles.push({ pos:new THREE.Vector3(tx, ty, tz), gap:false, weak:false, mesh:cap.mesh, crumbled:false, halfW:w/2 });   // capstone narrows fast → side lanes get cut near the top
     }
-    tiles.push({ pos:new THREE.Vector3(cap.pos.x, cap.pos.y + ch/2 + 0.03, cap.pos.z), gap:false, weak:false, mesh:cap.mesh, crumbled:false });  // EXACT flat-top centre (celebration spot)
+    tiles.push({ pos:new THREE.Vector3(cap.pos.x, cap.pos.y + ch/2 + 0.03, cap.pos.z), gap:false, weak:false, mesh:cap.mesh, crumbled:false, halfW:0.15 });  // EXACT flat-top centre (celebration spot)
   }
   return tiles;
 }
@@ -4099,10 +4099,23 @@ function climbPath(){
 // gets a stone slab tilted along the slope that buries the step notch beneath the tread. Where a block is missing, broken
 // or has a gap we leave the section UNFILLED (and the highlight skips it too) so the runner must jump it or fall through
 // and die. The slab borrows the placed block's own colour so it blends seamlessly into the course it sits on.
+const RAMP_LANE_W = LANE_W * 0.62;     // each lane's slab width (three distinct lanes, gaps showing the bare steps between)
+const RAMP_THICK  = 0.045;             // a VERY slim slab — just enough to fill the step notch and sit flush
+// One ramp slab per lane between two path points. A side lane is CUT when it would poke past the pyramid's actual edge at
+// that height (min half-width of the two endpoints), so nothing ever overhangs thin air — including up the narrow capstone.
+function rampSlab(A, B, hwA, hwB, mat, out){
+  const minHW = Math.min(hwA == null ? 9 : hwA, hwB == null ? 9 : hwB);
+  [-1,0,1].forEach(lane => {
+    const d = lane*LANE_W;
+    if (lane!==0 && Math.abs(d) > minHW - 0.05) return;          // this lane runs off the edge here → don't draw it
+    const dy = B.y - A.y, dz = B.z - A.z, len = Math.hypot(dy, dz) || 0.05, ang = Math.atan2(-dy, dz);
+    const seg = new THREE.Mesh(new THREE.BoxGeometry(RAMP_LANE_W, RAMP_THICK, len*1.04), mat);
+    seg.position.set((A.x+B.x)/2 + d, (A.y+B.y)/2 - RAMP_THICK/2 + 0.004, (A.z+B.z)/2);
+    seg.rotation.x = ang; seg.receiveShadow = true; scene.add(seg); out.push(seg);
+  });
+}
 function addSmoothRamps(tiles){
   const ramps = [];
-  const baseY = tiles[0].pos.y, apexY = tiles[tiles.length-1].pos.y, span = (apexY - baseY) || 1;
-  const Hbase = baseBlocks/2;
   // Borrow the EXACT material of the stone each segment sits on — same era texture, bump and per-course colour — so the
   // ramp reads as part of the pyramid, not a pale slab pasted on top. Cache one clone per source material (the texture
   // map is shared, so this is cheap) and tag it so the lane-shimmer leaves these stone ramps alone.
@@ -4120,19 +4133,7 @@ function addSmoothRamps(tiles){
     const t = tiles[i], t2 = tiles[i+1];
     if (t.gap || t2.gap || t.crumbled || t2.crumbled) continue;   // real hole → no fill, stays deadly
     if (t.weak || t2.weak) continue;                              // sloppily-placed course → the smooth ramp never forms; the raw step stays exposed
-    const frac = (t.pos.y - baseY) / span;
-    const mat = stoneMat(t);
-    [-1,0,1].forEach(lane => {
-      const d = lane*LANE_W;
-      if (lane!==0 && frac > 1 - Math.abs(d)/Hbase) return;       // side lane has run off the pyramid edge by this height
-      const A = t.pos, B = t2.pos;
-      const dy = B.y - A.y, dz = B.z - A.z, len = Math.hypot(dy, dz) || 0.05, ang = Math.atan2(-dy, dz);
-      const w = LANE_W * 0.62;                                    // THREE distinct lanes (0.2 apart) with a clear gap between them → the bare steps still show through
-      const thick = 0.075;                                        // a slim slab that fills the step notch and sits FLUSH on the treads (no floating gap)
-      const seg = new THREE.Mesh(new THREE.BoxGeometry(w, thick, len*1.04), mat);
-      seg.position.set((A.x+B.x)/2 + d, (A.y+B.y)/2 - thick/2 + 0.004, (A.z+B.z)/2);
-      seg.rotation.x = ang; seg.receiveShadow = true; scene.add(seg); ramps.push(seg);
-    });
+    rampSlab(t.pos, t2.pos, t.halfW, t2.halfW, stoneMat(t), ramps);
   }
   S.run.ramps = ramps;
 }
@@ -4143,26 +4144,27 @@ function addSmoothRamps(tiles){
 // down the unified pathway, so there's never a double.
 function addBuildLayerRamp(L, mesh){
   const h = LAYER_HEIGHT*1.04, zHalf = BLOCK_SIZE*0.985/2, inset = 0.04, N = STEP_N, stepH = h/N;
-  const y0 = L*LAYER_HEIGHT, H = (nForLayer(L)*BLOCK_SIZE)/2;
+  const y0 = L*LAYER_HEIGHT, H = (nForLayer(L)*BLOCK_SIZE)/2;       // pyramid half-width here — wide on a course, so all three lanes fit
   const mat = (mesh && mesh.material) ? mesh.material : new THREE.MeshStandardMaterial({ color:0xC9A368, roughness:0.92, metalness:0.04 });
-  const Hbase = baseBlocks/2, frac = L/Math.max(1, baseBlocks-1);
   const pos = i => new THREE.Vector3(0, y0 - h/2 + stepH*(i+1) + 0.015, H + zHalf - i*inset - 0.02);
-  for (let i=0; i<N-1; i++){
-    const A = pos(i), B = pos(i+1);
-    [-1,0,1].forEach(lane => {
-      const d = lane*LANE_W;
-      if (lane!==0 && frac > 1 - Math.abs(d)/Hbase) return;          // side lane has run off the pyramid edge near the top
-      const dy = B.y-A.y, dz = B.z-A.z, len = Math.hypot(dy,dz)||0.05, ang = Math.atan2(-dy,dz);
-      const w = LANE_W*0.62, thick = 0.075;
-      const seg = new THREE.Mesh(new THREE.BoxGeometry(w, thick, len*1.04), mat);
-      seg.position.set((A.x+B.x)/2 + d, (A.y+B.y)/2 - thick/2 + 0.004, (A.z+B.z)/2);
-      seg.rotation.x = ang; seg.receiveShadow = true; scene.add(seg); S.buildPath.push(seg);
-    });
-  }
+  for (let i=0; i<N-1; i++) rampSlab(pos(i), pos(i+1), H, H, mat, S.buildPath);
+}
+// extend the live pathway up the capstone so it reaches the very top — narrowing fast, so the side lanes get cut off as
+// the crown closes to its flat summit (matches the climb-time geometry, just drawn during the build).
+function addBuildCapstoneRamp(capMesh, capCenter){
+  const ch = LAYER_HEIGHT*1.04, cBaseW = BLOCK_SIZE*0.999, cN = 5;
+  const mat = (capMesh && capMesh.material) ? capMesh.material : new THREE.MeshStandardMaterial({ color:0xC9A368, roughness:0.92, metalness:0.04 });
+  const cx = capCenter.x, cy = capCenter.y, cz = capCenter.z;
+  const pt = f => { const w = cBaseW + (0.3 - cBaseW)*f; return { p:new THREE.Vector3(cx*f, cy - ch/2 + ch*f + 0.02, cz + w/2 + 0.015), hw:w/2 }; };
+  let prev = pt(0);                                                  // from the capstone base (joins the last course below)
+  for (let i=1; i<=cN; i++){ const cur = pt(i/cN); rampSlab(prev.p, cur.p, prev.hw, cur.hw, mat, S.buildPath); prev = cur; }
+  const top = { p:new THREE.Vector3(cx, cy + ch/2 + 0.03, cz), hw:0.15 };
+  rampSlab(prev.p, top.p, prev.hw, top.hw, mat, S.buildPath);        // final step onto the flat summit
 }
 // after a stone is placed, grow the live pathway if this was the front-centre stone of its course (and seated cleanly).
 function maybeBuildRamp(a, weak){
-  if (a.capstone || weak) return;
+  if (a.capstone){ addBuildCapstoneRamp(a.mesh, a.mesh.position); return; }   // crown the path at the very top
+  if (weak) return;
   const L = S.layer;
   if (S.buildRampLayers[L]) return;                                  // this course already has its pathway segment
   const H = (a.n*BLOCK_SIZE)/2;
@@ -4178,8 +4180,6 @@ function maybeBuildRamp(a, weak){
 // the two sides until the pyramid edge runs out at that height). These now ride ON TOP of the smooth ramps above.
 function addLaneGuides(tiles){
   const guides = [];
-  const baseY = tiles[0].pos.y, apexY = tiles[tiles.length-1].pos.y, span = (apexY - baseY) || 1;
-  const Hbase = baseBlocks/2;
   const seg = (lane, x, y, z, w, hgt, dep) => {
     const centre = lane===0, op = centre ? 0.4 : 0.26;          // plain translucent amber — NO additive (that blew out to white)
     const mat = new THREE.MeshBasicMaterial({ color: centre?0xd99836:0xb87d2c, transparent:true,
@@ -4189,10 +4189,10 @@ function addLaneGuides(tiles){
   };
   for (let i=0; i<tiles.length-1; i++){
     const t = tiles[i], t2 = tiles[i+1]; if (t.gap || t.crumbled || t.weak) continue;   // missing/broken/sloppy block → no highlight (smooth ramp only lights up where you stacked clean)
-    const frac = (t.pos.y - baseY) / span;
+    const minHW = Math.min(t.halfW == null ? 9 : t.halfW, t2.halfW == null ? 9 : t2.halfW);
     [-1,0,1].forEach(lane => {
       const d = lane*LANE_W;
-      if (lane!==0 && frac > 1 - Math.abs(d)/Hbase) return;   // side lane ran off the edge by this height
+      if (lane!==0 && Math.abs(d) > minHW - 0.05) return;     // side lane would run off the pyramid edge here → cut it (matches the ramp)
       const w = lane===0 ? 0.12 : 0.1;                       // a slim warm lane marker matching the ramp lane width
       const A = t.pos, B = t2.pos;
       // flat pad hugging the smooth ramp surface — only light overlap so pads don't pile up and over-darken
