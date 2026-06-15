@@ -1007,7 +1007,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.333 · 2026.06.15</div>
+  <div id="appVersion">v1.334 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1253,7 +1253,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.333';
+const APP_VERSION = '1.334';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -3520,6 +3520,7 @@ function resetState(){
     coins:0, timeScale:1, heartT:0, bestPerfect:0, coinsDoubled:false,
     buildQual:0, buildCount:0, allPerfect:true,    // placement quality & count + "every block perfect?" → star rating
     pathSlots:[],          // ordered per-cell {pos, placed} for the runner
+    buildPath:[], buildRampLayers:{},   // live three-lane pathway that grows up the front-centre as you build
     fight:null, fightWon:false,   // phase-3 boss fight state
     run:null, runner:null };
 }
@@ -3726,6 +3727,7 @@ function drop(){
   }
   S.allBlocks.push(a.mesh);
   pushCells(a, true, weak, isKey ? 0 : restOff);       // run path follows where the stone actually landed
+  maybeBuildRamp(a, weak);                              // grow the live front-centre pathway as you build
   updateHUD();
 
   if (S.integrity <= 0){ collapseAll(); endGame(false, 'collapsed'); return; }
@@ -4132,6 +4134,42 @@ function addSmoothRamps(tiles){
     });
   }
   S.run.ramps = ramps;
+}
+
+// BUILD-PHASE PREVIEW: the same three-lane ramp for ONE course, anchored at the front-centre (world x=0) using the exact
+// climb geometry, so the pathway visibly grows up the pyramid as you stack — and shows on each block as it's placed.
+// Wears the placed stone's own material (era texture + course colour). The climb-start builder removes these and lays
+// down the unified pathway, so there's never a double.
+function addBuildLayerRamp(L, mesh){
+  const h = LAYER_HEIGHT*1.04, zHalf = BLOCK_SIZE*0.985/2, inset = 0.04, N = STEP_N, stepH = h/N;
+  const y0 = L*LAYER_HEIGHT, H = (nForLayer(L)*BLOCK_SIZE)/2;
+  const mat = (mesh && mesh.material) ? mesh.material : new THREE.MeshStandardMaterial({ color:0xC9A368, roughness:0.92, metalness:0.04 });
+  const Hbase = baseBlocks/2, frac = L/Math.max(1, baseBlocks-1);
+  const pos = i => new THREE.Vector3(0, y0 - h/2 + stepH*(i+1) + 0.015, H + zHalf - i*inset - 0.02);
+  for (let i=0; i<N-1; i++){
+    const A = pos(i), B = pos(i+1);
+    [-1,0,1].forEach(lane => {
+      const d = lane*LANE_W;
+      if (lane!==0 && frac > 1 - Math.abs(d)/Hbase) return;          // side lane has run off the pyramid edge near the top
+      const dy = B.y-A.y, dz = B.z-A.z, len = Math.hypot(dy,dz)||0.05, ang = Math.atan2(-dy,dz);
+      const w = LANE_W*0.62, thick = 0.075;
+      const seg = new THREE.Mesh(new THREE.BoxGeometry(w, thick, len*1.04), mat);
+      seg.position.set((A.x+B.x)/2 + d, (A.y+B.y)/2 - thick/2 + 0.004, (A.z+B.z)/2);
+      seg.rotation.x = ang; seg.receiveShadow = true; scene.add(seg); S.buildPath.push(seg);
+    });
+  }
+}
+// after a stone is placed, grow the live pathway if this was the front-centre stone of its course (and seated cleanly).
+function maybeBuildRamp(a, weak){
+  if (a.capstone || weak) return;
+  const L = S.layer;
+  if (S.buildRampLayers[L]) return;                                  // this course already has its pathway segment
+  const H = (a.n*BLOCK_SIZE)/2;
+  if (a.center.z <= H - 0.6) return;                                 // only the FRONT (+z) wall carries the climb path
+  const xHalf = (a.axis==='x' ? a.len*BLOCK_SIZE : BLOCK_SIZE)*0.999/2;
+  if (a.center.x - xHalf > 0.25 || a.center.x + xHalf < -0.25) return;  // this stone doesn't cover the centre column
+  S.buildRampLayers[L] = true;
+  addBuildLayerRamp(L, a.mesh);
 }
 
 // glowing lane guides that TRACE the staircase: for every step each lane draws a flat pad across the tread AND a
@@ -4705,6 +4743,7 @@ function loadRunDressing(){
       lastGold = i;
     }
   }
+  if (S.buildPath){ S.buildPath.forEach(m => scene.remove(m)); S.buildPath = []; }   // drop the build-phase preview; the unified ramp replaces it (no double)
   addSmoothRamps(tiles);                                 // fill the three lane corridors into smooth flush ramps (gaps left open)
   addLaneGuides(tiles);                                  // the three glowing paths ride on top of those ramps
   spawnGuardian();                                       // boss looms on the summit during an era-final (guardian) level
