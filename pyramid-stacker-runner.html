@@ -986,7 +986,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.319 · 2026.06.15</div>
+  <div id="appVersion">v1.320 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1232,7 +1232,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.319';
+const APP_VERSION = '1.320';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -2297,7 +2297,7 @@ function characterThumb(charKey){
 // knobs: harder when you're crushing it, easier when you're struggling. A single eased "skill" value
 // (persisted) drives every knob, and when OFF skill reads a neutral 0.5 so nothing changes. ----------
 const DDA = {
-  on: Store.get('dda', 1) !== 0,                                  // default ON
+  on: Store.get('dda', 0) === 1,                                 // default OFF — difficulty is a steady per-level ramp, not adaptive
   skill: Math.max(0.1, Math.min(0.9, Store.get('skill', 0.5))),  // 0 = struggling … 1 = crushing it (persists)
   note(perf){                                                    // perf 0..1 for the latest action; eased, never snaps
     if (!this.on) return;
@@ -2333,7 +2333,7 @@ function relicEffects(){
 // ---------- level progression: each pyramid you finish bumps the level and ups the pace ----------
 let gameLevel = 1;
 // pace steps up once per 5-level band and stays flat within a band (so each block of 5 feels the same, then harder)
-function levelSpeed(){ return 1 + Math.floor((gameLevel-1)/5)*0.1; }
+function levelSpeed(){ return 1 + Math.min(2.0, (gameLevel-1)*0.02); }   // a gradual +2%/level ramp (capped) so each level steps up, instead of identical 5-level bands
 
 // ---------- progressive unlocks: new hazards & rewards roll in level by level. The FIRST time the player
 // meets one, the climb briefly freezes and a card explains it. Early levels stay gentle (small pyramid, few/no
