@@ -987,7 +987,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.322 · 2026.06.15</div>
+  <div id="appVersion">v1.323 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1233,7 +1233,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.322';
+const APP_VERSION = '1.323';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -2312,7 +2312,21 @@ const DDA = {
   runSpeed(){  return 1 + (this.s()-0.5)*0.3; },                 // slightly faster climb when sharp
   obstacleW(){ return Math.max(0.4, 1 + (this.s()-0.5)*0.7); },  // more run obstacles when sharp, fewer when struggling
 };
-function perfectThreshold(){ return TIER_PERFECT * DDA.perfectW(); }   // the live PERFECT cutoff
+// a free starter hero a few levels in — ignites the collection loop early (Crossy-Road style)
+function giftFirstCharacter(){
+  try {
+    Store.set('gift3', 1);
+    const pick = ownedChars.includes('ant') ? 'frida' : 'ant';   // a fun, characterful freebie
+    if (!ownedChars.includes(pick)){ ownedChars.push(pick); Store.set('ownedChars', ownedChars); }
+    checkAchievements(); CloudSave.queue();
+    const nm = (CHARACTERS[pick] && CHARACTERS[pick].name) || 'A NEW HERO';
+    setTimeout(()=> showHint('🎁 FREE CHARACTER UNLOCKED — ' + nm + '! Equip it in the SHOP.', 4400), 1500);
+  } catch(e){}
+}
+function buildGrace(){ return !dailyMode && gameLevel <= 2; }                 // gentle on-ramp: the first couple of levels can't collapse + a wider window
+function perfectThreshold(){ return TIER_PERFECT * (buildGrace()?1.7:1) * DDA.perfectW(); }   // the live PERFECT cutoff
+// apply integrity damage, but the on-ramp levels take it gently and can never actually fall
+function hurtIntegrity(amount){ const floor = buildGrace() ? 0.22 : 0; S.integrity = Math.max(floor, S.integrity - amount * (buildGrace()?0.5:1)); }
 
 // ---------- roguelike RELICS: between every level you pick 1 of 3 blessings; they STACK through the session ----------
 let runRelics = [];   // ids picked this session (reset on a fresh start from the menu)
@@ -3649,7 +3663,7 @@ function drop(){
   const weak = !isKey && dist > 0.34;                  // keystone seats clean; never a crack
   // STAKES: every sloppy seat costs integrity — even on the base layer — so a careless build can actually come down
   const dmg = (weak ? offN : offN*0.3) * (0.055 + S.layer*0.045);
-  S.integrity = Math.max(0, S.integrity - dmg);
+  hurtIntegrity(dmg);
   if (weak){
     Sound.drop();
     // an off seat sits visibly CROOKED → a careless pyramid LOOKS as bad as it scores
@@ -3657,7 +3671,6 @@ function drop(){
     a.mesh.rotation[la] += -Math.sign(off||1) * offN * 0.12;
     a.mesh.rotation.y  += (off>0?1:-1) * offN * 0.16;
   }
-
   // every imperfect stone drifts a little out over the open cells; we tally that drift and let it
   // consume whole cells as it builds up, so the wall fills its real width instead of crowding /
   // overflowing. when the cells run out, the next wall simply starts.
@@ -3760,7 +3773,7 @@ function crumbleStone(g){
 function missStone(a, label){
   crumbleStone(a.mesh);
   Sound.drop(); shake(0.6); buzz([24,40,24]);   // a real, jarring crunch
-  S.integrity = Math.max(0, S.integrity - (0.09 + S.layer*0.03));
+  hurtIntegrity(0.09 + S.layer*0.03);
   S.buildQual += 0; S.buildCount++; S.allPerfect = false;   // a crumbled/gap stone counts hard against the rating
   S.streak = 0; showCombo(0); showPop(label || 'MISS');
   pushCells(a, false, false, 0);                    // its cells become a gap in the run path
@@ -4993,6 +5006,7 @@ function startRun(){
   const stars = pyramidRating(); S.buildStars = stars;
   totalBuilds++; Store.set('builds', totalBuilds);                                   // lifetime pyramids built
   if (gameLevel > maxLevel){ maxLevel = gameLevel; Store.set('maxLevel', maxLevel); grantEraChars(); } // highest level reached → free peasant for any new era
+  if (!Store.get('gift3', 0) && maxLevel >= 3) giftFirstCharacter();   // early collection hook: a free hero a few levels in
   missionEvent('stars', stars); missionEvent('builds', 1);   // goals: build quality + pyramids built
   bumpRecord('bestStars', stars);                            // achievements: flawless build, build counts, levels reached
   const hazardMul = 1.0;   // build quality no longer thins out hazards — the climb's difficulty is the same however you built
@@ -6919,7 +6933,7 @@ function endGame(won, how){
     $('finalReward').innerHTML = `bank ◎${bank.toLocaleString()}`;
     $('dblBtn').style.display = (S.coins > 0 && !S.coinsDoubled) ? '' : 'none';
     $('overScreen').classList.remove('hidden');
-  }, 700);
+  }, 380);   // snappier game-over so RETRY is right there (was 700ms)
 }
 
 // ---------- input ----------
