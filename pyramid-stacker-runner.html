@@ -987,7 +987,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.324 · 2026.06.15</div>
+  <div id="appVersion">v1.325 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1233,7 +1233,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.324';
+const APP_VERSION = '1.325';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -2324,7 +2324,21 @@ function giftFirstCharacter(){
   } catch(e){}
 }
 function buildGrace(){ return !dailyMode && gameLevel <= 2; }                 // gentle on-ramp: the first couple of levels can't collapse + a wider window
-function perfectThreshold(){ return TIER_PERFECT * (buildGrace()?1.7:1) * DDA.perfectW(); }   // the live PERFECT cutoff
+// each ERA puts a distinct twist on the BUILD phase, so the core minigame stays fresh as you climb (the climb already changes per era)
+function eraBuildMod(){
+  if (dailyMode) return {};
+  switch ((eraFor(gameLevel)||{}).key){
+    case 'aztec':  return { wind:0.09,                        label:'🌀 WIND' };          // gusts buffet the stone side to side
+    case 'greek':  return { speed:1.2,                        label:'⚡ BRISK' };          // the gods demand pace
+    case 'norse':  return { tighten:0.72,                     label:'❄ PRECISION' };       // frostbite-tight seat
+    case 'nippon': return { speed:1.28, tighten:0.78,         label:'🗡 KATANA' };          // fast AND exact
+    case 'alien':  return { wobble:0.05,                      label:'🛸 WOBBLE' };          // anti-grav jitter
+    case 'cosmos': return { pulse:0.5,                        label:'🌌 TIME WARP' };       // the sweep speeds up & slows
+    case 'heaven': return { wind:0.06, speed:1.18, tighten:0.82, label:'✦ TRIAL' };        // everything at once
+    default:       return {};                                                              // egypt — the calm learning era
+  }
+}
+function perfectThreshold(){ return TIER_PERFECT * (buildGrace()?1.7:1) * (eraBuildMod().tighten||1) * DDA.perfectW(); }   // the live PERFECT cutoff
 // apply integrity damage, but the on-ramp levels take it gently and can never actually fall
 function hurtIntegrity(amount){ const floor = buildGrace() ? 0.22 : 0; S.integrity = Math.max(floor, S.integrity - amount * (buildGrace()?0.5:1)); }
 
@@ -2522,7 +2536,8 @@ function setLevelName(show){
     const d = $('lnDiff'); if (d){
       const sp = levelSpeed(), frac = Math.min(1, (sp-1)/2);     // 0 at L1 … 1 at the speed cap
       const filled = Math.max(1, Math.round(frac*8)), pips = '▰'.repeat(filled) + '▱'.repeat(8-filled);
-      d.textContent = '⚡ SPEED ×' + sp.toFixed(2) + '   ' + pips;
+      const em = eraBuildMod();
+      d.textContent = '⚡×' + sp.toFixed(2) + '  ' + pips + (em.label ? '   ' + em.label : '');
       d.style.color = frac < 0.34 ? '#7fe0a8' : frac < 0.67 ? '#ffd24a' : '#ff7a5a';   // green → gold → red as it climbs
     }
   }
@@ -3531,7 +3546,7 @@ function spawnBlock(){
   }
 
   // Daily Challenge: EVERY block swings at one fixed speed — no layer ramp, no per-block randomness, so it's identical for everyone
-  const speed = dailyMode ? 4.8 : (1.8 + S.layer*0.18);   // deterministic: base + a steady per-layer step (no random jitter)
+  const speed = dailyMode ? 4.8 : ((1.8 + S.layer*0.18) * (eraBuildMod().speed||1));   // deterministic base + per-layer step, times the era's build twist
   const color = layerColor(S.layer);                  // capstone matches the rest of the pyramid's stone
 
   let mesh;
@@ -7111,14 +7126,19 @@ function animate(){
   if (animProps.length) animateBackdrop(performance.now()*0.001);    // living backdrops
 
   if (S.active && S.phase==='build' && !S.paused){
-    const a = S.active;
-    a.phase += a.speed*dt;
+    const a = S.active, em = eraBuildMod(), now = (typeof performance!=='undefined'&&performance.now)?performance.now():Date.now();
+    let spd = a.speed;
+    if (em.pulse) spd *= (1 + Math.sin(now*0.0022)*em.pulse);                  // TIME WARP: the sweep speeds up and slows
+    a.phase += spd*dt;
     if (a.mode==='keystone' || a.mode==='open'){
       // steady sweep from the far/opposite end IN to the perfect seat, with a SHARP turn at the seat
       // (no dwelling there) — so it clearly enters from the far side and a PERFECT is hard to nail.
       const ax = (a.mode==='keystone') ? a.perpAxis : a.axis;
       const tri = 1 - Math.abs(((a.phase/Math.PI) % 2) - 1);   // 0 at the seat → 1 fully out → 0
-      a.mesh.position[ax] = a.seat + (a.far - a.seat)*tri;
+      let p = a.seat + (a.far - a.seat)*tri;
+      if (em.wind)   p += Math.sin(now*0.0016)*em.wind;        // WIND: slow lateral gusts you must read
+      if (em.wobble) p += Math.sin(now*0.013)*em.wobble;       // WOBBLE: anti-grav jitter
+      a.mesh.position[ax] = p;
     } else if (a.mode==='sym'){
       a.mesh.position[a.axis] = a.center[a.axis] + Math.sin(a.phase)*a.amp;
     }
