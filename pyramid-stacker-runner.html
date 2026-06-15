@@ -1008,7 +1008,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.339 · 2026.06.15</div>
+  <div id="appVersion">v1.340 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1254,7 +1254,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.339';
+const APP_VERSION = '1.340';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4067,13 +4067,13 @@ function climbPath(){
     const fi = fis[L], placed = fi.slot ? fi.slot.placed : false;
     const weak = fi.slot ? !!fi.slot.weak : false, mesh = fi.slot ? fi.slot.mesh : null;
     if (!placed){
-      tiles.push({ pos:new THREE.Vector3(climbX, fi.y + LAYER_HEIGHT*0.5, fi.H + zHalf - 0.2), gap:true, weak:false, mesh, crumbled:false, halfW:fi.H });
+      tiles.push({ pos:new THREE.Vector3(climbX, fi.y + LAYER_HEIGHT*0.5, fi.H + zHalf - 0.2), gap:true, weak:false, mesh, crumbled:false, halfW:fi.H, lyr:L });
       continue;
     }
     for (let i=0; i<N; i++){
       const ty = fi.y - h/2 + stepH*(i+1) + 0.015;           // tread top
       const tz = fi.H + zHalf - i*inset - 0.02;              // tread front edge, receding up the slope
-      tiles.push({ pos:new THREE.Vector3(climbX, ty, tz), gap:false, weak, mesh, crumbled:false, halfW:fi.H });   // half-width of the pyramid here (for cutting side lanes that run off the edge)
+      tiles.push({ pos:new THREE.Vector3(climbX, ty, tz), gap:false, weak, mesh, crumbled:false, halfW:fi.H, lyr:L });   // halfW = pyramid half-width here; lyr = course index so ramps don't bridge across the big inter-course step
     }
   }
   const lastX = climbX;                                          // straight climb — capstone eases from the same axis
@@ -4088,9 +4088,9 @@ function climbPath(){
       const ty = cap.pos.y - ch/2 + ch*f + 0.02;               // step up, a hair above the surface
       const tx = lastX + (cap.pos.x - lastX) * f;               // ease x from where the layer climb ended to the capstone's true centre
       const tz = cap.pos.z + w/2 + 0.015;                       // stand just in FRONT of this course's face → never clips into the next
-      tiles.push({ pos:new THREE.Vector3(tx, ty, tz), gap:false, weak:false, mesh:cap.mesh, crumbled:false, halfW:w/2 });   // capstone narrows fast → side lanes get cut near the top
+      tiles.push({ pos:new THREE.Vector3(tx, ty, tz), gap:false, weak:false, mesh:cap.mesh, crumbled:false, halfW:w/2, lyr:'cap' });   // capstone narrows fast → side lanes get cut near the top
     }
-    tiles.push({ pos:new THREE.Vector3(cap.pos.x, cap.pos.y + ch/2 + 0.03, cap.pos.z), gap:false, weak:false, mesh:cap.mesh, crumbled:false, halfW:0.15 });  // EXACT flat-top centre (celebration spot)
+    tiles.push({ pos:new THREE.Vector3(cap.pos.x, cap.pos.y + ch/2 + 0.03, cap.pos.z), gap:false, weak:false, mesh:cap.mesh, crumbled:false, halfW:0.15, lyr:'top' });  // EXACT flat-top centre (celebration spot) — lyr 'top' so NO ramp slab ever sits on the flat summit
   }
   return tiles;
 }
@@ -4134,6 +4134,7 @@ function addSmoothRamps(tiles){
     const t = tiles[i], t2 = tiles[i+1];
     if (t.gap || t2.gap || t.crumbled || t2.crumbled) continue;   // real hole → no fill, stays deadly
     if (t.weak || t2.weak) continue;                              // sloppily-placed course → the smooth ramp never forms; the raw step stays exposed
+    if (t.lyr !== t2.lyr) continue;                               // different course (or the capstone summit) → DON'T bridge the big step; the ramp sits flush and restarts on the next course
     rampSlab(t.pos, t2.pos, t.halfW, t2.halfW, stoneMat(t), ramps);
   }
   S.run.ramps = ramps;
@@ -4157,10 +4158,9 @@ function addBuildCapstoneRamp(capMesh, capCenter){
   const mat = (capMesh && capMesh.material) ? capMesh.material : new THREE.MeshStandardMaterial({ color:0xC9A368, roughness:0.92, metalness:0.04 });
   const cx = capCenter.x, cy = capCenter.y, cz = capCenter.z;
   const pt = f => { const w = cBaseW + (0.3 - cBaseW)*f; return { p:new THREE.Vector3(cx*f, cy - ch/2 + ch*f + 0.02, cz + w/2 + 0.015), hw:w/2 }; };
-  let prev = pt(0);                                                  // from the capstone base (joins the last course below)
+  let prev = pt(0);                                                  // from the capstone base
   for (let i=1; i<=cN; i++){ const cur = pt(i/cN); rampSlab(prev.p, cur.p, prev.hw, cur.hw, mat, S.buildPath); prev = cur; }
-  const top = { p:new THREE.Vector3(cx, cy + ch/2 + 0.03, cz), hw:0.15 };
-  rampSlab(prev.p, top.p, prev.hw, top.hw, mat, S.buildPath);        // final step onto the flat summit
+  // NO final summit slab — the ramp rides only the sloped sides of the crown and ends flush; the flat top stays bare.
 }
 // after a stone is placed, grow the live pathway if this was the front-centre stone of its course (and seated cleanly).
 function maybeBuildRamp(a, weak){
