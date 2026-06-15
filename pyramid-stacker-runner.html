@@ -983,7 +983,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.314 · 2026.06.15</div>
+  <div id="appVersion">v1.315 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1208,7 +1208,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.314';
+const APP_VERSION = '1.315';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1257,6 +1257,8 @@ const Analytics = {
         playMs: 0, runStart: 0, maxLevel: resumeLevel || 1, coins: 0, purchases: 0, nav: {}, lastScreen: 'home', flushed: 0 };
       this.track('open', { level: resumeLevel, meta: {
         sess: sessN,
+        name: (typeof playerName !== 'undefined' && playerName) ? String(playerName).slice(0, 12) : null,
+        char: (typeof curChar !== 'undefined') ? curChar : null,
         daysInstalled: Math.floor((now - (inst || now)) / 86400000),
         best: bestScore || 0, maxLevel: maxLevel || 1, coins: bank || 0,
         chars: (typeof ownedChars !== 'undefined' ? ownedChars.length : 0),
@@ -1289,6 +1291,8 @@ const Analytics = {
       s.flushed = now;
       this._beacon('session', { value: secs, level: s.maxLevel, meta: {
         id: s.id, reason: reason || 'hide',
+        name: (typeof playerName !== 'undefined' && playerName) ? String(playerName).slice(0, 12) : null,
+        char: (typeof curChar !== 'undefined') ? curChar : null,
         mins: Math.round(secs / 6) / 10, secs,
         playMins: Math.round(play / 6000) / 10, playSecs: Math.round(play / 1000),
         runs: s.runs, wins: s.wins, deaths: s.deaths, maxLevel: s.maxLevel,
@@ -6223,12 +6227,18 @@ function renderOwner(d){
     h += sect('Per-player ('+d.roster.length+')');
     h += '<div style="max-height:340px;overflow:auto;border:1px solid rgba(243,200,120,.14);border-radius:10px">';
     d.roster.forEach(p => {
-      h += '<div style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.05)">'
-        + '<div style="color:#ffe6b0;font-weight:700;font-size:12px">'+escapeHtml(sid(p.player))+' · '+escapeHtml(p.chr||'?')
-          +'<span style="float:right;opacity:.5;font-weight:400">'+ago(p.last_seen)+' ago</span></div>'
-        + '<div style="opacity:.72;font-size:10.5px;margin-top:2px">L'+n(p.max_level||1)+' · '+n(p.runs||0)+' runs · '+n(p.wins||0)+'W/'+n(p.deaths||0)+'D · '
-          +n(Math.round((p.play_sec||0)/60))+'m played · '+n(p.sessions||0)+' sess · '+n(p.days||0)+'d active · '+n(p.purchases||0)+' buys · '+n(p.emotes||0)+' emotes</div>'
-        + '</div>';
+      let thumb = null; try { thumb = characterThumb(p.chr); } catch(e){}
+      const who = p.name ? escapeHtml(p.name) : escapeHtml(sid(p.player));
+      const sub = p.name ? ('<span style="opacity:.45;font-weight:400">  '+escapeHtml(sid(p.player))+'</span>') : '';
+      h += '<div style="display:flex;gap:9px;align-items:center;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.05)">'
+        + (thumb ? '<img src="'+thumb+'" style="width:36px;height:36px;border-radius:8px;flex:0 0 auto;object-fit:cover;background:rgba(0,0,0,.25)">'
+                 : '<span style="width:36px;height:36px;border-radius:8px;flex:0 0 auto;background:rgba(243,200,120,.12);display:inline-block"></span>')
+        + '<div style="flex:1;min-width:0">'
+          + '<div style="color:#ffe6b0;font-weight:700;font-size:12px">'+who+' · '+escapeHtml(p.chr||'?')+sub
+            +'<span style="float:right;opacity:.5;font-weight:400">'+ago(p.last_seen)+' ago</span></div>'
+          + '<div style="opacity:.72;font-size:10.5px;margin-top:2px">L'+n(p.max_level||1)+' · '+n(p.runs||0)+' runs · '+n(p.wins||0)+'W/'+n(p.deaths||0)+'D · '
+            +n(Math.round((p.play_sec||0)/60))+'m played · '+n(p.sessions||0)+' sess · '+n(p.days||0)+'d active · '+n(p.purchases||0)+' buys · '+n(p.emotes||0)+' emotes</div>'
+        + '</div></div>';
     });
     h += '</div>';
   }
