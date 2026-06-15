@@ -28,6 +28,7 @@
   #levelName .lnLv { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:3px; opacity:.7; }
   #levelName .lnName { font-family:'Cinzel',serif; font-weight:700; font-size:12px; letter-spacing:1.5px; line-height:1.25;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #levelName .lnDiff { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:2px; margin-top:3px; opacity:.92; white-space:nowrap; }
 
   #meterWrap { position:fixed; left:50%; transform:translateX(-50%);
     bottom:max(26px,env(safe-area-inset-bottom)); width:min(320px,70vw); z-index:5;
@@ -708,7 +709,7 @@
   </div>
   <div id="lives" style="display:none"></div>
 </div>
-<div id="levelName"><div class="lnLv" id="lnLv">LEVEL 1</div><div class="lnName" id="lnName">DUSK DESERT</div></div>
+<div id="levelName"><div class="lnLv" id="lnLv">LEVEL 1</div><div class="lnName" id="lnName">DUSK DESERT</div><div class="lnDiff" id="lnDiff"></div></div>
 
 <div id="coinHud" class="hidden"><span class="coinIcon"></span><span id="coinVal">0</span><span class="coinLbl"></span></div>
 <div id="multHud" class="hidden">✦ ×<span id="multVal">2</span></div>
@@ -986,7 +987,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.321 · 2026.06.15</div>
+  <div id="appVersion">v1.322 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1232,7 +1233,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.321';
+const APP_VERSION = '1.322';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -2503,7 +2504,14 @@ function applyBiome(level){
 function setLevelName(show){
   const el = $('levelName'); if (!el) return;
   el.style.display = show ? 'block' : 'none';
-  if (show){ const b=biomeFor(gameLevel); $('lnLv').textContent = 'LEVEL ' + gameLevel + ' · ' + b.era; $('lnName').textContent = b.name; }
+  if (show){ const b=biomeFor(gameLevel); $('lnLv').textContent = 'LEVEL ' + gameLevel + ' · ' + b.era; $('lnName').textContent = b.name;
+    const d = $('lnDiff'); if (d){
+      const sp = levelSpeed(), frac = Math.min(1, (sp-1)/2);     // 0 at L1 … 1 at the speed cap
+      const filled = Math.max(1, Math.round(frac*8)), pips = '▰'.repeat(filled) + '▱'.repeat(8-filled);
+      d.textContent = '⚡ SPEED ×' + sp.toFixed(2) + '   ' + pips;
+      d.style.color = frac < 0.34 ? '#7fe0a8' : frac < 0.67 ? '#ffd24a' : '#ff7a5a';   // green → gold → red as it climbs
+    }
+  }
 }
 
 // ---------- true bloom (post-processing) — best-effort, falls back to plain render ----------
@@ -4049,7 +4057,7 @@ const HZ_BUILD = {
   // sliding spikes — drift lane↔lane; dodge into the clear lane
   slider(t, s){
     const mat = hzMat(s.c1 || 0xd9bd72, { emissive:s.em || 0x241808, metalness:s.metal ?? 0.72, roughness:0.3 });
-    t.ob = { type:'lane', lane:0, phase:RND()*6.28, spd:0.0016 + RND()*0.003, yOff:0, mat };
+    t.ob = { type:'lane', lane:0, phase:RND()*6.28, spd:0.0031, yOff:0, mat };
     const g = new THREE.Group();
     for (const [sx,sz,sh] of [[-0.06,-0.01,0.12],[-0.02,0.02,0.16],[0.02,0.02,0.16],[0.06,-0.01,0.12]]){
       const sp = new THREE.Mesh(new THREE.ConeGeometry(0.022, sh, s.sides || 6), mat);
@@ -4073,7 +4081,7 @@ const HZ_BUILD = {
   slam(t, s){
     const side = RND()<0.5 ? -1 : 1, L = hzRndLane();
     const Larm = Math.max(0.26, 0.5 - side*L*HZL), aMax = 1.45;
-    t.ob = { type:'lane', lane:99, side, L, aMax, phase:RND()*6.28, spd:0.0022 + RND()*0.0024, slam:false };
+    t.ob = { type:'lane', lane:99, side, L, aMax, phase:RND()*6.28, spd:0.0034, slam:false };
     const g = new THREE.Group();
     const headMat = hzMat(s.c1 || 0xe0b24a, { metalness:0.78, roughness:0.3 });
     const armMat  = hzMat(s.c2 || 0x5e4126, { roughness:0.85, metalness:0.05 });
@@ -4107,7 +4115,7 @@ const HZ_BUILD = {
     const fmat  = hzMat(s.c1 || 0xff7a1e, { emissive:s.em  || 0xff5400, emissiveIntensity:1.4, transparent:true, opacity:0.88, roughness:0.6 });
     const fmat2 = hzMat(s.c2 || 0xffe06a, { emissive:s.em2 || 0xffc000, emissiveIntensity:1.9, transparent:true, opacity:0.92, roughness:0.5 });
     const L = hzRndLane();
-    t.ob = { type:'lane', lane:99, L, phase:RND()*6.28, spd:0.003 + RND()*0.0035, mat:fmat, mat2:fmat2 };
+    t.ob = { type:'lane', lane:99, L, phase:RND()*6.28, spd:0.00475, mat:fmat, mat2:fmat2 };
     const g = new THREE.Group();
     const base = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.058,0.05,12), hzMat(s.c3 || 0x4a3a26, { roughness:0.9, metalness:0.1 })); base.castShadow = true; g.add(base);
     const cone = new THREE.Mesh(new THREE.ConeGeometry(0.055,0.22,10), fmat); cone.position.y = 0.15; g.add(cone); t.ob.coneMesh = cone;
@@ -4125,11 +4133,11 @@ const HZ_BUILD = {
     g.position.set(t.pos.x + L*HZL, t.pos.y + 0.1, t.pos.z);
     const hs = (typeof relicEffects === 'function') ? relicEffects().hazSpeed : 1;
     // NB: deliberately NO t.ob — boulders run their own continuous collision (see updateBoulders), so they can't merge or pass through you
-    (r.boulders = r.boulders || []).push({ lane:L, idx:startIdx, spd:(2.2 + RND()*1.3) * hs, mesh:g, ball, released:false });
+    (r.boulders = r.boulders || []).push({ lane:L, idx:startIdx, spd:2.85 * hs, mesh:g, ball, released:false });
   },
   // swinging blade/scythe/wing — sweeps across the lanes; dodge clear or SLIDE under
   sweep(t, s){
-    t.ob = { type:'lane', lane:99, slidable:true, phase:RND()*6.28, spd:0.0022 + RND()*0.0016 };
+    t.ob = { type:'lane', lane:99, slidable:true, phase:RND()*6.28, spd:0.003 };
     const g = new THREE.Group();
     const armMat = hzMat(s.c2 || 0x4a3a26, { roughness:0.8, metalness:0.1 });
     const bladeMat = hzMat(s.c1 || 0xcfd6dc, { metalness:0.85, roughness:0.25, emissive:s.em || 0x10141a });
@@ -4141,7 +4149,7 @@ const HZ_BUILD = {
   // falling block/idol/meteor — shadow telegraphs, then it slams a lane; dodge clear
   fall(t, s){
     const L = hzRndLane();
-    t.ob = { type:'lane', lane:99, L, phase:RND()*6.28, spd:0.0026 + RND()*0.0016 };
+    t.ob = { type:'lane', lane:99, L, phase:RND()*6.28, spd:0.0034 };
     const g = new THREE.Group();
     const block = new THREE.Mesh(new THREE.BoxGeometry(0.17,0.16,0.12), hzMat(s.c1 || 0x8a7350, { roughness:0.9, metalness:0.04, emissive:s.em || 0x000000 }));
     block.castShadow = true; block.position.y = 0.58; g.add(block); t.ob.block = block;
@@ -4152,7 +4160,7 @@ const HZ_BUILD = {
   // closing walls/columns — grind shut leaving one gap; be in the open lane
   walls(t, s){
     const G = hzRndLane(), gx = G*HZL;
-    t.ob = { type:'crush', closed:false, safeLane:G, gx, phase:RND()*6.28, spd:0.0018 + RND()*0.0012 };
+    t.ob = { type:'crush', closed:false, safeLane:G, gx, phase:RND()*6.28, spd:0.0024 };
     const g = new THREE.Group();
     const wMat = hzMat(s.c1 || 0x7a6748, { roughness:0.92, metalness:0.05, emissive:s.em || 0x000000 });
     const wallL = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.18,0.1), wMat); wallL.castShadow = true;
@@ -4164,7 +4172,7 @@ const HZ_BUILD = {
   // dart/shuriken/comet volley — a wall launcher fires darts across ONE telegraphed lane on a timer; dodge out before it looses
   volley(t, s){
     const L = hzRndLane(), side = L > 0 ? -1 : 1, bx = side*0.44;
-    t.ob = { type:'lane', lane:99, L, side, phase:RND()*6.28, spd:0.0024 + RND()*0.0018 };
+    t.ob = { type:'lane', lane:99, L, side, phase:RND()*6.28, spd:0.0033 };
     const g = new THREE.Group();
     const plate = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.14,0.14), hzMat(s.c2 || 0x6a5230, { roughness:0.85, metalness:0.25 }));
     plate.position.set(side*0.49, 0.085, 0); plate.castShadow = true; g.add(plate);
@@ -4192,7 +4200,7 @@ const HZ_BUILD = {
   popup(t, s){
     const L = hzRndLane();
     const mat = hzMat(s.c1 || 0x88e0c0, { emissive:s.em || 0x103028, metalness:0.45, roughness:0.4, flatShading:true });
-    t.ob = { type:'lane', lane:99, L, jumpable:true, phase:RND()*6.28, spd:0.0026 + RND()*0.002, mat };
+    t.ob = { type:'lane', lane:99, L, jumpable:true, phase:RND()*6.28, spd:0.0036, mat };
     const g = new THREE.Group();
     const socket = new THREE.Mesh(new THREE.BoxGeometry(0.19,0.03,0.11), hzMat(0x3a3a30, { roughness:0.9, metalness:0.1 })); socket.position.y = 0.015; socket.castShadow = true; g.add(socket);
     const rim = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.012,0.12), hzMat(s.c2 || 0x6a6a52, { metalness:0.3, roughness:0.6 })); rim.position.y = 0.03; g.add(rim);
@@ -4203,7 +4211,7 @@ const HZ_BUILD = {
   },
   // spinning rotor/pulsar — a raised turbine whirls and only one lane is open at a time; a glowing ring marks the gap
   spinner(t, s){
-    t.ob = { type:'crush', closed:true, safeLane:0, phase:RND()*6.28, spd:0.0016 + RND()*0.0012 };
+    t.ob = { type:'crush', closed:true, safeLane:0, phase:RND()*6.28, spd:0.0022 };
     const g = new THREE.Group();
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.024,0.17,8), hzMat(s.c2 || 0x4a3a5a, { metalness:0.5, roughness:0.5 })); post.position.y = 0.085; g.add(post);
     const rotor = new THREE.Group(); rotor.position.y = 0.18;
@@ -4225,7 +4233,7 @@ const HZ_BUILD = {
     const coreMat = new THREE.MeshStandardMaterial({ color:0xffffff, emissive:s.c1 || 0x66e0ff, emissiveIntensity:2.2, transparent:true, opacity:0, roughness:0.3, depthWrite:false });
     const glowMat = new THREE.MeshStandardMaterial({ color:s.c1 || 0x66e0ff, emissive:s.em || 0x2090c0, emissiveIntensity:1.4, transparent:true, opacity:0, roughness:0.5, depthWrite:false, blending:THREE.AdditiveBlending });
     const apMat = new THREE.MeshStandardMaterial({ color:s.c1 || 0x66e0ff, emissive:s.c1 || 0x66e0ff, emissiveIntensity:1.2, transparent:true, opacity:0.5, roughness:0.4 });
-    t.ob = { type:'beamT', on:false, phase:RND()*6.28, spd:0.0024 + RND()*0.0016, beamMat:coreMat, glowMat, apMat };
+    t.ob = { type:'beamT', on:false, phase:RND()*6.28, spd:0.0032, beamMat:coreMat, glowMat, apMat };
     const g = new THREE.Group();
     const glow = new THREE.Mesh(new THREE.BoxGeometry(0.62,0.07,0.07), glowMat); glow.position.y = 0.13; g.add(glow);
     const core = new THREE.Mesh(new THREE.BoxGeometry(0.62,0.022,0.022), coreMat); core.position.y = 0.13; g.add(core);
