@@ -1008,7 +1008,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.336 · 2026.06.15</div>
+  <div id="appVersion">v1.337 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1254,7 +1254,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.336';
+const APP_VERSION = '1.337';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4746,7 +4746,7 @@ function loadRunDressing(){
   }
   if (S.buildPath){ S.buildPath.forEach(m => scene.remove(m)); S.buildPath = []; }   // drop the build-phase preview; the unified ramp replaces it (no double)
   addSmoothRamps(tiles);                                 // fill the three lane corridors into smooth flush ramps (gaps left open)
-  addLaneGuides(tiles);                                  // the three glowing paths ride on top of those ramps
+  // addLaneGuides(tiles);                               // glowing highlight removed for now — just the smooth stone ramps show
   spawnGuardian();                                       // boss looms on the summit during an era-final (guardian) level
 }
 
