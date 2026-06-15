@@ -28,7 +28,22 @@
   #levelName .lnLv { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:3px; opacity:.7; }
   #levelName .lnName { font-family:'Cinzel',serif; font-weight:700; font-size:12px; letter-spacing:1.5px; line-height:1.25;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  #levelName .lnDiff { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:2px; margin-top:3px; opacity:.92; white-space:nowrap; }
+  /* ---- sleek SPEED / difficulty widget (bottom-left, above the structural-integrity bar) ---- */
+  #speedHud { position:fixed; left:max(12px,env(safe-area-inset-left));
+    bottom:calc(max(26px,env(safe-area-inset-bottom)) + 36px); z-index:6; width:150px; padding:8px 11px 9px; border-radius:13px;
+    background:linear-gradient(158deg, rgba(28,24,42,.82), rgba(13,11,20,.86)); border:1px solid rgba(243,200,120,.26);
+    -webkit-backdrop-filter:blur(7px); backdrop-filter:blur(7px); box-shadow:0 7px 22px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
+    font-family:'Space Mono',monospace; pointer-events:none; display:none; }
+  #speedHud.show { display:block; }
+  #speedHud .shRow { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; }
+  #speedHud .shLbl { font-size:9px; letter-spacing:3px; color:#cdbfa6; opacity:.8; }
+  #speedHud .shVal { font-family:'Cinzel',serif; font-weight:700; font-size:16px; color:#ffe6a8; line-height:1; text-shadow:0 1px 5px rgba(0,0,0,.55); }
+  #speedHud .shTrack { position:relative; height:7px; border-radius:5px; background:rgba(255,255,255,.1); overflow:hidden; box-shadow:inset 0 0 0 1px rgba(255,255,255,.08); }
+  #speedHud .shTrack::after { content:''; position:absolute; inset:0; pointer-events:none;
+    background:repeating-linear-gradient(90deg, transparent 0 11px, rgba(0,0,0,.4) 11px 12px); }   /* segmented ticks for a pro readout */
+  #speedHud .shFill { height:100%; border-radius:5px; transition:width .35s, background .35s; box-shadow:0 0 8px rgba(255,210,90,.5); }
+  #speedHud .shEra { display:inline-block; margin-top:7px; font-size:8.5px; letter-spacing:1.5px; font-weight:700; padding:2px 8px; border-radius:9px;
+    background:rgba(255,210,74,.14); color:#ffe6a8; border:1px solid rgba(255,210,74,.32); }
 
   #meterWrap { position:fixed; left:50%; transform:translateX(-50%);
     bottom:max(26px,env(safe-area-inset-bottom)); width:min(320px,70vw); z-index:5;
@@ -709,7 +724,12 @@
   </div>
   <div id="lives" style="display:none"></div>
 </div>
-<div id="levelName"><div class="lnLv" id="lnLv">LEVEL 1</div><div class="lnName" id="lnName">DUSK DESERT</div><div class="lnDiff" id="lnDiff"></div></div>
+<div id="levelName"><div class="lnLv" id="lnLv">LEVEL 1</div><div class="lnName" id="lnName">DUSK DESERT</div></div>
+<div id="speedHud">
+  <div class="shRow"><span class="shLbl">SPEED</span><span class="shVal" id="shVal">×1.00</span></div>
+  <div class="shTrack"><div class="shFill" id="shFill"></div></div>
+  <div class="shEra" id="shEra"></div>
+</div>
 
 <div id="coinHud" class="hidden"><span class="coinIcon"></span><span id="coinVal">0</span><span class="coinLbl"></span></div>
 <div id="multHud" class="hidden">✦ ×<span id="multVal">2</span></div>
@@ -987,7 +1007,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.325 · 2026.06.15</div>
+  <div id="appVersion">v1.326 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1233,7 +1253,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.325';
+const APP_VERSION = '1.326';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -2532,15 +2552,16 @@ function applyBiome(level){
 function setLevelName(show){
   const el = $('levelName'); if (!el) return;
   el.style.display = show ? 'block' : 'none';
-  if (show){ const b=biomeFor(gameLevel); $('lnLv').textContent = 'LEVEL ' + gameLevel + ' · ' + b.era; $('lnName').textContent = b.name;
-    const d = $('lnDiff'); if (d){
-      const sp = levelSpeed(), frac = Math.min(1, (sp-1)/2);     // 0 at L1 … 1 at the speed cap
-      const filled = Math.max(1, Math.round(frac*8)), pips = '▰'.repeat(filled) + '▱'.repeat(8-filled);
-      const em = eraBuildMod();
-      d.textContent = '⚡×' + sp.toFixed(2) + '  ' + pips + (em.label ? '   ' + em.label : '');
-      d.style.color = frac < 0.34 ? '#7fe0a8' : frac < 0.67 ? '#ffd24a' : '#ff7a5a';   // green → gold → red as it climbs
-    }
-  }
+  const sh = $('speedHud'); if (sh) sh.classList.toggle('show', !!show);
+  if (show){ const b=biomeFor(gameLevel); $('lnLv').textContent = 'LEVEL ' + gameLevel + ' · ' + b.era; $('lnName').textContent = b.name; updateSpeedHud(); }
+}
+// the sleek bottom-left SPEED readout: value, a segmented difficulty bar (green→gold→red), and the era's build twist
+function updateSpeedHud(){
+  const sp = levelSpeed(), frac = Math.min(1, (sp-1)/2);
+  const v=$('shVal'); if (v) v.textContent = '×' + sp.toFixed(2);
+  const f=$('shFill'); if (f){ f.style.width = Math.max(8, Math.round(frac*100)) + '%';
+    f.style.background = frac<0.34 ? 'linear-gradient(90deg,#5fd39a,#9fe9c0)' : frac<0.67 ? 'linear-gradient(90deg,#e8c45a,#ffd24a)' : 'linear-gradient(90deg,#ef7a4a,#ff5a4a)'; }
+  const e=$('shEra'); if (e){ const em=eraBuildMod(); if (em && em.label){ e.style.display=''; e.textContent=em.label; } else e.style.display='none'; }
 }
 
 // ---------- true bloom (post-processing) — best-effort, falls back to plain render ----------
@@ -6905,6 +6926,7 @@ function endGame(won, how){
   CloudSave.queue();
   $('reviveScreen').classList.add('hidden'); $('menuBtn').style.display = 'none'; $('restartBtn').style.display='none';
   $('hud').style.display = 'none'; $('coinHud').classList.add('hidden'); $('multHud').classList.add('hidden'); $('featureIntro').classList.remove('show');
+  { const sh=$('speedHud'); if (sh) sh.classList.remove('show'); }
   // coins were already banked as they were collected; just save records here
   const newBest = S.score > bestScore;
   if (newBest){ bestScore = S.score; Store.set('best', bestScore); }
