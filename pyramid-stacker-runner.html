@@ -983,7 +983,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.313 · 2026.06.15</div>
+  <div id="appVersion">v1.314 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1208,7 +1208,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.313';
+const APP_VERSION = '1.314';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1217,7 +1217,7 @@ if (!playerId){ playerId = 'p_' + Date.now().toString(36) + Math.random().toStri
 // Fire-and-forget product analytics. Every event is a row in public.events. Players can INSERT but NOT read
 // (row-level security); only YOU can read aggregates, via the password-checked analytics() RPC. See SQL below.
 const Analytics = {
-  enabled(){ return RemoteBoard.enabled() && typeof fetch !== 'undefined'; },
+  enabled(){ return RemoteBoard.enabled() && typeof fetch !== 'undefined' && !Store.get('noTrack', 0); },   // owner can exclude their own device
   track(type, fields){
     if (!this.enabled() || !type) return;
     try {
@@ -6167,8 +6167,14 @@ async function openOwner(){
     if (!r.ok){ body.textContent = 'request failed (HTTP ' + r.status + ') — did you run the SQL?'; return; }
     const j = await r.json();
     if (j && j.error){ body.textContent = j.error==='denied' ? '✗ wrong password' : ('error: ' + j.error); return; }
-    renderOwner(j);
+    _ownerData = j; renderOwner(j);
   } catch(e){ body.textContent = 'network error'; }
+}
+let _ownerData = null;
+function toggleNoTrack(){
+  const v = Store.get('noTrack', 0) ? 0 : 1; Store.set('noTrack', v);
+  showPop(v ? 'THIS DEVICE EXCLUDED FROM ANALYTICS' : 'ANALYTICS ON FOR THIS DEVICE');
+  if (_ownerData) renderOwner(_ownerData);
 }
 function renderOwner(d){
   d = d || {};
@@ -6180,6 +6186,14 @@ function renderOwner(d){
   const totalPl = (p.perfect||0)+(p.great||0)+(p.good||0)+(p.miss||0);
   const pct = x => totalPl ? Math.round(100*(x||0)/totalPl)+'%' : '—';
   let h = '';
+  // this-device banner + opt-out so your own playtesting can be excluded
+  { const off = !!Store.get('noTrack', 0);
+    h += '<div style="margin:2px 2px 10px;padding:9px 11px;border-radius:10px;background:rgba(243,200,120,.06);border:1px solid rgba(243,200,120,.18)">'
+      + '<div style="font-size:10px;letter-spacing:1px;opacity:.6;text-transform:uppercase">This device id</div>'
+      + '<div style="font-size:12px;color:#ffe6b0;font-weight:700;word-break:break-all">'+escapeHtml(playerId)+'</div>'
+      + '<div onclick="toggleNoTrack()" style="margin-top:7px;display:inline-block;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:1px;padding:6px 12px;border-radius:20px;'
+        + (off ? 'color:#9fe9c0;border:1px solid #9fe9c0;background:rgba(159,233,192,.1)' : 'color:#ff9a8a;border:1px solid #ff9a8a;background:rgba(255,154,138,.1)')+'">'
+        + (off ? '✓ this device is EXCLUDED — tap to include' : '🚫 exclude this device from analytics') + '</div></div>'; }
   h += sect('Audience');
   h += card('Installs', d.installs) + card('Players (all-time)', d.players);
   h += card('DAU (24h)', d.dau) + card('WAU (7d)', d.wau);
