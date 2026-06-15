@@ -983,7 +983,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.316 · 2026.06.15</div>
+  <div id="appVersion">v1.317 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1229,7 +1229,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.316';
+const APP_VERSION = '1.317';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -6006,7 +6006,7 @@ function startGame(atLevel){
   runRelics = [];                                // a fresh session starts with no relics — they build up as you clear levels
   // atLevel set → restart that exact level (retry / in-game restart); otherwise CONTINUE from saved progress
   gameLevel = dailyMode ? 1 : Math.max(1, atLevel || resumeLevel);
-  Analytics.track('play', { level: gameLevel, meta:{ daily: !!dailyMode, char: curChar } });
+  Analytics.track('play', { level: gameLevel, meta:{ daily: !!dailyMode, char: curChar, name: (playerName||'').slice(0,12) || null } });
   Analytics.runStart();                          // start the play-time clock for this run
   applyBiome(gameLevel);                        // biome for the level you're resuming at
   checkDailyStreak();                          // first game of the day → streak bump + bonus coins
@@ -6821,7 +6821,7 @@ function endGame(won, how){
   DDA.note(won ? 0.9 : (how==='collapsed' ? 0.15 : 0.3));   // run outcome feeds the adaptive skill estimate
   // ---- analytics: run outcome + duration + this run's placement quality ----
   const _runSecs = Analytics.runSecs();
-  Analytics.track(won ? 'win' : 'death', { level: gameLevel, value: S.score||0, meta:{ reason: how||'', height: Math.round((S.peakY||0)*10)/10, dur: _runSecs, daily: !!dailyMode, char: curChar, coins: S.coins||0 } });
+  Analytics.track(won ? 'win' : 'death', { level: gameLevel, value: S.score||0, meta:{ reason: how||'', height: Math.round((S.peakY||0)*10)/10, dur: _runSecs, daily: !!dailyMode, char: curChar, coins: S.coins||0, name: (playerName||'').slice(0,12) || null } });
   if (S.tally){ Analytics.track('placements', { level: gameLevel, meta: S.tally }); }
   Analytics.runEnd(won, gameLevel); Analytics.bump('coins', S.coins||0);   // close the play-time clock + tally session coins
   CloudSave.queue();
