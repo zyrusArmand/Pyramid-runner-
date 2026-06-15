@@ -38,6 +38,9 @@
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.1); }
   #meterFill { height:100%; width:100%; border-radius:6px;
     background:linear-gradient(90deg,#6fe3a0,#e8d35f); transition:width .25s,background .25s; }
+  #meterBar.danger { animation:meterAlarm .5s ease-in-out infinite; box-shadow:inset 0 0 0 1px rgba(255,90,70,.6), 0 0 12px rgba(232,95,95,.6); }
+  @keyframes meterAlarm { 0%,100%{ transform:scale(1); opacity:1; } 50%{ transform:scale(1.06); opacity:.72; } }
+  #meterWrap.danger #meterLabel { color:#ff7a6a; opacity:1; }
 
   #pop { position:fixed; top:38%; left:50%; transform:translate(-50%,-50%) scale(.6);
     font-family:'Cinzel',serif; font-weight:700; font-size:clamp(22px,6.4vw,34px); color:#ffe9a8; text-align:center;
@@ -983,7 +986,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.318 · 2026.06.15</div>
+  <div id="appVersion">v1.319 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1229,7 +1232,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.318';
+const APP_VERSION = '1.319';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -3636,9 +3639,16 @@ function drop(){
   }
 
   const weak = !isKey && dist > 0.34;                  // keystone seats clean; never a crack
-  const dmg = (weak ? offN : offN*0.4) * S.layer * 0.04;
+  // STAKES: every sloppy seat costs integrity — even on the base layer — so a careless build can actually come down
+  const dmg = (weak ? offN : offN*0.3) * (0.055 + S.layer*0.045);
   S.integrity = Math.max(0, S.integrity - dmg);
-  if (weak) Sound.drop();
+  if (weak){
+    Sound.drop();
+    // an off seat sits visibly CROOKED → a careless pyramid LOOKS as bad as it scores
+    const la = (offAxis==='x') ? 'z' : 'x';
+    a.mesh.rotation[la] += -Math.sign(off||1) * offN * 0.12;
+    a.mesh.rotation.y  += (off>0?1:-1) * offN * 0.16;
+  }
 
   // every imperfect stone drifts a little out over the open cells; we tally that drift and let it
   // consume whole cells as it builds up, so the wall fills its real width instead of crowding /
@@ -3741,8 +3751,8 @@ function crumbleStone(g){
 // a squished / unsupported stone: crumble it apart and leave a gap (same logic as before, new visual)
 function missStone(a, label){
   crumbleStone(a.mesh);
-  Sound.drop(); shake(0.35);
-  S.integrity = Math.max(0, S.integrity - 0.06);
+  Sound.drop(); shake(0.6); buzz([24,40,24]);   // a real, jarring crunch
+  S.integrity = Math.max(0, S.integrity - (0.09 + S.layer*0.03));
   S.buildQual += 0; S.buildCount++; S.allPerfect = false;   // a crumbled/gap stone counts hard against the rating
   S.streak = 0; showCombo(0); showPop(label || 'MISS');
   pushCells(a, false, false, 0);                    // its cells become a gap in the run path
@@ -3776,9 +3786,9 @@ function blockPlaced(mesh, instability, capstone, len, consumed, bonus){
   // accuracy tiers — PERFECT (exact) / GREAT / GOOD pay 3 / 2 / 1 coins; anything looser is a MISS
   let tier, coins, baseScore;
   if      (instability < perfectThreshold()){ tier='PERFECT'; coins=5; baseScore=100; }
-  else if (instability < TIER_GREAT)  { tier='GREAT';   coins=2; baseScore=70;  }
-  else if (instability < TIER_GOOD)   { tier='GOOD';    coins=1; baseScore=45;  }
-  else                                { tier='MISS';    coins=0; baseScore=15;  }
+  else if (instability < TIER_GREAT)  { tier='GREAT';   coins=2; baseScore=60;  }
+  else if (instability < TIER_GOOD)   { tier='GOOD';    coins=1; baseScore=26;  }
+  else                                { tier='MISS';    coins=0; baseScore=4;   }   // a sloppy seat is worth almost nothing now
   // feed the adaptive-difficulty skill estimate (perfect = sharp, miss = struggling)
   DDA.note(tier==='PERFECT' ? 1 : tier==='GREAT' ? 0.7 : tier==='GOOD' ? 0.4 : 0.1);
   // tally placement quality for the end-of-pyramid star rating
@@ -3786,6 +3796,9 @@ function blockPlaced(mesh, instability, capstone, len, consumed, bonus){
   if (tier !== 'PERFECT') S.allPerfect = false;   // 5★ "WONDER" requires EVERY block perfect
   // analytics: count placement tiers for this run (sent in one summary event at game end)
   S.tally = S.tally || { PERFECT:0, GREAT:0, GOOD:0, MISS:0 }; S.tally[tier] = (S.tally[tier]||0) + 1;
+  // clean placements REINFORCE the structure — so a careful builder stays safe while a sloppy one drains toward collapse
+  if (tier==='PERFECT') S.integrity = Math.min(1, S.integrity + 0.045);
+  else if (tier==='GREAT') S.integrity = Math.min(1, S.integrity + 0.018);
 
   if (tier === 'PERFECT'){
     // exact hit ONLY — the full reaction: emoji pop + phone buzz + chime + sparkle
@@ -5986,6 +5999,9 @@ function updateBuildCam(dt){
   S.camRE   += (buildFitDistance() - S.camRE) * Math.min(1, dt*3);
   const a = S.camRotE, R = S.camRE, h = S.camHE;
   camera.position.set(Math.sin(a)*R, h + R*0.34, Math.cos(a)*R);
+  // the whole structure feels like it's TEETERING once integrity drops low
+  const unstable = Math.max(0, 0.45 - (S.integrity ?? 1));
+  if (unstable > 0){ const tw = Date.now()*0.006; camera.position.x += Math.sin(tw)*unstable*0.6; camera.position.y += Math.cos(tw*1.3)*unstable*0.35; }
   camera.lookAt(0, h, 0);                                  // aim at the row being built
   applyShake();
 }
@@ -6005,6 +6021,15 @@ function updateHUD(){
   $('meterFill').style.width = (integ*100)+'%';
   $('meterFill').style.background = integ>0.4 ? 'linear-gradient(90deg,#6fe3a0,#e8d35f)' : 'linear-gradient(90deg,#e8a35f,#e85f5f)';
   $('vignette').style.opacity = (S.phase==='build' && integ < 0.4) ? String((0.4-integ)/0.4 * 0.9) : '0';
+  const danger = S.phase==='build' && integ < 0.35;
+  const mb = $('meterBar'); if (mb) mb.classList.toggle('danger', danger);
+  const mw = $('meterWrap'); if (mw) mw.classList.toggle('danger', danger);
+  // the FIRST time the structure slips past a danger line, jolt the player so they feel it going
+  if (S.phase==='build'){
+    if (integ < 0.25 && (S.__warn||0) < 2){ S.__warn = 2; showPop('⚠ ABOUT TO COLLAPSE'); buzz([40,60,40,60]); shake(0.4); }
+    else if (integ < 0.5 && (S.__warn||0) < 1){ S.__warn = 1; showPop('⚠ UNSTABLE'); buzz([20,30,20]); }
+    else if (integ > 0.62 && (S.__warn||0) > 0){ S.__warn = 0; }   // re-arm if they steady it back up
+  }
 }
 function showPop(t){ const p=$('pop'); p.textContent=t; p.classList.remove('show'); void p.offsetWidth; p.classList.add('show'); }
 function buzz(pattern){ try { if (navigator.vibrate) navigator.vibrate(pattern); } catch(e){} }   // phone haptics (perfect only)
