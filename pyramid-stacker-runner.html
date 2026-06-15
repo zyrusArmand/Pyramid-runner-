@@ -1007,7 +1007,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.326 · 2026.06.15</div>
+  <div id="appVersion">v1.327 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1253,7 +1253,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.326';
+const APP_VERSION = '1.327';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -3670,17 +3670,26 @@ function drop(){
   const DRIFT_CAP = 0.3;
   if (restAt > ref + DRIFT_CAP) restAt = ref + DRIFT_CAP;
   else if (restAt < ref - DRIFT_CAP) restAt = ref - DRIFT_CAP;
+  let cornerSplice = null;
   if (!a.capstone){
-    restAt = clampPlacement(a, restAt, offAxis);                  // solid stones can never merge
-    if (restAt === null){                                        // no room here — a solid stone can't fit, so it crumbles
-      missStone(a, 'NO FIT');
-      if (S.integrity <= 0){ collapseAll(); endGame(false, 'collapsed'); return; }
-      advance(a.len);
-      return;
+    if (a.corner){
+      // CORNER STONES MERGE: never blocked by a neighbour — they settle where they land, and whatever OVER-merges
+      // into a placed stone is spliced off (it crumbles) and costs a little integrity. (applies on every level)
+      const ovx = cornerOverlap(a, restAt, offAxis);
+      if (ovx.ov > 0.03) cornerSplice = ovx;
+    } else {
+      restAt = clampPlacement(a, restAt, offAxis);                // solid (non-corner) stones can never merge
+      if (restAt === null){                                      // no room here — it crumbles
+        missStone(a, 'NO FIT');
+        if (S.integrity <= 0){ collapseAll(); endGame(false, 'collapsed'); return; }
+        advance(a.len);
+        return;
+      }
     }
   }
   a.mesh.position.copy(a.center);
   a.mesh.position[offAxis] = restAt;
+  if (cornerSplice) spliceCorner(a, offAxis, cornerSplice);      // trim the over-merged part, crumble it, dent integrity
   const restOff = restAt - a.center[offAxis];
 
   // a stone can still miss its BASE on layer 2+
@@ -3804,6 +3813,43 @@ function crumbleStone(g){
     S.falling.push({ mesh:rock, vel:new THREE.Vector3((Math.random()-0.5)*5, 1.4+Math.random()*2.4, (Math.random()-0.5)*5), rot:rand3(11) });
   }
   spawnDust(c, 0xceaa6e, 10, 2.2, 1.6);                 // puff of dust
+}
+// how far a (corner) stone over-merges into the nearest collinear neighbour, and which side that neighbour is on
+function cornerOverlap(a, cur, offAxis){
+  const perpAx = (offAxis==='x') ? 'z' : 'x';
+  const halfO  = ((offAxis===a.axis ? a.len : 1) * BLOCK_SIZE)/2;
+  const halfPe = ((perpAx ===a.axis ? a.len : 1) * BLOCK_SIZE)/2;
+  const cPe = a.center[perpAx], bLo = cur-halfO, bHi = cur+halfO;
+  let ov = 0, dir = 1;
+  S.layerBoxes.forEach(o => {
+    const oPeLo = (perpAx==='x') ? o.x0 : o.z0, oPeHi = (perpAx==='x') ? o.x1 : o.z1;
+    if (Math.min(cPe+halfPe,oPeHi) - Math.max(cPe-halfPe,oPeLo) < 0.34) return;   // only a collinear (same-wall) neighbour merges
+    const oLo = (offAxis==='x') ? o.x0 : o.z0, oHi = (offAxis==='x') ? o.x1 : o.z1;
+    const inter = Math.min(bHi,oHi) - Math.max(bLo,oLo);
+    if (inter > ov){ ov = inter; dir = (cur <= (oLo+oHi)/2) ? 1 : -1; }            // dir +1: neighbour on the HIGH side → trim the high end
+  });
+  return { ov: Math.max(0, ov), dir };
+}
+// trim the over-merged end of a corner stone, crumble the spliced-off chunk, and dent integrity
+function spliceCorner(a, offAxis, info){
+  const ov = info.ov, dir = info.dir;
+  const L = (offAxis===a.axis ? a.len : 1) * BLOCK_SIZE;
+  const keep = Math.max(0.25, L - ov), fac = keep / L;
+  a.mesh.scale[offAxis] *= fac;                          // cut the stone down to its non-overlapping length
+  a.mesh.position[offAxis] -= dir * (ov/2);              // anchor the OUTER end so it stays seated
+  const seam = a.mesh.position.clone(); seam[offAxis] += dir * (keep/2 + ov/2);
+  crumbleAt(seam, (a.mesh.material && a.mesh.material.color) ? a.mesh.material.color.clone() : new THREE.Color(0xcdb083), 7);
+  hurtIntegrity(0.05 + ov*0.18);
+  Sound.drop(); shake(0.42); buzz([18,30]);
+}
+function crumbleAt(c, col, n){
+  const mat = new THREE.MeshStandardMaterial({ color:col, roughness:0.96, metalness:0.02 });
+  for (let i=0;i<n;i++){ const s=0.07+Math.random()*0.12;
+    const rock=new THREE.Mesh(new THREE.BoxGeometry(s, s*(0.7+Math.random()*0.6), s*(0.7+Math.random()*0.6)), mat);
+    rock.position.set(c.x+(Math.random()-0.5)*0.4, c.y+(Math.random()-0.5)*0.25, c.z+(Math.random()-0.5)*0.4);
+    rock.rotation.set(Math.random()*3.1,Math.random()*3.1,Math.random()*3.1); rock.castShadow=true; scene.add(rock);
+    S.falling.push({ mesh:rock, vel:new THREE.Vector3((Math.random()-0.5)*4, 1.2+Math.random()*2, (Math.random()-0.5)*4), rot:rand3(10) }); }
+  spawnDust(c, 0xceaa6e, 8, 2.0, 1.6);
 }
 // a squished / unsupported stone: crumble it apart and leave a gap (same logic as before, new visual)
 function missStone(a, label){
