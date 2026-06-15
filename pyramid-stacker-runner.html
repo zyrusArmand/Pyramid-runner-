@@ -1007,7 +1007,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.327 · 2026.06.15</div>
+  <div id="appVersion">v1.328 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1253,7 +1253,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.327';
+const APP_VERSION = '1.328';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -3707,7 +3707,7 @@ function drop(){
 
   const weak = !isKey && dist > 0.34;                  // keystone seats clean; never a crack
   // STAKES: every sloppy seat costs integrity — even on the base layer — so a careless build can actually come down
-  const dmg = (weak ? offN : offN*0.3) * (0.055 + S.layer*0.045);
+  const dmg = (weak ? offN : offN*0.32) * (0.085 + S.layer*0.06);   // harsher: fewer chances before it comes down
   hurtIntegrity(dmg);
   if (weak){
     Sound.drop();
@@ -3855,7 +3855,7 @@ function crumbleAt(c, col, n){
 function missStone(a, label){
   crumbleStone(a.mesh);
   Sound.drop(); shake(0.6); buzz([24,40,24]);   // a real, jarring crunch
-  hurtIntegrity(0.09 + S.layer*0.03);
+  hurtIntegrity(0.14 + S.layer*0.045);
   S.buildQual += 0; S.buildCount++; S.allPerfect = false;   // a crumbled/gap stone counts hard against the rating
   S.streak = 0; showCombo(0); showPop(label || 'MISS');
   pushCells(a, false, false, 0);                    // its cells become a gap in the run path
@@ -3900,8 +3900,8 @@ function blockPlaced(mesh, instability, capstone, len, consumed, bonus){
   // analytics: count placement tiers for this run (sent in one summary event at game end)
   S.tally = S.tally || { PERFECT:0, GREAT:0, GOOD:0, MISS:0 }; S.tally[tier] = (S.tally[tier]||0) + 1;
   // clean placements REINFORCE the structure — so a careful builder stays safe while a sloppy one drains toward collapse
-  if (tier==='PERFECT') S.integrity = Math.min(1, S.integrity + 0.045);
-  else if (tier==='GREAT') S.integrity = Math.min(1, S.integrity + 0.018);
+  if (tier==='PERFECT') S.integrity = Math.min(1, S.integrity + 0.028);
+  else if (tier==='GREAT') S.integrity = Math.min(1, S.integrity + 0.01);
 
   if (tier === 'PERFECT'){
     // exact hit ONLY — the full reaction: emoji pop + phone buzz + chime + sparkle
