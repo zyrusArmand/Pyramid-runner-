@@ -30,15 +30,15 @@
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   /* ---- sleek SPEED / difficulty widget (bottom-left, above the structural-integrity bar) ---- */
   #speedHud { position:fixed; left:max(12px,env(safe-area-inset-left));
-    bottom:calc(max(26px,env(safe-area-inset-bottom)) + 36px); z-index:6; width:150px; padding:8px 11px 9px; border-radius:13px;
-    background:linear-gradient(158deg, rgba(28,24,42,.82), rgba(13,11,20,.86)); border:1px solid rgba(243,200,120,.26);
-    -webkit-backdrop-filter:blur(7px); backdrop-filter:blur(7px); box-shadow:0 7px 22px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
+    bottom:calc(max(26px,env(safe-area-inset-bottom)) + 36px); z-index:6; width:146px; padding:9px 12px 10px; border-radius:14px;
+    background:rgba(20,12,28,.5); border:1.5px solid rgba(243,200,120,.45);
+    -webkit-backdrop-filter:blur(7px); backdrop-filter:blur(7px); box-shadow:0 6px 18px rgba(0,0,0,.4);
     font-family:'Space Mono',monospace; pointer-events:none; display:none; }
   #speedHud.show { display:block; }
   #speedHud .shRow { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; }
-  #speedHud .shLbl { font-size:9px; letter-spacing:3px; color:#cdbfa6; opacity:.8; }
-  #speedHud .shVal { font-family:'Cinzel',serif; font-weight:700; font-size:16px; color:#ffe6a8; line-height:1; text-shadow:0 1px 5px rgba(0,0,0,.55); }
-  #speedHud .shTrack { position:relative; height:7px; border-radius:5px; background:rgba(255,255,255,.1); overflow:hidden; box-shadow:inset 0 0 0 1px rgba(255,255,255,.08); }
+  #speedHud .shLbl { font-size:9px; letter-spacing:3px; color:#e7d3a6; opacity:.85; }
+  #speedHud .shVal { font-family:'Cinzel',serif; font-weight:700; font-size:16px; color:#f3d99a; line-height:1; text-shadow:0 1px 5px rgba(0,0,0,.55); }
+  #speedHud .shTrack { position:relative; height:7px; border-radius:5px; background:rgba(255,255,255,.08); overflow:hidden; box-shadow:inset 0 0 0 1px rgba(243,200,120,.18); }
   #speedHud .shTrack::after { content:''; position:absolute; inset:0; pointer-events:none;
     background:repeating-linear-gradient(90deg, transparent 0 11px, rgba(0,0,0,.4) 11px 12px); }   /* segmented ticks for a pro readout */
   #speedHud .shFill { height:100%; border-radius:5px; transition:width .35s, background .35s; box-shadow:0 0 8px rgba(255,210,90,.5); }
@@ -1008,7 +1008,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.342 · 2026.06.15</div>
+  <div id="appVersion">v1.343 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1254,7 +1254,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.342';
+const APP_VERSION = '1.343';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -2383,7 +2383,7 @@ function relicEffects(){
 // ---------- level progression: each pyramid you finish bumps the level and ups the pace ----------
 let gameLevel = 1;
 // pace steps up once per 5-level band and stays flat within a band (so each block of 5 feels the same, then harder)
-function levelSpeed(){ return 1 + Math.min(2.0, (gameLevel-1)*0.02); }   // a gradual +2%/level ramp (capped) so each level steps up, instead of identical 5-level bands
+function levelSpeed(){ return 1.5 + Math.min(2.5, (gameLevel-1)*0.05); }   // starts ~0.5 hotter and steps up a clearer +5%/level (capped) — each level is noticeably faster
 
 // ---------- progressive unlocks: new hazards & rewards roll in level by level. The FIRST time the player
 // meets one, the climb briefly freezes and a card explains it. Early levels stay gentle (small pyramid, few/no
@@ -2558,7 +2558,7 @@ function setLevelName(show){
 }
 // the sleek bottom-left SPEED readout: value, a segmented difficulty bar (green→gold→red), and the era's build twist
 function updateSpeedHud(){
-  const sp = levelSpeed(), frac = Math.min(1, (sp-1)/2);
+  const sp = levelSpeed(), frac = Math.min(1, (sp-1)/3);
   const v=$('shVal'); if (v) v.textContent = '×' + sp.toFixed(2);
   const f=$('shFill'); if (f){ f.style.width = Math.max(8, Math.round(frac*100)) + '%';
     f.style.background = frac<0.34 ? 'linear-gradient(90deg,#5fd39a,#9fe9c0)' : frac<0.67 ? 'linear-gradient(90deg,#e8c45a,#ffd24a)' : 'linear-gradient(90deg,#ef7a4a,#ff5a4a)'; }
@@ -4161,16 +4161,16 @@ function attachCourseRamp(a){
     [-1,0,1].forEach(lane => {
       const d = lane*LANE_W; if (lane!==0 && Math.abs(d) > minHW - 0.05) return;
       const dy = B.y-A.y, dz = B.z-A.z, len = Math.hypot(dy,dz) || 0.05, ang = Math.atan2(-dy, dz);
-      const seg = new THREE.Mesh(new THREE.BoxGeometry(RAMP_LANE_W, RAMP_THICK, len*1.04), mat);
-      seg.position.set((A.x+B.x)/2 + d - seat.x, (A.y+B.y)/2 - RAMP_THICK/2 + 0.004 - seat.y, (A.z+B.z)/2 - seat.z);
+      const seg = new THREE.Mesh(new THREE.BoxGeometry(RAMP_LANE_W, RAMP_THICK, len*1.5), mat);   // generous length → consecutive slabs OVERLAP so no step lines peek through (continuous smooth surface)
+      seg.position.set((A.x+B.x)/2 + d - seat.x, (A.y+B.y)/2 - RAMP_THICK/2 + 0.012 - seat.y, (A.z+B.z)/2 - seat.z);   // sit a hair higher so the step-edge lines are buried under the smooth surface
       seg.rotation.x = ang; seg.receiveShadow = true; seg.__ramp = true; mesh.add(seg); S.buildPath.push(seg);
     });
   };
-  if (a.capstone){                                                  // crown: ride only the sloped sides, nothing on the flat top
-    const ch = LAYER_HEIGHT*1.04, cBaseW = BLOCK_SIZE*0.999, cN = 5;
-    const cy = a.center.y;
-    const pt = f => { const w = cBaseW + (0.3 - cBaseW)*f; return { p:new THREE.Vector3(0, cy - ch/2 + ch*f + 0.02, w/2 + 0.015), hw:w/2 }; };
-    let prev = pt(0); for (let i=1; i<=cN; i++){ const cur = pt(i/cN); addSlab(prev.p, cur.p, prev.hw, cur.hw); prev = cur; }
+  if (a.capstone){                                                  // crown: SAME fine stepping as every other stone, riding only the sloped sides up to the very top — nothing on the flat top
+    const N = STEP_N, h = LAYER_HEIGHT*1.04, stepH = h/N, inset = 0.04, baseW = BLOCK_SIZE*0.999, cy = a.center.y;
+    const wOf = i => Math.max(0.28, baseW - 2*i*inset);             // crown plate width recedes on all sides (matches makeCapstonePeak)
+    const pt = i => { const wTop = wOf(i+1); return { p:new THREE.Vector3(0, cy - h/2 + stepH*(i+1) + 0.015, wTop/2 + 0.015), hw:wTop/2 }; };
+    for (let i=0; i<N-1; i++) addSlab(pt(i).p, pt(i+1).p, pt(i).hw, pt(i+1).hw);   // reaches the top step → smooth part meets the summit
     return;
   }
   const L = S.layer, H = (a.n*BLOCK_SIZE)/2;
@@ -4753,9 +4753,9 @@ function loadRunDressing(){
       lastGold = i;
     }
   }
-  if (S.buildPath){ S.buildPath.forEach(m => { if (m.parent) m.parent.remove(m); else scene.remove(m); }); S.buildPath = []; }   // detach the on-block preview ramps; the unified ramp replaces them (no double)
-  addSmoothRamps(tiles);                                 // fill the three lane corridors into smooth flush ramps (gaps left open)
-  // addLaneGuides(tiles);                               // glowing highlight removed for now — just the smooth stone ramps show
+  // The smooth pathway is the on-block ramps attached during the build — KEEP them so build and climb are the exact same
+  // meshes (no rebuild, no double, no look mismatch). They already ride the stones, sit at x=0 when seated, skip weak
+  // seats and gaps, and run per-course.
   spawnGuardian();                                       // boss looms on the summit during an era-final (guardian) level
 }
 
