@@ -1007,7 +1007,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.332 · 2026.06.15</div>
+  <div id="appVersion">v1.333 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1253,7 +1253,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.332';
+const APP_VERSION = '1.333';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4100,26 +4100,34 @@ function addSmoothRamps(tiles){
   const ramps = [];
   const baseY = tiles[0].pos.y, apexY = tiles[tiles.length-1].pos.y, span = (apexY - baseY) || 1;
   const Hbase = baseBlocks/2;
-  const tileColor = t => {
-    try { if (t.mesh && t.mesh.material && t.mesh.material.color) return t.mesh.material.color; } catch(e){}
-    return new THREE.Color(0xC9A368);
+  // Borrow the EXACT material of the stone each segment sits on — same era texture, bump and per-course colour — so the
+  // ramp reads as part of the pyramid, not a pale slab pasted on top. Cache one clone per source material (the texture
+  // map is shared, so this is cheap) and tag it so the lane-shimmer leaves these stone ramps alone.
+  const matCache = new Map();
+  const stoneMat = t => {
+    const src = t.mesh && t.mesh.material;
+    if (src && src.clone){
+      if (!matCache.has(src.uuid)){ const m = src.clone(); m.transparent = false; m.__ramp = true; matCache.set(src.uuid, m); }
+      return matCache.get(src.uuid);
+    }
+    if (!matCache.has('fallback')) matCache.set('fallback', new THREE.MeshStandardMaterial({ color:0xC9A368, roughness:0.92, metalness:0.04 }));
+    return matCache.get('fallback');
   };
   for (let i=0; i<tiles.length-1; i++){
     const t = tiles[i], t2 = tiles[i+1];
     if (t.gap || t2.gap || t.crumbled || t2.crumbled) continue;   // real hole → no fill, stays deadly
     if (t.weak || t2.weak) continue;                              // sloppily-placed course → the smooth ramp never forms; the raw step stays exposed
     const frac = (t.pos.y - baseY) / span;
-    const col = tileColor(t);
+    const mat = stoneMat(t);
     [-1,0,1].forEach(lane => {
       const d = lane*LANE_W;
       if (lane!==0 && frac > 1 - Math.abs(d)/Hbase) return;       // side lane has run off the pyramid edge by this height
       const A = t.pos, B = t2.pos;
       const dy = B.y - A.y, dz = B.z - A.z, len = Math.hypot(dy, dz) || 0.05, ang = Math.atan2(-dy, dz);
-      const w = LANE_W * 1.02;                                    // strips touch → the three lanes merge into one filled band
-      const thick = 0.12;                                         // buries the step notch below the tread so it isn't indented
-      const mat = new THREE.MeshStandardMaterial({ color: col.clone(), roughness: 0.94, metalness: 0.03 });
+      const w = LANE_W * 0.62;                                    // THREE distinct lanes (0.2 apart) with a clear gap between them → the bare steps still show through
+      const thick = 0.075;                                        // a slim slab that fills the step notch and sits FLUSH on the treads (no floating gap)
       const seg = new THREE.Mesh(new THREE.BoxGeometry(w, thick, len*1.04), mat);
-      seg.position.set((A.x+B.x)/2 + d, (A.y+B.y)/2 - thick/2 + 0.01, (A.z+B.z)/2);
+      seg.position.set((A.x+B.x)/2 + d, (A.y+B.y)/2 - thick/2 + 0.004, (A.z+B.z)/2);
       seg.rotation.x = ang; seg.receiveShadow = true; scene.add(seg); ramps.push(seg);
     });
   }
@@ -4146,10 +4154,10 @@ function addLaneGuides(tiles){
     [-1,0,1].forEach(lane => {
       const d = lane*LANE_W;
       if (lane!==0 && frac > 1 - Math.abs(d)/Hbase) return;   // side lane ran off the edge by this height
-      const w = lane===0 ? 0.13 : 0.1;                       // a slim warm lane marker, not a fat band
+      const w = lane===0 ? 0.12 : 0.1;                       // a slim warm lane marker matching the ramp lane width
       const A = t.pos, B = t2.pos;
-      // flat pad sitting ON TOP of the smooth ramp — only light overlap so pads don't pile up and over-darken
-      seg(lane, A.x + d, A.y + 0.016, (A.z + B.z)/2, w, 0.006, Math.max(0.06, Math.abs(A.z - B.z) + 0.035));
+      // flat pad hugging the smooth ramp surface — only light overlap so pads don't pile up and over-darken
+      seg(lane, A.x + d, A.y + 0.01, (A.z + B.z)/2, w, 0.006, Math.max(0.06, Math.abs(A.z - B.z) + 0.035));
       // SLOPED connector bridging this tread up to the next — overlaps both ends so the trail is one continuous lit
       // line. Skipped when the next tile is a hole/broken block, leaving a clear dark break the player must clear.
       if (!B.gap && !B.crumbled && !B.weak){
@@ -4157,7 +4165,7 @@ function addLaneGuides(tiles){
         const op = lane===0 ? 0.34 : 0.22;
         const conn = new THREE.Mesh(new THREE.BoxGeometry(w*0.9, 0.008, len*1.2),
           new THREE.MeshBasicMaterial({ color: lane===0?0xd99836:0xb87d2c, transparent:true, opacity:op, depthWrite:false }));
-        conn.position.set((A.x+B.x)/2 + d, (A.y+B.y)/2 + 0.019, (A.z+B.z)/2); conn.rotation.x = ang;
+        conn.position.set((A.x+B.x)/2 + d, (A.y+B.y)/2 + 0.012, (A.z+B.z)/2); conn.rotation.x = ang;
         conn.baseOp = op; scene.add(conn); guides.push(conn);
       }
     });
@@ -5156,7 +5164,7 @@ function startRun(){
   const rel = relicEffects();                            // stacked roguelike relics this session
   S.run = { tiles, idx:0, t:0, speed:4.0, jumping:false, jumpT:0, jumpDur:0.42, jumpH:0.42,
             falling:false, fallV:0, yOff:0, startDelay:0.6, awaitStart:true,
-            lane:0, laneX:0, sliding:false, slideT:0, slideDur:0.5, stumble:0,
+            lane:0, laneX:0, sliding:false, slideT:0, slideDur:0.5, stumble:0, hop:0,
             rolling:false, rollT:0, rollDur:0.5, rollDir:1, rollCD:0,
             magnet:0, shield:0, slow:0, bubble:null, hazardMul, dressed:false,
             gMult:1, gMultT:0, gMultMax:1,                      // golden-block score multiplier (+ peak reached this run)
@@ -5241,7 +5249,9 @@ function runSlide(){
 function runMove(dir){   // -1 = left, +1 = right (relative to run direction)
   const r = S.run; if (!r || r.falling || r.dead || r.startDelay>0) return;
   if (r.laneLock > 0){ Sound.step(); return; }   // ice slick: footing frozen, can't change lanes yet
+  const prev = r.lane;
   r.lane = Math.max(-1, Math.min(1, r.lane + dir));
+  if (r.lane !== prev) r.hop = 0.24;             // little hop over the gap between pathways
   Sound.step();
 }
 function runRoll(dir){   // +1 = forward roll, -1 = backward roll — a quick somersault dodge with brief i-frames
@@ -5477,7 +5487,11 @@ function updateRun(dt){
   const laneTarget = r.lane * LANE_W;                          // stay on the ledge (matches pillar lanes)
   r.laneX += (laneTarget - r.laneX) * Math.min(1, dt*22);      // snappy lane changes — quick, decisive left/right shifts
 
-  g.position.set(base.x + perp.x*r.laneX, base.y + r.yOff, base.z + perp.z*r.laneX);
+  // little hop when crossing the gap between pathways
+  if (r.hop > 0) r.hop = Math.max(0, r.hop - dt);
+  const hopY = r.hop > 0 ? Math.sin((1 - r.hop/0.24)*Math.PI) * 0.085 : 0;
+
+  g.position.set(base.x + perp.x*r.laneX, base.y + r.yOff + hopY, base.z + perp.z*r.laneX);
   g.scale.set(sx*RUN_SCALE, sy*RUN_SCALE, sx*RUN_SCALE);
   if (r.bubble){ r.bubble.position.set(g.position.x, g.position.y + 0.07, g.position.z);
     const bs = 1 + 0.06*Math.sin(performance.now()*0.008); r.bubble.scale.set(bs, bs, bs); }
@@ -5976,7 +5990,7 @@ function performRevive(){
     const t = r.tiles[j]; if (t.obMesh){ scene.remove(t.obMesh); t.obMesh=null; } if (t.ob) t.ob=null;
   }
   r.idx = i; r.t = 0; r.dead = false; r.falling = false; r.fallV = 0;
-  r.jumping = false; r.sliding = false; r.yOff = 0; r.lane = 0; r.laneX = 0;
+  r.jumping = false; r.sliding = false; r.yOff = 0; r.lane = 0; r.laneX = 0; r.hop = 0; r.stumble = 0;
   r.magnet = 0; r.slow = 0; removeShieldBubble(r);
   r.startDelay = 0.6; r.invuln = 1.3;
   g.rotation.z = 0; g.position.copy(r.tiles[i].pos); g.visible = true;
