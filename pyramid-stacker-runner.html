@@ -1040,7 +1040,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.363 · 2026.06.15</div>
+  <div id="appVersion">v1.364 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1290,7 +1290,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.363';
+const APP_VERSION = '1.364';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -5392,6 +5392,7 @@ function startRun(){
   });
   // CLIMB LIGHTING: a gentle side-key (brighter than the dark version) for a little step shadow without going murky
   sun.position.set(8, 15, 6); sun.intensity = 0.82; hemi.intensity = 0.46;
+  if (S.puzzle){ sun.position.set(7, 5.5, 7); sun.intensity = 1.0; hemi.intensity = 0.34; }   // LEVEL 0: a low, raking sun so the rock relief shows on the tread TOPS too, not just the walls
   // NB: no solid inner core — any gap from a missed/dropped stone is simply left open (the player asked for the
   // pyramid's empty gaps to read as real gaps, not filled in behind).
   // BUILD → CLIMB: the quality of the pyramid you built shapes the climb. A clean build climbs at the normal
