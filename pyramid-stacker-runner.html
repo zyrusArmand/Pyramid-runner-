@@ -1040,7 +1040,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.367 · 2026.06.15</div>
+  <div id="appVersion">v1.368 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1290,7 +1290,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.367';
+const APP_VERSION = '1.368';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4197,7 +4197,7 @@ function spawnCandidates(){
   const items = [ { pat:w1, correct:false }, { pat:target, correct:true }, { pat:w2, correct:false } ];
   for (let a=items.length-1; a>0; a--){ const b=Math.floor(RND()*(a+1)); const t=items[a]; items[a]=items[b]; items[b]=t; }   // shuffle so the right one isn't always centre
   items.forEach(it => { it.mesh = makeJointStone(it.pat, slot, color); it.mesh.visible = false;
-    it.spinAxis = new THREE.Vector3(RND()-0.5, RND()-0.5, RND()-0.5).normalize(); it.spinRate = 0.4 + RND()*0.45; });   // each tumbles slowly on its own (world-space)
+    it.spinAxis = new THREE.Vector3(RND()-0.5, RND()-0.5, RND()-0.5).normalize(); it.spinRate = 0.2 + RND()*0.22; });   // each tumbles slowly on its own (world-space)
   S.cand = { slot, items, idx:1, timer:PUZZLE_TIME, placing:false, drag:null, firstStone, slideX:0 };
   S.active = null;
   showPuzzleActive();
