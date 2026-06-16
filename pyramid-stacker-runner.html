@@ -325,7 +325,7 @@
   #charStage.hidden { display:none; }
   #charPreviewCanvas { width:100%; height:100%; display:block; }
   /* help (?) button — sits left of the gear */
-  #homeHelp { position:fixed; right:64px; top:calc(max(16px,env(safe-area-inset-top)) + 2px); z-index:6;
+  #homeHelp { position:fixed; right:14px; top:calc(max(16px,env(safe-area-inset-top)) + 52px); z-index:6;
     width:42px; height:42px; display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer;
     font-family:'Cinzel',serif; font-weight:700; font-size:20px; color:#f3d99a; background:rgba(20,12,28,.55);
     border:1px solid rgba(243,200,120,.35); border-radius:50%; transition:transform .15s; }
@@ -648,13 +648,13 @@
   .relicName { font-family:'Cinzel',serif; font-size:13.5px; letter-spacing:1.2px; color:#ffe6a8; margin-bottom:6px; }
   .relicDesc { font-family:'Space Mono',monospace; font-size:10.5px; line-height:1.45; color:#e8dcc6; letter-spacing:.3px; }
   .relicHave { margin-top:8px; font-size:9.5px; letter-spacing:1px; color:#ffb45e; opacity:.85; min-height:11px; }
-  /* ---- daily challenge — pinned to the top header, between the profile icon (left) and the help/settings cluster (right) ---- */
-  #homeDaily { position:fixed; z-index:6; top:calc(max(16px,env(safe-area-inset-top)) + 5px); left:78px; right:112px;
-    height:36px; display:flex; align-items:center; justify-content:center; gap:7px; padding:0 14px; border-radius:18px; cursor:pointer;
+  /* ---- daily challenge — pinned to the top header, centred on screen ---- */
+  #homeDaily { position:fixed; z-index:6; top:calc(max(16px,env(safe-area-inset-top)) + 5px); left:50%; transform:translateX(-50%);
+    max-width:min(58vw,220px); height:36px; display:flex; align-items:center; justify-content:center; gap:7px; padding:0 18px; border-radius:18px; cursor:pointer;
     background:rgba(20,12,28,.4); border:1.5px solid rgba(243,200,120,.45); color:#f3d99a;
     -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
     font-family:'Space Mono',monospace; transition:transform .12s; overflow:hidden; white-space:nowrap; }
-  #homeDaily:active { transform:scale(.94); }
+  #homeDaily:active { transform:translateX(-50%) scale(.94); }
   #homeDaily .hdIcon { color:#ffd24a; font-size:12px; flex:0 0 auto; }
   #homeDaily .hdText { color:#f3d99a; font-size:9px; letter-spacing:1.5px; font-weight:700; overflow:hidden; text-overflow:ellipsis; }
   #homeDaily .hdMeta { margin-left:auto; color:#e7d3a6; font-size:8.5px; letter-spacing:.5px; opacity:.7; flex:0 0 auto; }
@@ -1040,7 +1040,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.356 · 2026.06.15</div>
+  <div id="appVersion">v1.357 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1290,7 +1290,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.356';
+const APP_VERSION = '1.357';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
