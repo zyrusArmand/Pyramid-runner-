@@ -1040,7 +1040,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.373 · 2026.06.15</div>
+  <div id="appVersion">v1.374 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1290,7 +1290,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.373';
+const APP_VERSION = '1.374';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4181,7 +4181,7 @@ function setPuzzleGlow(group, on){
     o.material.emissive.setHex(on ? 0x2ec0ff : 0x000000); o.material.emissiveIntensity = on ? 0.8 : 0; } });
   group.__glow = !!on;
 }
-function puzzleCenterPos(){ return new THREE.Vector3(0, S.layer*LAYER_HEIGHT + 1.45, 0.15); }   // candidate floats centred above the build
+function puzzleCenterPos(){ return new THREE.Vector3(0, S.layer*LAYER_HEIGHT + 0.95, 0.15); }   // candidate floats centred above the build (lowered so it stays in the ring at the closer puzzle zoom)
 
 function spawnCandidates(){
   const slot = puzzleSlot();
@@ -4207,7 +4207,7 @@ function spawnCandidates(){
 function showPuzzleActive(){
   if (!S.cand) return;
   S.cand.items.forEach((it,i)=> it.mesh.visible = (i===S.cand.idx));
-  const it = S.cand.items[S.cand.idx]; it.mesh.scale.set(1.4,1.4,1.4);
+  const it = S.cand.items[S.cand.idx]; it.mesh.scale.set(1.0,1.0,1.0);   // smaller, since the puzzle camera now sits closer
   const p = puzzleCenterPos(); it.mesh.position.set(p.x + (S.cand.slideX||0), p.y, p.z);
 }
 function cyclePuzzle(dir){ if (!S.cand || S.cand.placing) return;
@@ -4243,7 +4243,7 @@ function makeCapstoneJoint(color){
   scene.add(g); return g;
 }
 function spawnCapstone(slot){
-  const mesh = makeCapstoneJoint(layerColor(S.layer)); mesh.scale.set(1.4,1.4,1.4);
+  const mesh = makeCapstoneJoint(layerColor(S.layer)); mesh.scale.set(1.0,1.0,1.0);
   mesh.position.copy(puzzleCenterPos());
   const correct = Math.floor(RND()*4); let start; do { start = Math.floor(RND()*4); } while (start===correct);
   mesh.rotation.y = start*Math.PI/2;
@@ -6515,9 +6515,9 @@ function updateBuildCam(dt){
   S.camHE   += (S.camHeight - S.camHE) * Math.min(1, dt*4);
   S.camRE   += (buildFitDistance() - S.camRE) * Math.min(1, dt*3);
   // LEVEL 0: swing 45° around to the open-corner side so the last stone's CONNECTING face (the comb the next block must
-  // match, along the wall axis) is in view alongside its outer face. Camera still aims down the centre axis, so the
-  // floating candidate stays put in the ring.
-  const a = S.camRotE + (S.puzzle ? Math.PI/4 : 0), R = S.camRE, h = S.camHE;
+  // match, along the wall axis) is in view alongside its outer face — and pull in CLOSE so its gaps/notches read clearly.
+  // Camera still aims down the centre axis, so the floating candidate stays put in the ring.
+  const a = S.camRotE + (S.puzzle ? Math.PI/4 : 0), R = (S.puzzle ? Math.max(5.4, S.camRE*0.6) : S.camRE), h = S.camHE;
   camera.position.set(Math.sin(a)*R, h + R*0.34, Math.cos(a)*R);
   // the whole structure feels like it's TEETERING once integrity drops low
   const unstable = Math.max(0, 0.45 - (S.integrity ?? 1));
