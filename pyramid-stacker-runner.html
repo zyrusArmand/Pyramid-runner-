@@ -1040,7 +1040,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.365 · 2026.06.15</div>
+  <div id="appVersion">v1.366 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1290,7 +1290,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.365';
+const APP_VERSION = '1.366';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4186,8 +4186,9 @@ function puzzleCenterPos(){ return new THREE.Vector3(0, S.layer*LAYER_HEIGHT + 1
 function spawnCandidates(){
   const slot = puzzleSlot();
   // the correct comb COMPLEMENTS the last-placed (glowing) stone — its fingers fill that stone's gaps. The FIRST stone of
-  // every layer (the first cell of wall 0) has nothing to mate with yet, so it's a free tap-to-place starter.
-  const firstStone = (S.wall===0 && S.cellIndex===0) || !S.lastComb;
+  // each WALL is its own interlocking chain (the joint runs along the wall axis; corners meet plainly). So the FIRST cell of
+  // every wall is a free tap-to-place starter, and the matching resets per wall — that fixes the ring-closing mismatch.
+  const firstStone = (S.cellIndex===0) || !S.lastComb;
   const target = firstStone ? combPattern() : combInvert(S.lastComb);
   let w1 = combPattern(); while (combEq(w1,target)) w1 = combPattern();
   let w2 = combPattern(); while (combEq(w2,target) || combEq(w2,w1)) w2 = combPattern();
