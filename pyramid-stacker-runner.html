@@ -1040,7 +1040,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.364 · 2026.06.15</div>
+  <div id="appVersion">v1.365 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1290,7 +1290,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.364';
+const APP_VERSION = '1.365';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4143,7 +4143,7 @@ function makeJointStone(pattern, slot, color){
   const aPosEx = (axis==='x') ? ePX : ePZ, aNegEx = (axis==='x') ? eNX : eNZ;
   const cPosEx = (axis==='x') ? ePZ : ePX, cNegEx = (axis==='x') ? eNZ : eNX;
   const intP = !aPosEx, intN = !aNegEx;                                               // interior (mating) sides → carve the joint
-  const NT = 7, tierH = H/NT, inset = 0.04, combDepth = BLOCK_SIZE*0.17, K = PUZZLE_K;
+  const NT = STEP_N, tierH = H/NT, inset = 0.04, combDepth = BLOCK_SIZE*0.17, K = PUZZLE_K;   // match the climb's step cadence so the runner stands ON each tread (no merging)
   const cellC = (2*halfC)/K;
   // add a box given (a,c) ranges → real x/z. UVs are remapped to WORLD size so the stone texture reads at the same scale
   // on every face (thin side faces no longer squash the texture).
@@ -4157,7 +4157,7 @@ function makeJointStone(pattern, slot, color){
     const y = -H/2 + tierH*(i+0.5), ov = tierH + 0.006;
     const aR = halfA - (aPosEx?i*inset:0), aL = -halfA + (aNegEx?i*inset:0);          // exposed faces recede with height → steps
     const cF = halfC - (cPosEx?i*inset:0), cB = -halfC + (cNegEx?i*inset:0);
-    const inBand = i >= 2 && i <= NT-3;                                               // joint lives in the middle tiers
+    const inBand = i >= 3 && i <= 6;                                                  // joint lives in the middle tiers
     const coreR = intP ? halfA - combDepth : aR, coreL = intN ? -(halfA - combDepth) : aL;
     addAC(coreL, coreR, cB, cF, y, ov);                                              // core (recedes on exposed across faces)
     [[intP, 1], [intN, -1]].forEach(([interior, sgn]) => {
