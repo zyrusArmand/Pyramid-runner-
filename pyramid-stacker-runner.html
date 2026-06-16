@@ -35,6 +35,18 @@
     -webkit-backdrop-filter:blur(7px); backdrop-filter:blur(7px); box-shadow:0 6px 18px rgba(0,0,0,.4);
     font-family:'Space Mono',monospace; pointer-events:none; display:none; }
   #speedHud.show { display:block; }
+  /* LEVEL 0 button (home) + in-game puzzle HUD */
+  #homeLv0 { align-self:center; margin-top:14px; pointer-events:auto; cursor:pointer; font-family:'Space Mono',monospace;
+    font-size:10px; letter-spacing:2px; font-weight:700; color:#f3d99a; padding:8px 18px; border-radius:20px;
+    background:rgba(20,12,28,.4); border:1.5px solid rgba(243,200,120,.45); transition:transform .12s; }
+  #homeLv0 span { color:#ffd24a; }
+  #homeLv0:active { transform:scale(.95); }
+  #puzzleHud { position:fixed; left:50%; top:calc(max(16px,env(safe-area-inset-top)) + 78px); transform:translateX(-50%);
+    z-index:6; width:min(78vw,300px); display:none; flex-direction:column; align-items:center; gap:7px; pointer-events:none; }
+  #puzzleHud.show { display:flex; }
+  #puzzleHint { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:1.5px; color:#e7d3a6; opacity:.85; text-shadow:0 1px 4px rgba(0,0,0,.6); }
+  #puzzleTimerBar { width:100%; height:6px; border-radius:5px; background:rgba(20,12,28,.5); border:1px solid rgba(243,200,120,.3); overflow:hidden; }
+  #puzzleTimerFill { height:100%; width:100%; border-radius:5px; background:#9fe9c0; transition:width .12s linear, background .25s; }
   #speedHud .shRow { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; }
   #speedHud .shLbl { font-size:9px; letter-spacing:3px; color:#e7d3a6; opacity:.85; }
   #speedHud .shVal { font-family:'Cinzel',serif; font-weight:700; font-size:16px; color:#f3d99a; line-height:1; text-shadow:0 1px 5px rgba(0,0,0,.55); }
@@ -732,6 +744,11 @@
   <div class="shEra" id="shEra"></div>
 </div>
 
+<div id="puzzleHud">
+  <div id="puzzleHint">SWIPE to switch · DRAG to inspect · TAP to fit</div>
+  <div id="puzzleTimerBar"><div id="puzzleTimerFill"></div></div>
+</div>
+
 <div id="coinHud" class="hidden"><span class="coinIcon"></span><span id="coinVal">0</span><span class="coinLbl"></span></div>
 <div id="multHud" class="hidden">✦ ×<span id="multVal">2</span></div>
 <div id="combo"></div>
@@ -869,6 +886,7 @@
       <div class="iconCol" id="homeLeader" title="Leaderboard"><div class="iconCircle"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4a5 5 0 0 1-10 0V4z"/><path d="M7 6H4v1.5A3.5 3.5 0 0 0 7.5 11"/><path d="M17 6h3v1.5A3.5 3.5 0 0 1 16.5 11"/><path d="M9.5 18h5"/><path d="M12 14.5V18"/></svg></div><div class="iconCap">RANKS</div></div>
       <div class="iconCol" id="homeShop" title="Shop"><div class="iconCircle"><svg class="bicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12l-1 11H7L6 8z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg></div><div class="iconCap">SHOP</div></div>
     </div>
+    <div id="homeLv0" title="Level 0 — puzzle-fit build (beta)"><span>▦</span> LEVEL&nbsp;0 · PUZZLE</div>
   </div>
 </div>
 
@@ -1008,7 +1026,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.344 · 2026.06.15</div>
+  <div id="appVersion">v1.345 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1115,6 +1133,10 @@ const CORNER_CHANCE         = 0.6;   // chance the first piece of a wall is a co
 const FALL_THRESHOLD        = 0.55;  // above layer 1, a drop this far off its support topples off
 const RUN_SCALE             = 0.115; // tiny climber → the pyramid feels massive on the run up
 const LANE_W                = 0.2;   // half-spacing between the 3 dodge-lanes (everything lane-based uses this)
+// ---- LEVEL 0 (isolated puzzle-fit build) ----
+let puzzleMode = false;              // true ONLY while playing Level 0 — nothing else in the game reads/changes for it
+const PUZZLE_TIME = 10;             // seconds to choose before the blocks break
+const PUZZLE_BASE = 3;             // a small base-3 pyramid for the puzzle level (fewer, snappier placements)
 
 // ---------- seeded RNG (so the Daily Challenge is identical for everyone, every day) ----------
 let __seed = 0, __seeded = false;
@@ -1254,7 +1276,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.344';
+const APP_VERSION = '1.345';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -2554,7 +2576,9 @@ function setLevelName(show){
   const el = $('levelName'); if (!el) return;
   el.style.display = show ? 'block' : 'none';
   const sh = $('speedHud'); if (sh) sh.classList.toggle('show', !!show);
-  if (show){ const b=biomeFor(gameLevel); $('lnLv').textContent = 'LEVEL ' + gameLevel + ' · ' + b.era; $('lnName').textContent = b.name; updateSpeedHud(); }
+  if (show){ const b=biomeFor(gameLevel);
+    $('lnLv').textContent = (puzzleMode ? 'LEVEL 0 · PUZZLE' : ('LEVEL ' + gameLevel + ' · ' + b.era));
+    $('lnName').textContent = puzzleMode ? 'FIT THE STONES' : b.name; updateSpeedHud(); }
 }
 // the sleek bottom-left SPEED readout: value, a segmented difficulty bar (green→gold→red), and the era's build twist
 function updateSpeedHud(){
@@ -3511,8 +3535,8 @@ function shake(amt){ S.shakeAmt = Math.max(S.shakeAmt||0, amt); }
 // ---------- state ----------
 let S = {};
 function resetState(){
-  baseBlocks = dailyMode ? 10 : baseForLevel(gameLevel);   // Daily Challenge is a big base-10 pyramid; normal play grows with the level
-  S = { phase:'build', gameOver:false, won:false,
+  baseBlocks = puzzleMode ? PUZZLE_BASE : (dailyMode ? 10 : baseForLevel(gameLevel));   // Level 0 = small puzzle pyramid; Daily = base-10; else grows with the level
+  S = { phase:'build', gameOver:false, won:false, puzzle:puzzleMode, cand:null,
     wall:0, cellIndex:0, layer:0, capstone:false, wallDrift:0,
     camRot:0, camHeight:0, camR:baseBlocks + 5,
     fallen:0, score:0, streak:0, integrity:1, allBlocks:[],
@@ -3548,6 +3572,7 @@ function addPlaceGuide(a){
 function removeKeystoneGuide(){ if (S.keyGuide){ scene.remove(S.keyGuide); S.keyGuide = null; } }
 
 function spawnBlock(){
+  if (S.puzzle){ spawnCandidates(); return; }   // LEVEL 0: no swinging stone — present three puzzle candidates instead
   const capstone = S.capstone;
   let center, axis, len = 1, cells = [], corner = false;
 
@@ -4042,6 +4067,103 @@ function advance(len){
   }
   spawnBlock();
 }
+
+// ============================ LEVEL 0 — PUZZLE-FIT BUILD (isolated; runs ONLY when S.puzzle) ============================
+// No swinging stones. Three candidate puzzle blocks tumble in the centre of the screen; you start on the middle one,
+// swipe L/R to bring another into view, drag to inspect, and TAP to try to fit it. Exactly one of the three matches the
+// course's required notch/tab shape — fit it and it locks; pick wrong (or let the 10s timer run out) and that course
+// takes a HOLE + a stability hit. The climb afterwards is exactly the same as every other level.
+function startPuzzleLevel(){ puzzleMode = true; dailyMode = false; startGame(1); }
+
+// the cell/centre/axis the next stone fills — mirrors spawnBlock's cell maths (single-cell pieces for the puzzle)
+function puzzleSlot(){
+  if (S.capstone) return { capstone:true, center:new THREE.Vector3(0, S.layer*LAYER_HEIGHT, 0), axis:(RND()<0.5?'x':'z'), len:1, cells:[0], n:1 };
+  const n = nForLayer(S.layer), axis = (S.wall===0||S.wall===2)?'x':'z';
+  const center = gridPos(S.wall, S.cellIndex, n, S.layer).clone();
+  return { capstone:false, center, axis, len:1, cells:[S.cellIndex], n };
+}
+// a chunky puzzle block: a cube wearing a few tabs (extrusions) and notches (recessed dark insets). `sig` = 4-side shape
+// signature. NOTE: first-pass shapes — the exact extrusion/intrusion vocabulary will be redone from the reference picture.
+function makePuzzleBlock(sig, color){
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color, roughness:0.8, metalness:0.06 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(BLOCK_SIZE*0.86, BLOCK_SIZE*0.7, BLOCK_SIZE*0.86), mat);
+  body.castShadow = true; g.add(body);
+  const hw = BLOCK_SIZE*0.43, dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+  const notchMat = new THREE.MeshStandardMaterial({ color:0x1a120a, roughness:0.95 });
+  sig.forEach((s, i) => {
+    if (!s) return;
+    const [dx,dz] = dirs[i];
+    const nub = new THREE.Mesh(new THREE.BoxGeometry(BLOCK_SIZE*0.3, BLOCK_SIZE*0.34, BLOCK_SIZE*0.3), s>0 ? mat : notchMat);
+    nub.position.set(dx*(s>0 ? hw+0.08 : hw-0.16), 0, dz*(s>0 ? hw+0.08 : hw-0.16));
+    nub.castShadow = (s>0); g.add(nub);
+  });
+  scene.add(g); return g;
+}
+function puzzleCenterPos(){ return new THREE.Vector3(0, S.layer*LAYER_HEIGHT + 1.25, 0.15); }   // floats centred above the build
+
+function spawnCandidates(){
+  const slot = puzzleSlot();
+  const rnd4 = () => [0,0,0,0].map(()=> [-1,0,1][Math.floor(RND()*3)]);
+  const target = rnd4();
+  let w1 = rnd4(); while (w1.join() === target.join()) w1 = rnd4();
+  let w2 = rnd4(); while (w2.join() === target.join() || w2.join() === w1.join()) w2 = rnd4();
+  const color = layerColor(S.layer);
+  const items = [ { sig:w1, correct:false }, { sig:target, correct:true }, { sig:w2, correct:false } ];
+  for (let a=items.length-1; a>0; a--){ const b=Math.floor(RND()*(a+1)); const t=items[a]; items[a]=items[b]; items[b]=t; }   // shuffle so the right one isn't always centre
+  items.forEach(it => { it.mesh = makePuzzleBlock(it.sig, color); it.mesh.visible = false;
+    it.spin = new THREE.Vector3((RND()-0.5)*1.3, 0.5+RND()*0.9, (RND()-0.5)*1.1); });   // each tumbles slowly on its own
+  S.cand = { slot, items, idx:1, timer:PUZZLE_TIME, placing:false, drag:null };
+  S.active = null;
+  showPuzzleActive();
+  showPuzzleHud(true); updatePuzzleTimer(PUZZLE_TIME);
+}
+function showPuzzleActive(){
+  if (!S.cand) return;
+  S.cand.items.forEach((it,i)=> it.mesh.visible = (i===S.cand.idx));
+  const it = S.cand.items[S.cand.idx];
+  it.mesh.position.copy(puzzleCenterPos()); it.mesh.scale.set(1.3,1.3,1.3);
+}
+function cyclePuzzle(dir){ if (!S.cand || S.cand.placing) return; S.cand.idx = (S.cand.idx + dir + 3) % 3; showPuzzleActive(); if (Sound.step) Sound.step(); }
+function tryFitPuzzle(){ if (!S.cand || S.cand.placing) return; const it = S.cand.items[S.cand.idx];
+  if (it.correct || S.cand.slot.capstone) puzzleLock(it); else puzzleFail(it); }
+function puzzleTimeout(){ if (!S.cand || S.cand.placing) return;
+  if (S.cand.slot.capstone) puzzleLock(S.cand.items.find(i=>i.correct) || S.cand.items[S.cand.idx]);
+  else puzzleFail(null); }
+function clearCandidates(){ if (S.cand){ S.cand.items.forEach(it=>{ try{ scene.remove(it.mesh); }catch(e){} }); } }
+
+function puzzleLock(it){
+  S.cand.placing = true; const slot = S.cand.slot;
+  clearCandidates();
+  const color = layerColor(S.layer);
+  const stone = slot.capstone ? makeCapstonePeak(color) : makeSteppedPiece(slot.len, slot.axis, color, slot.center, slot.n);
+  stone.position.copy(slot.center); S.allBlocks.push(stone);
+  const a = { mesh:stone, center:slot.center.clone(), axis:slot.axis, seat:slot.center[slot.axis],
+              mode:slot.capstone?'sym':'open', len:slot.len, cells:slot.cells, capstone:slot.capstone, n:slot.n };
+  attachCourseRamp(a); pushCells(a, true, false, 0);
+  S.buildQual += 0.85; S.buildCount++; S.integrity = Math.min(1, S.integrity + 0.02); S.score += 80;
+  if (Sound.perfect) Sound.perfect(1); showPop('LOCKED ✓'); spawnDust(slot.center.clone(), 0xffe6a0, 10, 2, 1.6); shake(0.12);
+  S.cand = null; showPuzzleHud(false); updateHUD();
+  if (slot.capstone){ startRun(); return; }
+  advance(slot.len);
+}
+function puzzleFail(it){
+  S.cand.placing = true; const slot = S.cand.slot;
+  if (it && it.mesh) crumbleStone(it.mesh);
+  clearCandidates();
+  hurtIntegrity(0.16 + S.layer*0.05);                       // stability hit
+  S.buildCount++; S.allPerfect = false; S.streak = 0; showCombo(0);
+  pushCells({ center:slot.center.clone(), axis:slot.axis, cells:slot.cells, n:slot.n, capstone:false }, false, false, 0);   // a real HOLE in this course
+  if (Sound.drop) Sound.drop(); shake(0.5); buzz([24,40,24]); showPop('BROKE!');
+  S.cand = null; showPuzzleHud(false); updateHUD();
+  if (S.integrity <= 0){ collapseAll(); endGame(false, 'collapsed'); return; }
+  if (slot.capstone){ startRun(); return; }
+  advance(slot.len);
+}
+// puzzle HUD (timer + hint)
+function showPuzzleHud(on){ const h=$('puzzleHud'); if (h) h.classList.toggle('show', !!on); }
+function updatePuzzleTimer(t){ const f=$('puzzleTimerFill'); if (f){ const frac=Math.max(0,Math.min(1,t/PUZZLE_TIME));
+  f.style.width = (frac*100)+'%'; f.style.background = frac<0.3 ? '#ff5a4a' : frac<0.6 ? '#ffd24a' : '#9fe9c0'; } }
 
 // ---------- RUN PHASE ----------
 // A steep, direct climb straight up the pyramid's front face — stepping on each individual stone
@@ -6315,7 +6437,8 @@ function startGame(atLevel){
   $('storm').style.opacity='0'; scene.fog.near=16; scene.fog.far=46; S.stormA=0; sun.position.set(7,16,9); sun.intensity = 0.72; hemi.intensity = 0.55;
   $('reviveScreen').classList.add('hidden'); $('adModal').classList.add('hidden'); $('hint').classList.remove('show');
   $('menuBtn').style.display = 'block'; $('restartBtn').style.display='block';
-  if (firstTime) showHint('TAP to drop the stone INTO the glowing outline — nail it for a PERFECT', 5500);
+  if (puzzleMode) showHint('Three blocks tumble — SWIPE to switch, DRAG to inspect, TAP the one that FITS', 5500);
+  else if (firstTime) showHint('TAP to drop the stone INTO the glowing outline — nail it for a PERFECT', 5500);
   updateHUD(); spawnBlock(); setLevelName(true);
 }
 
@@ -6323,6 +6446,7 @@ function startGame(atLevel){
 // tapped NEXT LEVEL → just build the next pyramid (relics are now chosen before each climb, not here)
 function onNextLevel(){
   $('nextLevelWrap').classList.remove('show');
+  if (S.puzzle){ showStart(); return; }   // LEVEL 0 is a standalone experience → back to the menu after clearing it
   nextLevel();
 }
 // choose ONE relic for the climb ahead (shown after the build, before the run)
@@ -6390,7 +6514,8 @@ function beginBuild(){
 // ---------- home / leaderboard / shop ----------
 let shopTab = 'chars';
 function showStart(){            // the main "home" menu (cover art + PLAY / LEADERBOARD / SHOP)
-  atMenu = true; charPrevOn = false;
+  atMenu = true; charPrevOn = false; puzzleMode = false;   // leaving to the menu always exits Level 0
+  { const ph=$('puzzleHud'); if (ph) ph.classList.remove('show'); }
   if (S.fight) endFight();        // tear down any in-progress boss fight UI
   $('emoteBtn').classList.remove('show');
   setLevelName(false); removeVictoryBeam();
@@ -7184,6 +7309,7 @@ function primeAudio(){
 // buttons that must NOT bubble to the global tap handler
 function btn(id, fn){ $(id).addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); fn(); }); }
 btn('homePlay',      ()=>startGame());
+btn('homeLv0',       startPuzzleLevel);
 btn('homeLeader',    showLeader);
 btn('homeShop',      ()=>showShop());
 btn('homeGoalsBtn',  showGoals);
@@ -7283,13 +7409,29 @@ window.addEventListener('pointerdown', e => {
   if (atMenu){ return; }                                                   // menu uses its own buttons
   if (S.gameOver || S.paused) return;                                      // over/confirm screens use their own buttons
   if (S.fight && S.fight.active){ if (fightInJoyZone(e.clientX, e.clientY)) fightJoyStart(e.clientX, e.clientY, e.pointerId); return; }   // PHASE 3: bottom-left joystick only
-  if (S.phase==='build'){ drop(); return; }
+  if (S.phase==='build'){
+    if (S.puzzle){ gStart = { x:e.clientX, y:e.clientY }; if (S.cand) S.cand.drag = { x:e.clientX, y:e.clientY }; return; }   // LEVEL 0: tap to fit / swipe to switch / drag to inspect
+    drop(); return;
+  }
   if (S.phase==='run'){ gStart = { x:e.clientX, y:e.clientY }; }   // wait for swipe direction
 }, { passive:false });
-window.addEventListener('pointermove', e => { if (S.fight && S.fight.active && S.fight.joy.active) fightJoyMove(e.clientX, e.clientY, e.pointerId); }, { passive:true });
+window.addEventListener('pointermove', e => {
+  if (S.fight && S.fight.active && S.fight.joy.active) fightJoyMove(e.clientX, e.clientY, e.pointerId);
+  if (S.phase==='build' && S.puzzle && S.cand && S.cand.drag && !S.cand.placing){   // drag the active block around to inspect it
+    const it = S.cand.items[S.cand.idx];
+    if (it && it.mesh){ it.mesh.rotation.y += (e.clientX - S.cand.drag.x)*0.012; it.mesh.rotation.x += (e.clientY - S.cand.drag.y)*0.012; }
+    S.cand.drag = { x:e.clientX, y:e.clientY };
+  }
+}, { passive:true });
 window.addEventListener('pointercancel', e => { if (S.fight && S.fight.active) fightJoyEnd(e.pointerId); }, { passive:true });
 window.addEventListener('pointerup', e => {
   if (S.fight && S.fight.active){ gStart = null; fightJoyEnd(e.pointerId); return; }       // release the joystick
+  if (S.phase==='build' && S.puzzle && gStart){     // LEVEL 0: tap = fit · big horizontal swipe = switch candidate
+    const dx = e.clientX - gStart.x, dy = e.clientY - gStart.y; gStart = null; if (S.cand) S.cand.drag = null;
+    if (Math.hypot(dx,dy) < 14) tryFitPuzzle();
+    else if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) cyclePuzzle(dx > 0 ? 1 : -1);
+    return;
+  }
   if (S.phase!=='run' || !gStart) return;
   const dx = e.clientX - gStart.x, dy = e.clientY - gStart.y; gStart = null;
   const TH = 28;
@@ -7308,7 +7450,9 @@ window.addEventListener('keydown', e => {
   if (atMenu){ startGame(); return; }
   if (S.gameOver){ if (!$('overScreen').classList.contains('hidden')) startGame(gameLevel); return; }
   if (S.phase==='intro'){ beginBuild(); return; }     // any key starts building the next pyramid
-  if (S.phase==='build'){ if (k==='Space'||k==='ArrowUp'||k==='ArrowDown') drop(); return; }
+  if (S.phase==='build'){
+    if (S.puzzle){ if (k==='Space') tryFitPuzzle(); else if (k==='ArrowLeft') cyclePuzzle(-1); else if (k==='ArrowRight') cyclePuzzle(1); return; }
+    if (k==='Space'||k==='ArrowUp'||k==='ArrowDown') drop(); return; }
   if (S.phase==='run'){
     if (S.fight && S.fight.active){                 // PHASE 3 keyboard: Space punch, ↑ kick, ↓ throw (movement is the on-screen joystick)
       if (k==='Space') pPunch();
@@ -7374,6 +7518,14 @@ function animate(){
         else a.mesh.material.emissive.setRGB(0, 0, 0);
       }
     }
+  }
+  // LEVEL 0: tumble the active candidate, hold it centred, and run the choose-timer down
+  if (S.puzzle && S.phase==='build' && S.cand && !S.cand.placing && !S.paused){
+    const it = S.cand.items[S.cand.idx];
+    if (it && it.mesh){ it.mesh.rotation.x += it.spin.x*sdt; it.mesh.rotation.y += it.spin.y*sdt; it.mesh.rotation.z += it.spin.z*sdt;
+      it.mesh.position.copy(puzzleCenterPos()); }
+    S.cand.timer -= dt; updatePuzzleTimer(S.cand.timer);
+    if (S.cand.timer <= 0) puzzleTimeout();
   }
   for (let i=S.falling.length-1;i>=0;i--){ const f=S.falling[i];
     f.vel.y -= 9.8*sdt; f.mesh.position.addScaledVector(f.vel,sdt);
