@@ -55,11 +55,10 @@
   #puzzleArrowR { left:calc(50% + 122px); transform:translate(-50%,-50%) scaleY(2.1); }
   @keyframes arrowPulse { 0%,100%{ opacity:.5; } 50%{ opacity:1; } }
   /* the rotate-zone ring around the previewed stone */
-  #puzzleRing { position:fixed; left:50%; top:41%; transform:translate(-50%,-50%); z-index:5; display:none; pointer-events:none;
-    width:200px; height:200px; border-radius:50%; border:2px dashed rgba(255,210,74,.5);
-    box-shadow:0 0 22px rgba(255,200,74,.16) inset; animation:ringSpin 14s linear infinite; }
+  #puzzleRing { position:fixed; left:50%; top:41%; transform:translate(-50%,-50%); z-index:6; display:none; pointer-events:none;
+    width:200px; height:200px; border-radius:50%; border:2px solid rgba(255,214,90,.85);
+    box-shadow:0 0 18px rgba(255,205,80,.55), 0 0 34px rgba(255,205,80,.28), inset 0 0 22px rgba(255,205,80,.22); }
   #puzzleRing.show { display:block; }
-  @keyframes ringSpin { from{ transform:translate(-50%,-50%) rotate(0); } to{ transform:translate(-50%,-50%) rotate(360deg); } }
   #speedHud .shRow { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; }
   #speedHud .shLbl { font-size:9px; letter-spacing:3px; color:#e7d3a6; opacity:.85; }
   #speedHud .shVal { font-family:'Cinzel',serif; font-weight:700; font-size:16px; color:#f3d99a; line-height:1; text-shadow:0 1px 5px rgba(0,0,0,.55); }
@@ -1042,7 +1041,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.350 · 2026.06.15</div>
+  <div id="appVersion">v1.351 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1292,7 +1291,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.350';
+const APP_VERSION = '1.351';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
