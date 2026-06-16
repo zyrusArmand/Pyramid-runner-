@@ -47,16 +47,16 @@
   #puzzleHint { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:1.5px; color:#e7d3a6; opacity:.85; text-shadow:0 1px 4px rgba(0,0,0,.6); }
   #puzzleTimerBar { width:100%; height:6px; border-radius:5px; background:rgba(20,12,28,.5); border:1px solid rgba(243,200,120,.3); overflow:hidden; }
   #puzzleTimerFill { height:100%; width:100%; border-radius:5px; background:#9fe9c0; transition:width .12s linear, background .25s; }
-  .puzzleArrow { position:fixed; top:41%; z-index:7; display:none; pointer-events:none;
+  .puzzleArrow { position:fixed; top:39%; z-index:7; display:none; pointer-events:none;
     font-family:'Cinzel',serif; font-size:46px; line-height:1; font-weight:700;
     color:#ffd24a; text-shadow:0 0 14px rgba(255,200,74,.6), 0 2px 4px rgba(0,0,0,.5); animation:arrowPulse 1.1s ease-in-out infinite; }
   .puzzleArrow.show { display:block; }
-  #puzzleArrowL { left:calc(50% - 122px); transform:translate(-50%,-50%) scaleY(2.1); }   /* just outside the rotate ring, stretched tall */
-  #puzzleArrowR { left:calc(50% + 122px); transform:translate(-50%,-50%) scaleY(2.1); }
+  #puzzleArrowL { left:calc(50% - 152px); transform:translate(-50%,-50%) scaleY(2.1); }   /* just outside the rotate ring, stretched tall */
+  #puzzleArrowR { left:calc(50% + 152px); transform:translate(-50%,-50%) scaleY(2.1); }
   @keyframes arrowPulse { 0%,100%{ opacity:.5; } 50%{ opacity:1; } }
   /* the rotate-zone ring around the previewed stone */
-  #puzzleRing { position:fixed; left:50%; top:41%; transform:translate(-50%,-50%); z-index:6; display:none; pointer-events:none;
-    width:200px; height:200px; border-radius:50%; border:2px solid rgba(255,214,90,.85);
+  #puzzleRing { position:fixed; left:50%; top:39%; transform:translate(-50%,-50%); z-index:6; display:none; pointer-events:none;
+    width:260px; height:260px; border-radius:50%; border:2px solid rgba(255,214,90,.85);
     box-shadow:0 0 18px rgba(255,205,80,.55), 0 0 34px rgba(255,205,80,.28), inset 0 0 22px rgba(255,205,80,.22); }
   #puzzleRing.show { display:block; }
   #speedHud .shRow { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; }
@@ -757,7 +757,6 @@
 </div>
 
 <div id="puzzleHud">
-  <div id="puzzleHint">DRAG centre to rotate · tap LEFT / RIGHT to switch · TAP centre to fit the GLOWING stone</div>
   <div id="puzzleTimerBar"><div id="puzzleTimerFill"></div></div>
 </div>
 <div id="puzzleArrowL" class="puzzleArrow">‹</div>
@@ -1041,7 +1040,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.353 · 2026.06.15</div>
+  <div id="appVersion">v1.354 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1291,7 +1290,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.353';
+const APP_VERSION = '1.354';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4102,6 +4101,8 @@ function puzzleSlot(){
 // and they alternate. A block fits its course only when its comb matches the required pattern.
 const PUZZLE_K = 5;
 const PUZZLE_W = BLOCK_SIZE*0.92, PUZZLE_D = BLOCK_SIZE*0.7, PUZZLE_H = BLOCK_SIZE*0.42, PUZZLE_FH = BLOCK_SIZE*0.34;
+// world-space rotate helper (lazy — built at first use, never at module load)
+function puzzleRotateWorld(mesh, axis, ang){ mesh.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(axis, ang)); }
 function combPattern(){
   const arr = new Array(PUZZLE_K).fill(0);
   const amount = [1,2,3,4,5][Math.floor(RND()*5)];                 // little → a lot
@@ -4116,31 +4117,34 @@ const combEq = (a,b) => a.length===b.length && a.every((v,i)=>v===b[i]);
 const combInvert = a => a.map(v => v ? 0 : 1);            // the complementary comb — its fingers fill the other's gaps
 // add the finger/comb joint on the two SIDE faces that mate with the neighbouring stones (along the wall axis), arranged
 // across the depth — like a real box/finger joint. Fingers stick out from both connecting faces; gaps are the slots.
-// a SOLID custom stone with a REAL finger joint carved into its two mating faces (along the wall axis): a narrow CORE,
-// solid caps above/below, and within a middle band, FINGER cells fill out to the mating plane while NOTCH cells are left
-// empty — genuine pockets the neighbouring stone's fingers drop into. Built only from boxes, so the notches are real
-// (not faked), and there are no steps to clash with.
-function makeJointStone(pattern, slot, color){
-  const g = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color, roughness:0.82, metalness:0.04 }); applyEraBlockTex(mat);
-  const axis = slot.capstone ? 'x' : slot.axis;
-  const halfA = BLOCK_SIZE*0.48, halfC = BLOCK_SIZE*0.48, H = LAYER_HEIGHT*1.04;
-  const combDepth = BLOCK_SIZE*0.17, coreA = halfA - combDepth, fY = H*0.62, capH = (H - fY)/2;
-  const cell = (2*halfC)/PUZZLE_K, cellW = cell*0.9;
-  const add = (sx,sy,sz, px,py,pz) => { const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),mat); m.position.set(px,py,pz); m.castShadow=true; m.receiveShadow=true; g.add(m); };
-  const along = (a) => (axis==='x') ? [a, H, 2*halfC] : [2*halfC, H, a];        // a box of "a" thickness along the joint axis, full elsewhere
-  // CORE — solid middle, narrower along the joint axis so the comb pockets exist on both ends
-  { const d = along(2*coreA); add(d[0], d[1], d[2], 0,0,0); }
-  // solid CAPS above & below the comb band — full out to the mating plane (so only the band carries the joint)
-  [1,-1].forEach(sy => { const d = (axis==='x') ? [2*halfA, capH, 2*halfC] : [2*halfC, capH, 2*halfA];
-    add(d[0], d[1], d[2], 0, sy*(fY/2 + capH/2), 0); });
-  // FINGERS in the band — a tab from the core out to the mating plane; NOTCH cells stay empty (a real pocket)
-  [1,-1].forEach(sign => { pattern.forEach((on,i) => { if (!on) return;
-    const ac = -halfC + cell*(i+0.5), axc = sign*(coreA + combDepth/2);
-    if (axis==='x') add(combDepth, fY, cellW, axc, 0, ac); else add(cellW, fY, combDepth, ac, 0, axc);
+// The finger joint sits on the two FLAT interior mating faces (along the wall axis), inset from the stepped OUTER face so
+// the pyramid steps stay clean. FINGER cells PROTRUDE out past the face (so they physically fill the neighbour stone's
+// gaps); NOTCH cells are dark recesses the neighbour's fingers drop into.
+function addCombTo(group, pattern, slot, color){
+  const axis = slot.axis, across = (axis==='x') ? 'z' : 'x';
+  const exposedSign = (slot.center && slot.center[across] > 0) ? 1 : -1;            // toward the stepped outer face
+  const halfAxis = BLOCK_SIZE*0.46, span = BLOCK_SIZE*0.5, combMid = -exposedSign * BLOCK_SIZE*0.13;   // hold the comb to the interior
+  const cell = span/PUZZLE_K, cellW = cell*0.74, fY = LAYER_HEIGHT*0.5;
+  const tabLen = BLOCK_SIZE*0.13, notchLen = BLOCK_SIZE*0.07;
+  const tabMat = new THREE.MeshStandardMaterial({ color, roughness:0.78, metalness:0.05 }); applyEraBlockTex(tabMat);
+  const notchMat = new THREE.MeshStandardMaterial({ color: color.clone().multiplyScalar(0.22), roughness:0.98, metalness:0 });
+  [1,-1].forEach(sign => { pattern.forEach((on,i) => {
+    const ac = combMid - span/2 + cell*(i+0.5);
+    const len = on ? tabLen : notchLen;
+    const ax = on ? sign*(halfAxis + len/2 - 0.03)     // finger: rooted in the face, clearly STICKING OUT
+                  : sign*(halfAxis - len/2 + 0.01);    // notch: a dark recess set into the face
+    const d = (axis==='x') ? [len, on?fY:fY*0.86, cellW] : [cellW, on?fY:fY*0.86, len];
+    const m = new THREE.Mesh(new THREE.BoxGeometry(d[0], d[1], d[2]), on ? tabMat : notchMat);
+    if (axis==='x') m.position.set(ax, 0, ac); else m.position.set(ac, 0, ax);
+    m.castShadow = on; group.add(m);
   }); });
-  g.__pattern = pattern.join(''); g.__combMat = mat;
-  scene.add(g); return g;
+  group.__pattern = pattern.join(''); group.__combMat = tabMat;
+}
+// a candidate / placed stone = the real STEPPED pyramid stone for this slot (steps + era texture) + its mating-face joint
+function makeJointStone(pattern, slot, color){
+  const stone = slot.capstone ? makeCapstonePeak(color) : makeSteppedPiece(slot.len, slot.axis, color, slot.center, slot.n);
+  addCombTo(stone, pattern, slot, color);
+  return stone;
 }
 // glow the last-placed stone so its fingers/gaps read — the next block must COMPLEMENT it
 function setPuzzleGlow(group, on){
@@ -4163,7 +4167,7 @@ function spawnCandidates(){
   const items = [ { pat:w1, correct:false }, { pat:target, correct:true }, { pat:w2, correct:false } ];
   for (let a=items.length-1; a>0; a--){ const b=Math.floor(RND()*(a+1)); const t=items[a]; items[a]=items[b]; items[b]=t; }   // shuffle so the right one isn't always centre
   items.forEach(it => { it.mesh = makeJointStone(it.pat, slot, color); it.mesh.visible = false;
-    it.spin = new THREE.Vector3((RND()-0.5)*0.7, 0.35+RND()*0.5, (RND()-0.5)*0.6); });   // each tumbles slowly on its own
+    it.spinAxis = new THREE.Vector3(RND()-0.5, RND()-0.5, RND()-0.5).normalize(); it.spinRate = 0.4 + RND()*0.45; });   // each tumbles slowly on its own (world-space)
   S.cand = { slot, items, idx:1, timer:PUZZLE_TIME, placing:false, drag:null, firstStone, slideX:0 };
   S.active = null;
   showPuzzleActive();
@@ -7480,9 +7484,13 @@ window.addEventListener('pointerdown', e => {
 }, { passive:false });
 window.addEventListener('pointermove', e => {
   if (S.fight && S.fight.active && S.fight.joy.active) fightJoyMove(e.clientX, e.clientY, e.pointerId);
-  if (S.phase==='build' && S.puzzle && S.cand && S.cand.drag && !S.cand.placing){   // drag the active block around to inspect it
+  if (S.phase==='build' && S.puzzle && S.cand && S.cand.drag && !S.cand.placing){   // drag to inspect — WORLD-space so it tracks the finger and never inverts
     const it = S.cand.items[S.cand.idx];
-    if (it && it.mesh){ it.mesh.rotation.y += (e.clientX - S.cand.drag.x)*0.012; it.mesh.rotation.x += (e.clientY - S.cand.drag.y)*0.012; }
+    if (it && it.mesh){
+      const dx = (e.clientX - S.cand.drag.x)*0.01, dy = (e.clientY - S.cand.drag.y)*0.01;
+      puzzleRotateWorld(it.mesh, new THREE.Vector3(0,1,0), dx);    // drag right → spins right
+      puzzleRotateWorld(it.mesh, new THREE.Vector3(1,0,0), dy);    // drag down → tilts down
+    }
     S.cand.drag = { x:e.clientX, y:e.clientY };
   }
 }, { passive:true });
@@ -7588,7 +7596,8 @@ function animate(){
     const it = S.cand.items[S.cand.idx];
     S.cand.slideX = (S.cand.slideX||0) * (1 - Math.min(1, dt*9));      // slide the swapped stone in toward centre
     if (Math.abs(S.cand.slideX) < 0.002) S.cand.slideX = 0;
-    if (it && it.mesh){ it.mesh.rotation.x += it.spin.x*sdt; it.mesh.rotation.y += it.spin.y*sdt; it.mesh.rotation.z += it.spin.z*sdt;
+    if (it && it.mesh){
+      if (!S.cand.drag){ puzzleRotateWorld(it.mesh, it.spinAxis, it.spinRate*sdt); }   // gentle world-space tumble, paused while you drag
       const p = puzzleCenterPos(); it.mesh.position.set(p.x + S.cand.slideX, p.y, p.z); }
     S.cand.timer -= dt; updatePuzzleTimer(S.cand.timer);
     if (S.cand.timer <= 0) puzzleTimeout();
