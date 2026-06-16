@@ -1040,7 +1040,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.371 · 2026.06.15</div>
+  <div id="appVersion">v1.372 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1290,7 +1290,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.371';
+const APP_VERSION = '1.372';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4196,8 +4196,8 @@ function spawnCandidates(){
   const color = layerColor(S.layer);
   const items = [ { pat:w1, correct:false }, { pat:target, correct:true }, { pat:w2, correct:false } ];
   for (let a=items.length-1; a>0; a--){ const b=Math.floor(RND()*(a+1)); const t=items[a]; items[a]=items[b]; items[b]=t; }   // shuffle so the right one isn't always centre
-  items.forEach(it => { it.mesh = makeJointStone(it.pat, slot, color); it.mesh.visible = false;
-    it.mesh.rotation.set(0.32, 0.6, 0); });   // a fixed 3/4 starting angle (no auto-tumble) — you turn it yourself by dragging
+  items.forEach(it => { it.mesh = makeJointStone(it.pat, slot, color); it.mesh.visible = false; it.mesh.rotation.set(0.3, 0.55, 0);
+    it.spinAxis = new THREE.Vector3(RND()-0.5, RND()-0.5, RND()-0.5).normalize(); it.spinRate = 0.2 + RND()*0.22; });   // gentle auto-tumble (pauses while you touch it)
   S.cand = { slot, items, idx:1, timer:PUZZLE_TIME, placing:false, drag:null, firstStone, slideX:0 };
   S.active = null;
   showPuzzleActive();
@@ -6515,12 +6515,6 @@ function updateBuildCam(dt){
   S.camHE   += (S.camHeight - S.camHE) * Math.min(1, dt*4);
   S.camRE   += (buildFitDistance() - S.camRE) * Math.min(1, dt*3);
   const a = S.camRotE, R = S.camRE, h = S.camHE;
-  if (S.puzzle){                                            // LEVEL 0: a clear ~45° three-quarter view of the course being matched (+ the floating candidate)
-    const fy = h + 0.85, Rp = R*0.82;
-    camera.position.set(Math.sin(a)*Rp, fy + Rp, Math.cos(a)*Rp);   // height above the aim ≈ horizontal distance → ~45° elevation
-    camera.lookAt(0, fy, 0);
-    applyShake(); return;
-  }
   camera.position.set(Math.sin(a)*R, h + R*0.34, Math.cos(a)*R);
   // the whole structure feels like it's TEETERING once integrity drops low
   const unstable = Math.max(0, 0.45 - (S.integrity ?? 1));
@@ -7693,12 +7687,14 @@ function animate(){
     c.timer -= dt; updatePuzzleTimer(c.timer);
     if (c.timer <= 0) puzzleTimeout();
   }
-  // LEVEL 0 (stones): hold the active candidate centred (NO auto-tumble — it only turns when you drag it) and run the timer
+  // LEVEL 0 (stones): gentle auto-tumble (paused whenever you're touching it), held centred, run the timer
   else if (S.puzzle && S.phase==='build' && S.cand && !S.cand.placing && !S.paused){
     const it = S.cand.items[S.cand.idx];
     S.cand.slideX = (S.cand.slideX||0) * (1 - Math.min(1, dt*9));      // slide the swapped stone in toward centre
     if (Math.abs(S.cand.slideX) < 0.002) S.cand.slideX = 0;
-    if (it && it.mesh){ const p = puzzleCenterPos(); it.mesh.position.set(p.x + S.cand.slideX, p.y, p.z); }
+    if (it && it.mesh){
+      if (!gStart && it.spinAxis){ puzzleRotateWorld(it.mesh, it.spinAxis, it.spinRate*sdt); }   // spins on its own; any touch (gStart) stops it, release resumes
+      const p = puzzleCenterPos(); it.mesh.position.set(p.x + S.cand.slideX, p.y, p.z); }
     S.cand.timer -= dt; updatePuzzleTimer(S.cand.timer);
     if (S.cand.timer <= 0) puzzleTimeout();
   }
