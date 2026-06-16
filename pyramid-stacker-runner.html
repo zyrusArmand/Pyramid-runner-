@@ -1040,7 +1040,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.354 · 2026.06.15</div>
+  <div id="appVersion">v1.355 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1290,7 +1290,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.354';
+const APP_VERSION = '1.355';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4117,30 +4117,30 @@ const combEq = (a,b) => a.length===b.length && a.every((v,i)=>v===b[i]);
 const combInvert = a => a.map(v => v ? 0 : 1);            // the complementary comb — its fingers fill the other's gaps
 // add the finger/comb joint on the two SIDE faces that mate with the neighbouring stones (along the wall axis), arranged
 // across the depth — like a real box/finger joint. Fingers stick out from both connecting faces; gaps are the slots.
-// The finger joint sits on the two FLAT interior mating faces (along the wall axis), inset from the stepped OUTER face so
-// the pyramid steps stay clean. FINGER cells PROTRUDE out past the face (so they physically fill the neighbour stone's
-// gaps); NOTCH cells are dark recesses the neighbour's fingers drop into.
+// Carve the finger joint OUT of the single stepped stone: rectangular pockets (NOTCH cells) are cut into the flat mating
+// face; the leftover solid between them are the fingers. Only the INTERIOR connecting face(s) are carved — an exposed
+// corner/outer face is left plain. The pyramid steps are untouched.
 function addCombTo(group, pattern, slot, color){
   const axis = slot.axis, across = (axis==='x') ? 'z' : 'x';
-  const exposedSign = (slot.center && slot.center[across] > 0) ? 1 : -1;            // toward the stepped outer face
-  const halfAxis = BLOCK_SIZE*0.46, span = BLOCK_SIZE*0.5, combMid = -exposedSign * BLOCK_SIZE*0.13;   // hold the comb to the interior
-  const cell = span/PUZZLE_K, cellW = cell*0.74, fY = LAYER_HEIGHT*0.5;
-  const tabLen = BLOCK_SIZE*0.13, notchLen = BLOCK_SIZE*0.07;
-  const tabMat = new THREE.MeshStandardMaterial({ color, roughness:0.78, metalness:0.05 }); applyEraBlockTex(tabMat);
-  const notchMat = new THREE.MeshStandardMaterial({ color: color.clone().multiplyScalar(0.22), roughness:0.98, metalness:0 });
-  [1,-1].forEach(sign => { pattern.forEach((on,i) => {
-    const ac = combMid - span/2 + cell*(i+0.5);
-    const len = on ? tabLen : notchLen;
-    const ax = on ? sign*(halfAxis + len/2 - 0.03)     // finger: rooted in the face, clearly STICKING OUT
-                  : sign*(halfAxis - len/2 + 0.01);    // notch: a dark recess set into the face
-    const d = (axis==='x') ? [len, on?fY:fY*0.86, cellW] : [cellW, on?fY:fY*0.86, len];
-    const m = new THREE.Mesh(new THREE.BoxGeometry(d[0], d[1], d[2]), on ? tabMat : notchMat);
-    if (axis==='x') m.position.set(ax, 0, ac); else m.position.set(ac, 0, ax);
-    m.castShadow = on; group.add(m);
-  }); });
-  group.__pattern = pattern.join(''); group.__combMat = tabMat;
+  const Hlayer = (slot.n || 1) * BLOCK_SIZE / 2, axisCoord = slot.center ? slot.center[axis] : 0;
+  const exSign = (slot.center && slot.center[across] > 0) ? 1 : -1;                 // toward the stepped outer (across) face
+  const face = BLOCK_SIZE*0.5, span = BLOCK_SIZE*0.54, combMid = -exSign * BLOCK_SIZE*0.1;   // keep the joint on the interior strip
+  const cell = span/PUZZLE_K, cellW = cell*0.76, fY = LAYER_HEIGHT*0.54, depth = BLOCK_SIZE*0.16;
+  const holeMat = new THREE.MeshStandardMaterial({ color: color.clone().multiplyScalar(0.15), roughness:1, metalness:0 });
+  [1,-1].forEach(sign => {
+    const exposed = (sign > 0) ? (axisCoord > Hlayer - 0.6) : (axisCoord < -Hlayer + 0.6);   // corner / outer end
+    if (exposed) return;                                                            // carve ONLY the wall side that connects to a neighbour
+    pattern.forEach((on,i) => { if (on) return;                                     // a NOTCH is a carved rectangle; a finger is the untouched solid stone
+      const ac = combMid - span/2 + cell*(i+0.5), cen = sign*(face - depth/2 + 0.004);
+      const d = (axis==='x') ? [depth, fY, cellW] : [cellW, fY, depth];
+      const m = new THREE.Mesh(new THREE.BoxGeometry(d[0], d[1], d[2]), holeMat);
+      if (axis==='x') m.position.set(cen, 0, ac); else m.position.set(ac, 0, cen);
+      group.add(m);
+    });
+  });
+  group.__pattern = pattern.join('');
 }
-// a candidate / placed stone = the real STEPPED pyramid stone for this slot (steps + era texture) + its mating-face joint
+// a candidate / placed stone = the real STEPPED pyramid stone for this slot (steps + era texture) with its joint carved in
 function makeJointStone(pattern, slot, color){
   const stone = slot.capstone ? makeCapstonePeak(color) : makeSteppedPiece(slot.len, slot.axis, color, slot.center, slot.n);
   addCombTo(stone, pattern, slot, color);
