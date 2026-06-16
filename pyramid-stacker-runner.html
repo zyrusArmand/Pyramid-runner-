@@ -1040,7 +1040,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.362 · 2026.06.15</div>
+  <div id="appVersion">v1.363 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1290,7 +1290,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.362';
+const APP_VERSION = '1.363';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4228,7 +4228,7 @@ function puzzleLock(it){
   stone.position.copy(slot.center); S.allBlocks.push(stone);
   const a = { mesh:stone, center:slot.center.clone(), axis:slot.axis, seat:slot.center[slot.axis],
               mode:slot.capstone?'sym':'open', len:slot.len, cells:slot.cells, capstone:slot.capstone, n:slot.n };
-  attachCourseRamp(a); pushCells(a, true, false, 0);
+  pushCells(a, true, false, 0);   // LEVEL 0: no smooth ramp — you climb the bare TEXTURED stepped stones (the floor matches the walls)
   S.buildQual += 0.85; S.buildCount++; S.integrity = Math.min(1, S.integrity + 0.02); S.score += 80;
   if (Sound.perfect) Sound.perfect(1); showPop('LOCKED ✓'); spawnDust(slot.center.clone(), 0xffe6a0, 10, 2, 1.6); shake(0.12);
   // this stone becomes the reference: glow it so its fingers/gaps read, and the NEXT block must complement its comb
