@@ -47,6 +47,13 @@
   #puzzleHint { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:1.5px; color:#e7d3a6; opacity:.85; text-shadow:0 1px 4px rgba(0,0,0,.6); }
   #puzzleTimerBar { width:100%; height:6px; border-radius:5px; background:rgba(20,12,28,.5); border:1px solid rgba(243,200,120,.3); overflow:hidden; }
   #puzzleTimerFill { height:100%; width:100%; border-radius:5px; background:#9fe9c0; transition:width .12s linear, background .25s; }
+  .puzzleArrow { position:fixed; top:52%; transform:translateY(-50%); z-index:6; display:none; pointer-events:none;
+    font-family:'Cinzel',serif; font-size:54px; line-height:1; font-weight:700;
+    color:#ffd24a; text-shadow:0 0 14px rgba(255,200,74,.6), 0 2px 4px rgba(0,0,0,.5); animation:arrowPulse 1.1s ease-in-out infinite; }
+  .puzzleArrow.show { display:block; }
+  #puzzleArrowL { left:max(14px,env(safe-area-inset-left)); }
+  #puzzleArrowR { right:max(14px,env(safe-area-inset-right)); }
+  @keyframes arrowPulse { 0%,100%{ opacity:.55; transform:translateY(-50%) scale(1); } 50%{ opacity:1; transform:translateY(-50%) scale(1.18); } }
   #speedHud .shRow { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; }
   #speedHud .shLbl { font-size:9px; letter-spacing:3px; color:#e7d3a6; opacity:.85; }
   #speedHud .shVal { font-family:'Cinzel',serif; font-weight:700; font-size:16px; color:#f3d99a; line-height:1; text-shadow:0 1px 5px rgba(0,0,0,.55); }
@@ -748,6 +755,8 @@
   <div id="puzzleHint">DRAG centre to rotate · tap LEFT / RIGHT to switch · TAP centre to fit the GLOWING stone</div>
   <div id="puzzleTimerBar"><div id="puzzleTimerFill"></div></div>
 </div>
+<div id="puzzleArrowL" class="puzzleArrow">‹</div>
+<div id="puzzleArrowR" class="puzzleArrow">›</div>
 
 <div id="coinHud" class="hidden"><span class="coinIcon"></span><span id="coinVal">0</span><span class="coinLbl"></span></div>
 <div id="multHud" class="hidden">✦ ×<span id="multVal">2</span></div>
@@ -1026,7 +1035,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.347 · 2026.06.15</div>
+  <div id="appVersion">v1.348 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1276,7 +1285,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.347';
+const APP_VERSION = '1.348';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4099,21 +4108,29 @@ function combPattern(){
 }
 const combEq = (a,b) => a.length===b.length && a.every((v,i)=>v===b[i]);
 const combInvert = a => a.map(v => v ? 0 : 1);            // the complementary comb — its fingers fill the other's gaps
-// add the finger/comb joint on TOP of a real stepped pyramid stone, along its width
-function addCombTo(group, pattern, color){
-  const topY = LAYER_HEIGHT*1.04/2, cell = PUZZLE_W/PUZZLE_K;
+// add the finger/comb joint on the two SIDE faces that mate with the neighbouring stones (along the wall axis), arranged
+// across the depth — like a real box/finger joint. Fingers stick out from both connecting faces; gaps are the slots.
+function addCombTo(group, pattern, slot, color){
+  const axis = slot.axis, cell = PUZZLE_W/PUZZLE_K, halfAxis = BLOCK_SIZE*0.46, fLen = BLOCK_SIZE*0.2, fY = LAYER_HEIGHT*0.78;
   const mat = new THREE.MeshStandardMaterial({ color, roughness:0.78, metalness:0.05 });
   applyEraBlockTex(mat);
-  pattern.forEach((on,i) => { if (!on) return;
-    const f = new THREE.Mesh(new THREE.BoxGeometry(cell*0.84, PUZZLE_FH, PUZZLE_D), mat);
-    f.position.set(-PUZZLE_W/2 + cell*(i+0.5), topY + PUZZLE_FH/2 - 0.01, 0); f.castShadow = true; group.add(f);
+  [1,-1].forEach(sign => {
+    pattern.forEach((on,i) => { if (!on) return;
+      const across = -PUZZLE_W/2 + cell*(i+0.5);
+      const f = (axis==='x')
+        ? new THREE.Mesh(new THREE.BoxGeometry(fLen, fY, cell*0.8), mat)
+        : new THREE.Mesh(new THREE.BoxGeometry(cell*0.8, fY, fLen), mat);
+      if (axis==='x') f.position.set(sign*(halfAxis + fLen/2), 0, across);
+      else            f.position.set(across, 0, sign*(halfAxis + fLen/2));
+      f.castShadow = true; group.add(f);
+    });
   });
   group.__pattern = pattern.join(''); group.__combMat = mat;
 }
-// a candidate / placed stone = the ACTUAL pyramid stone for this slot (steps, taper, era texture) + its comb on top
+// a candidate / placed stone = the ACTUAL pyramid stone for this slot (steps, taper, era texture) + its mating-face combs
 function makeJointStone(pattern, slot, color){
   const stone = slot.capstone ? makeCapstonePeak(color) : makeSteppedPiece(slot.len, slot.axis, color, slot.center, slot.n);
-  addCombTo(stone, pattern, color);
+  addCombTo(stone, pattern, slot, color);
   return stone;
 }
 // glow the last-placed stone so its fingers/gaps read — the next block must COMPLEMENT it
@@ -4127,9 +4144,9 @@ function puzzleCenterPos(){ return new THREE.Vector3(0, S.layer*LAYER_HEIGHT + 1
 
 function spawnCandidates(){
   const slot = puzzleSlot();
-  // the correct comb COMPLEMENTS the last-placed (glowing) stone — its fingers fill that stone's gaps. The very first
-  // stone of the build has nothing to mate with, so any choice seats (free starter).
-  const firstStone = !S.lastComb;
+  // the correct comb COMPLEMENTS the last-placed (glowing) stone — its fingers fill that stone's gaps. The FIRST stone of
+  // every layer (the first cell of wall 0) has nothing to mate with yet, so it's a free tap-to-place starter.
+  const firstStone = (S.wall===0 && S.cellIndex===0) || !S.lastComb;
   const target = firstStone ? combPattern() : combInvert(S.lastComb);
   let w1 = combPattern(); while (combEq(w1,target)) w1 = combPattern();
   let w2 = combPattern(); while (combEq(w2,target) || combEq(w2,w1)) w2 = combPattern();
@@ -4138,18 +4155,23 @@ function spawnCandidates(){
   for (let a=items.length-1; a>0; a--){ const b=Math.floor(RND()*(a+1)); const t=items[a]; items[a]=items[b]; items[b]=t; }   // shuffle so the right one isn't always centre
   items.forEach(it => { it.mesh = makeJointStone(it.pat, slot, color); it.mesh.visible = false;
     it.spin = new THREE.Vector3((RND()-0.5)*0.7, 0.35+RND()*0.5, (RND()-0.5)*0.6); });   // each tumbles slowly on its own
-  S.cand = { slot, items, idx:1, timer:PUZZLE_TIME, placing:false, drag:null, firstStone };
+  S.cand = { slot, items, idx:1, timer:PUZZLE_TIME, placing:false, drag:null, firstStone, slideX:0 };
   S.active = null;
   showPuzzleActive();
   showPuzzleHud(true); updatePuzzleTimer(PUZZLE_TIME);
+  if (firstStone) showPop('FREE STONE — TAP TO PLACE');
 }
 function showPuzzleActive(){
   if (!S.cand) return;
   S.cand.items.forEach((it,i)=> it.mesh.visible = (i===S.cand.idx));
-  const it = S.cand.items[S.cand.idx];
-  it.mesh.position.copy(puzzleCenterPos()); it.mesh.scale.set(1.4,1.4,1.4);
+  const it = S.cand.items[S.cand.idx]; it.mesh.scale.set(1.4,1.4,1.4);
+  const p = puzzleCenterPos(); it.mesh.position.set(p.x + (S.cand.slideX||0), p.y, p.z);
 }
-function cyclePuzzle(dir){ if (!S.cand || S.cand.placing) return; S.cand.idx = (S.cand.idx + dir + 3) % 3; showPuzzleActive(); if (Sound.step) Sound.step(); }
+function cyclePuzzle(dir){ if (!S.cand || S.cand.placing) return;
+  S.cand.idx = (S.cand.idx + dir + 3) % 3;
+  S.cand.slideX = dir > 0 ? 2.2 : -2.2;     // the new stone slides in from the side you swiped toward
+  showPuzzleActive(); if (Sound.step) Sound.step();
+}
 function tryFitPuzzle(){ if (!S.cand || S.cand.placing) return; const it = S.cand.items[S.cand.idx];
   if (it.correct || S.cand.firstStone || S.cand.slot.capstone) puzzleLock(it); else puzzleFail(it); }
 function puzzleTimeout(){ if (!S.cand || S.cand.placing) return;
@@ -4188,7 +4210,7 @@ function puzzleFail(it){
   advance(slot.len);
 }
 // puzzle HUD (timer + hint)
-function showPuzzleHud(on){ const h=$('puzzleHud'); if (h) h.classList.toggle('show', !!on); }
+function showPuzzleHud(on){ ['puzzleHud','puzzleArrowL','puzzleArrowR'].forEach(id => { const h=$(id); if (h) h.classList.toggle('show', !!on); }); }
 function updatePuzzleTimer(t){ const f=$('puzzleTimerFill'); if (f){ const frac=Math.max(0,Math.min(1,t/PUZZLE_TIME));
   f.style.width = (frac*100)+'%'; f.style.background = frac<0.3 ? '#ff5a4a' : frac<0.6 ? '#ffd24a' : '#9fe9c0'; } }
 
@@ -6542,7 +6564,7 @@ function beginBuild(){
 let shopTab = 'chars';
 function showStart(){            // the main "home" menu (cover art + PLAY / LEADERBOARD / SHOP)
   atMenu = true; charPrevOn = false; puzzleMode = false;   // leaving to the menu always exits Level 0
-  { const ph=$('puzzleHud'); if (ph) ph.classList.remove('show'); }
+  ['puzzleHud','puzzleArrowL','puzzleArrowR'].forEach(id => { const ph=$(id); if (ph) ph.classList.remove('show'); });
   if (S.fight) endFight();        // tear down any in-progress boss fight UI
   $('emoteBtn').classList.remove('show');
   setLevelName(false); removeVictoryBeam();
@@ -7555,8 +7577,10 @@ function animate(){
   // LEVEL 0: tumble the active candidate, hold it centred, and run the choose-timer down
   if (S.puzzle && S.phase==='build' && S.cand && !S.cand.placing && !S.paused){
     const it = S.cand.items[S.cand.idx];
+    S.cand.slideX = (S.cand.slideX||0) * (1 - Math.min(1, dt*9));      // slide the swapped stone in toward centre
+    if (Math.abs(S.cand.slideX) < 0.002) S.cand.slideX = 0;
     if (it && it.mesh){ it.mesh.rotation.x += it.spin.x*sdt; it.mesh.rotation.y += it.spin.y*sdt; it.mesh.rotation.z += it.spin.z*sdt;
-      it.mesh.position.copy(puzzleCenterPos()); }
+      const p = puzzleCenterPos(); it.mesh.position.set(p.x + S.cand.slideX, p.y, p.z); }
     S.cand.timer -= dt; updatePuzzleTimer(S.cand.timer);
     if (S.cand.timer <= 0) puzzleTimeout();
   }
