@@ -1040,7 +1040,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.369 · 2026.06.15</div>
+  <div id="appVersion">v1.370 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1290,7 +1290,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.369';
+const APP_VERSION = '1.370';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4282,10 +4282,10 @@ function puzzleLock(it){
   pushCells(a, true, false, 0);   // LEVEL 0: no smooth ramp — you climb the bare TEXTURED stepped stones (the floor matches the walls)
   S.buildQual += 0.85; S.buildCount++; S.integrity = Math.min(1, S.integrity + 0.02); S.score += 80;
   if (Sound.perfect) Sound.perfect(1); showPop('LOCKED ✓'); spawnDust(slot.center.clone(), 0xffe6a0, 10, 2, 1.6); shake(0.12);
-  // this stone becomes the reference: glow it so its fingers/gaps read, and the NEXT block must complement its comb
-  setPuzzleGlow(S.lastBlock, false); S.lastBlock = stone; S.lastComb = pat; setPuzzleGlow(stone, true);
+  // this stone becomes the reference the NEXT block must complement (no glow — the angled camera shows it clearly)
+  S.lastBlock = stone; S.lastComb = pat;
   S.cand = null; showPuzzleHud(false); updateHUD();
-  if (slot.capstone){ setPuzzleGlow(stone, false); startRun(); return; }   // climb without a glowing crown
+  if (slot.capstone){ startRun(); return; }
   advance(slot.len);
 }
 function puzzleFail(it){
@@ -6515,6 +6515,12 @@ function updateBuildCam(dt){
   S.camHE   += (S.camHeight - S.camHE) * Math.min(1, dt*4);
   S.camRE   += (buildFitDistance() - S.camRE) * Math.min(1, dt*3);
   const a = S.camRotE, R = S.camRE, h = S.camHE;
+  if (S.puzzle){                                            // LEVEL 0: a clear ~45° three-quarter view of the course being matched (+ the floating candidate)
+    const fy = h + 0.85, Rp = R*0.82;
+    camera.position.set(Math.sin(a)*Rp, fy + Rp, Math.cos(a)*Rp);   // height above the aim ≈ horizontal distance → ~45° elevation
+    camera.lookAt(0, fy, 0);
+    applyShake(); return;
+  }
   camera.position.set(Math.sin(a)*R, h + R*0.34, Math.cos(a)*R);
   // the whole structure feels like it's TEETERING once integrity drops low
   const unstable = Math.max(0, 0.45 - (S.integrity ?? 1));
@@ -7697,10 +7703,6 @@ function animate(){
       const p = puzzleCenterPos(); it.mesh.position.set(p.x + S.cand.slideX, p.y, p.z); }
     S.cand.timer -= dt; updatePuzzleTimer(S.cand.timer);
     if (S.cand.timer <= 0) puzzleTimeout();
-  }
-  if (S.puzzle && S.lastBlock && S.lastBlock.__glow){           // the reference stone breathes so its fingers/gaps pop
-    const gi = 0.55 + 0.4*Math.sin(performance.now()*0.005);
-    S.lastBlock.traverse(o => { if (o.isMesh && o.material && o.material.emissive) o.material.emissiveIntensity = gi; });
   }
   for (let i=S.falling.length-1;i>=0;i--){ const f=S.falling[i];
     f.vel.y -= 9.8*sdt; f.mesh.position.addScaledVector(f.vel,sdt);
