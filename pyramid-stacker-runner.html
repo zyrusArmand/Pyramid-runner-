@@ -1040,7 +1040,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.366 · 2026.06.15</div>
+  <div id="appVersion">v1.367 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1290,7 +1290,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.366';
+const APP_VERSION = '1.367';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4185,6 +4185,7 @@ function puzzleCenterPos(){ return new THREE.Vector3(0, S.layer*LAYER_HEIGHT + 1
 
 function spawnCandidates(){
   const slot = puzzleSlot();
+  if (slot.capstone){ spawnCapstone(slot); return; }   // the crown has its own rotate-to-seat mini-game
   // the correct comb COMPLEMENTS the last-placed (glowing) stone — its fingers fill that stone's gaps. The FIRST stone of
   // each WALL is its own interlocking chain (the joint runs along the wall axis; corners meet plainly). So the FIRST cell of
   // every wall is a free tap-to-place starter, and the matching resets per wall — that fixes the ring-closing mismatch.
@@ -4210,16 +4211,65 @@ function showPuzzleActive(){
   const p = puzzleCenterPos(); it.mesh.position.set(p.x + (S.cand.slideX||0), p.y, p.z);
 }
 function cyclePuzzle(dir){ if (!S.cand || S.cand.placing) return;
+  if (S.cand.capstone){ S.cand.facing = (S.cand.facing + dir + 4) % 4; if (Sound.step) Sound.step(); return; }   // rotate the crown to the next of the 4 wall facings
   S.cand.idx = (S.cand.idx + dir + 3) % 3;
   S.cand.slideX = dir > 0 ? 2.2 : -2.2;     // the new stone slides in from the side you swiped toward
   showPuzzleActive(); if (Sound.step) Sound.step();
 }
-function tryFitPuzzle(){ if (!S.cand || S.cand.placing) return; const it = S.cand.items[S.cand.idx];
-  if (it.correct || S.cand.firstStone || S.cand.slot.capstone) puzzleLock(it); else puzzleFail(it); }
+function tryFitPuzzle(){ if (!S.cand || S.cand.placing) return;
+  if (S.cand.capstone){ placeCapstone(); return; }
+  const it = S.cand.items[S.cand.idx];
+  if (it.correct || S.cand.firstStone) puzzleLock(it); else puzzleFail(it); }
 function puzzleTimeout(){ if (!S.cand || S.cand.placing) return;
-  if (S.cand.firstStone || S.cand.slot.capstone) puzzleLock(S.cand.items.find(i=>i.correct) || S.cand.items[S.cand.idx]);
+  if (S.cand.capstone){ placeCapstone(); return; }                 // time out → forced seat at the current facing
+  if (S.cand.firstStone) puzzleLock(S.cand.items.find(i=>i.correct) || S.cand.items[S.cand.idx]);
   else puzzleFail(null); }
-function clearCandidates(){ if (S.cand){ S.cand.items.forEach(it=>{ try{ scene.remove(it.mesh); }catch(e){} }); } }
+function clearCandidates(){ if (S.cand){ if (S.cand.items) S.cand.items.forEach(it=>{ try{ scene.remove(it.mesh); }catch(e){} });
+  if (S.cand.mesh){ try{ scene.remove(S.cand.mesh); }catch(e){} } } }
+
+// ---- CAPSTONE: a tapered crown stone with bottom fingers; rotate it through the 4 wall facings until the right one SNAPS
+// (glow + click + haptic). Tilt to peek underneath. Seat it on the snap. A wrong seat strains the structure a LOT; a
+// SECOND wrong seat shatters the crown and the pyramid is lost. ----
+function makeCapstoneJoint(color){
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color, roughness:0.86, metalness:0.04 }); applyEraBlockTex(mat);
+  const H = LAYER_HEIGHT*1.04, NT = STEP_N, tierH = H/NT, base = BLOCK_SIZE*0.48, inset = 0.045;
+  const addB = (w,h,d,x,y,z) => { const geo = new THREE.BoxGeometry(w,h,d); boxWorldUV(geo,w,h,d,BLOCK_TEX_SCALE);
+    const b = new THREE.Mesh(geo, mat); b.position.set(x,y,z); b.castShadow = b.receiveShadow = true; g.add(b); };
+  for (let i=0;i<NT;i++){ const w = Math.max(0.26, 2*base - 2*i*inset); addB(w, tierH+0.006, w, 0, -H/2 + tierH*(i+0.5), 0); }   // taper to a peak on all 4 sides
+  const K = 3, span = 2*base*0.74, cell = span/K, fLen = BLOCK_SIZE*0.12;                  // bottom fingers seat into the course below
+  for (let a=0;a<K;a++) for (let c=0;c<K;c++){ if ((a+c)%2) continue;
+    addB(cell*0.64, fLen, cell*0.64, -span/2+cell*(a+0.5), -H/2 - fLen/2 + 0.012, -span/2+cell*(c+0.5)); }
+  scene.add(g); return g;
+}
+function spawnCapstone(slot){
+  const mesh = makeCapstoneJoint(layerColor(S.layer)); mesh.scale.set(1.4,1.4,1.4);
+  mesh.position.copy(puzzleCenterPos());
+  const correct = Math.floor(RND()*4); let start; do { start = Math.floor(RND()*4); } while (start===correct);
+  mesh.rotation.y = start*Math.PI/2;
+  S.cand = { slot, capstone:true, mesh, facing:start, facingE:start, tilt:0, correct, wrong:0, snapped:false, placing:false, drag:null, timer:PUZZLE_TIME };
+  S.active = null;
+  showPuzzleHud(true); updatePuzzleTimer(PUZZLE_TIME);
+  showPop('CAPSTONE — rotate until it SNAPS, then TAP to seat');
+}
+function placeCapstone(){
+  const c = S.cand; if (!c || c.placing) return;
+  if (c.facing === c.correct){                                     // SEATED — crown the pyramid and climb
+    c.placing = true; try{ scene.remove(c.mesh); }catch(e){}
+    const stone = makeCapstoneJoint(layerColor(S.layer)); stone.position.copy(c.slot.center); stone.rotation.y = c.correct*Math.PI/2; S.allBlocks.push(stone);
+    pushCells({ mesh:stone, center:c.slot.center.clone(), axis:c.slot.axis, capstone:true, n:1, cells:[0] }, true, false, 0);
+    S.buildQual += 1; S.buildCount++; if (Sound.perfect) Sound.perfect(2); showPop('CAPSTONE SEATED ✓'); try{ flash(); }catch(e){} shake(0.22); spawnDust(c.slot.center.clone(), 0xffe6a0, 14, 2.4, 2);
+    S.cand = null; showPuzzleHud(false); updateHUD(); startRun(); return;
+  }
+  c.wrong++;
+  if (c.wrong >= 2){                                               // second mistake → the crown shatters, pyramid lost
+    c.placing = true; try{ crumbleStone(c.mesh); }catch(e){}
+    showPop('CAPSTONE SHATTERED!'); shake(0.7); buzz([40,60,40]);
+    S.cand = null; showPuzzleHud(false); collapseAll(); endGame(false, 'collapsed'); return;
+  }
+  hurtIntegrity(0.4); shake(0.55); buzz([30,45,30]); showPop('MISALIGNED — STRUCTURE STRAINED!'); updateHUD();   // first mistake → heavy integrity hit
+  if (S.integrity <= 0){ S.cand = null; showPuzzleHud(false); collapseAll(); endGame(false, 'collapsed'); }
+}
 
 function puzzleLock(it){
   S.cand.placing = true; const slot = S.cand.slot, pat = it.pat;
@@ -7513,12 +7563,17 @@ window.addEventListener('pointerdown', e => {
 }, { passive:false });
 window.addEventListener('pointermove', e => {
   if (S.fight && S.fight.active && S.fight.joy.active) fightJoyMove(e.clientX, e.clientY, e.pointerId);
-  if (S.phase==='build' && S.puzzle && S.cand && S.cand.drag && !S.cand.placing){   // drag to inspect — WORLD-space so it tracks the finger and never inverts
-    const it = S.cand.items[S.cand.idx];
-    if (it && it.mesh){
-      const dx = (e.clientX - S.cand.drag.x)*0.01, dy = (e.clientY - S.cand.drag.y)*0.01;
-      puzzleRotateWorld(it.mesh, new THREE.Vector3(0,1,0), dx);    // drag right → spins right
-      puzzleRotateWorld(it.mesh, new THREE.Vector3(1,0,0), dy);    // drag down → tilts down
+  if (S.phase==='build' && S.puzzle && S.cand && S.cand.drag && !S.cand.placing){
+    if (S.cand.capstone){                                          // crown: drag UP/DOWN tilts it so you can peek underneath (clamped)
+      const dy = (e.clientY - S.cand.drag.y)*0.01;
+      S.cand.tilt = Math.max(-0.6, Math.min(0.6, (S.cand.tilt||0) + dy));
+    } else {                                                       // stone: drag to inspect — WORLD-space so it tracks the finger and never inverts
+      const it = S.cand.items[S.cand.idx];
+      if (it && it.mesh){
+        const dx = (e.clientX - S.cand.drag.x)*0.01, dy = (e.clientY - S.cand.drag.y)*0.01;
+        puzzleRotateWorld(it.mesh, new THREE.Vector3(0,1,0), dx);    // drag right → spins right
+        puzzleRotateWorld(it.mesh, new THREE.Vector3(1,0,0), dy);    // drag down → tilts down
+      }
     }
     S.cand.drag = { x:e.clientX, y:e.clientY };
   }
@@ -7620,8 +7675,20 @@ function animate(){
       }
     }
   }
-  // LEVEL 0: tumble the active candidate, hold it centred, and run the choose-timer down
-  if (S.puzzle && S.phase==='build' && S.cand && !S.cand.placing && !S.paused){
+  // LEVEL 0 (capstone): ease toward the chosen facing, hold the peek-tilt, SNAP-glow on the correct facing, run the timer
+  if (S.puzzle && S.phase==='build' && S.cand && S.cand.capstone && !S.cand.placing && !S.paused){
+    const c = S.cand, m = c.mesh;
+    c.facingE += (c.facing - c.facingE) * Math.min(1, dt*11);
+    if (m){ m.rotation.set(c.tilt||0, c.facingE*Math.PI/2, 0); const p = puzzleCenterPos(); m.position.copy(p); }
+    const onCorrect = (c.facing === c.correct) && Math.abs(c.facingE - c.facing) < 0.06;
+    if (onCorrect && !c.snapped){ c.snapped = true; setPuzzleGlow(m, true); if (Sound.perfect) Sound.perfect(1); buzz([10,16,10]); }   // SNAP: glow + click + haptic
+    else if (!onCorrect && c.snapped){ c.snapped = false; setPuzzleGlow(m, false); }
+    if (c.snapped && m){ const gi = 0.5 + 0.45*Math.sin(performance.now()*0.007); m.traverse(o => { if (o.isMesh && o.material && o.material.emissive) o.material.emissiveIntensity = gi; }); }
+    c.timer -= dt; updatePuzzleTimer(c.timer);
+    if (c.timer <= 0) puzzleTimeout();
+  }
+  // LEVEL 0 (stones): tumble the active candidate, hold it centred, and run the choose-timer down
+  else if (S.puzzle && S.phase==='build' && S.cand && !S.cand.placing && !S.paused){
     const it = S.cand.items[S.cand.idx];
     S.cand.slideX = (S.cand.slideX||0) * (1 - Math.min(1, dt*9));      // slide the swapped stone in toward centre
     if (Math.abs(S.cand.slideX) < 0.002) S.cand.slideX = 0;
