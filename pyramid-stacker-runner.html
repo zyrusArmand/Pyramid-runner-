@@ -1040,7 +1040,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.372 · 2026.06.15</div>
+  <div id="appVersion">v1.373 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1290,7 +1290,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.372';
+const APP_VERSION = '1.373';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -6514,7 +6514,10 @@ function updateBuildCam(dt){
   S.camRotE += (S.camRot - S.camRotE) * Math.min(1, dt*5);
   S.camHE   += (S.camHeight - S.camHE) * Math.min(1, dt*4);
   S.camRE   += (buildFitDistance() - S.camRE) * Math.min(1, dt*3);
-  const a = S.camRotE, R = S.camRE, h = S.camHE;
+  // LEVEL 0: swing 45° around to the open-corner side so the last stone's CONNECTING face (the comb the next block must
+  // match, along the wall axis) is in view alongside its outer face. Camera still aims down the centre axis, so the
+  // floating candidate stays put in the ring.
+  const a = S.camRotE + (S.puzzle ? Math.PI/4 : 0), R = S.camRE, h = S.camHE;
   camera.position.set(Math.sin(a)*R, h + R*0.34, Math.cos(a)*R);
   // the whole structure feels like it's TEETERING once integrity drops low
   const unstable = Math.max(0, 0.45 - (S.integrity ?? 1));
@@ -6578,7 +6581,7 @@ function startGame(atLevel){
   $('storm').style.opacity='0'; scene.fog.near=16; scene.fog.far=46; S.stormA=0; sun.position.set(7,16,9); sun.intensity = 0.72; hemi.intensity = 0.55;
   $('reviveScreen').classList.add('hidden'); $('adModal').classList.add('hidden'); $('hint').classList.remove('show');
   $('menuBtn').style.display = 'block'; $('restartBtn').style.display='block';
-  if (puzzleMode) showHint('Pick the stone that fits the glowing one.   SWIPE sides to switch  ·  DRAG to spin  ·  TAP to place', 6500);
+  if (puzzleMode) showHint('Three stones, one fits the last piece like a puzzle — find it.   SWIPE sides to switch  ·  DRAG to spin  ·  TAP to place', 6500);
   else if (firstTime) showHint('TAP to drop the stone INTO the glowing outline — nail it for a PERFECT', 5500);
   updateHUD(); spawnBlock(); setLevelName(true);
 }
