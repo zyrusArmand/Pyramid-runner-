@@ -1041,7 +1041,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.351 · 2026.06.15</div>
+  <div id="appVersion">v1.352 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1291,7 +1291,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.351';
+const APP_VERSION = '1.352';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4117,19 +4117,24 @@ const combInvert = a => a.map(v => v ? 0 : 1);            // the complementary c
 // add the finger/comb joint on the two SIDE faces that mate with the neighbouring stones (along the wall axis), arranged
 // across the depth — like a real box/finger joint. Fingers stick out from both connecting faces; gaps are the slots.
 function addCombTo(group, pattern, slot, color){
-  // every cell on each mating face is EITHER a small extruded tab (pattern 1) OR a cut-in notch (pattern 0) — a real
-  // finger joint: one block's tabs drop into the other's notches. Kept small & flush so they read as part of the stone.
-  const axis = slot.axis, cell = PUZZLE_W/PUZZLE_K, halfAxis = BLOCK_SIZE*0.47;
-  const tabLen = BLOCK_SIZE*0.07, notchDepth = BLOCK_SIZE*0.085, cellW = cell*0.78, fY = LAYER_HEIGHT*0.56;
+  // finger joint on the two FLAT interior mating faces (along the wall axis). Each cell is a small extruded TAB or a dark
+  // recessed SOCKET. The comb is held to the inner part of the face, clear of the stepped OUTER face, so the pyramid's
+  // stepped look is never disturbed. One block's tabs drop into the next block's sockets.
+  const axis = slot.axis, across = (axis==='x') ? 'z' : 'x';
+  const exposedSign = (slot.center && slot.center[across] > 0) ? 1 : -1;        // which way the stepped outer face points
+  const halfAxis = BLOCK_SIZE*0.46, span = BLOCK_SIZE*0.5, combMid = -exposedSign * BLOCK_SIZE*0.14;   // sit on the interior side, away from the steps
+  const cell = span/PUZZLE_K, cellW = cell*0.72, fY = LAYER_HEIGHT*0.5;
+  const tabLen = BLOCK_SIZE*0.1, sockLen = BLOCK_SIZE*0.05;
   const tabMat = new THREE.MeshStandardMaterial({ color, roughness:0.78, metalness:0.05 }); applyEraBlockTex(tabMat);
-  const notchMat = new THREE.MeshStandardMaterial({ color: color.clone().multiplyScalar(0.4), roughness:0.95, metalness:0.02 });
+  const sockMat = new THREE.MeshStandardMaterial({ color: color.clone().multiplyScalar(0.28), roughness:0.98, metalness:0 });
   [1,-1].forEach(sign => {
     pattern.forEach((on,i) => {
-      const across = -PUZZLE_W/2 + cell*(i+0.5);
-      const len = on ? tabLen : notchDepth, ax = sign*(halfAxis + (on ? len/2 : -len/2));   // tab pokes out, notch sits inset
-      const dims = (axis==='x') ? [len, fY, cellW] : [cellW, fY, len];
-      const m = new THREE.Mesh(new THREE.BoxGeometry(dims[0], dims[1], dims[2]), on ? tabMat : notchMat);
-      if (axis==='x') m.position.set(ax, 0, across); else m.position.set(across, 0, ax);
+      const ac = combMid - span/2 + cell*(i+0.5);
+      const len = on ? tabLen : sockLen;
+      const ax = sign*(halfAxis + len/2);                                       // tab pokes out; socket is a short dark stub → reads as a recess between the taller tabs
+      const dims = (axis==='x') ? [len, on?fY:fY*0.74, cellW] : [cellW, on?fY:fY*0.74, len];
+      const m = new THREE.Mesh(new THREE.BoxGeometry(dims[0], dims[1], dims[2]), on ? tabMat : sockMat);
+      if (axis==='x') m.position.set(ax, 0, ac); else m.position.set(ac, 0, ax);
       m.castShadow = on; group.add(m);
     });
   });
