@@ -1040,7 +1040,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.361 · 2026.06.15</div>
+  <div id="appVersion">v1.362 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1290,7 +1290,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.361';
+const APP_VERSION = '1.362';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -2746,6 +2746,7 @@ function _applyProcSandstone(mat){
 }
 function _applyEgyptMaps(mat){
   const t=_egyptPBR; if(!t||!t.map) return;
+  [t.map, t.normalMap, t.roughnessMap].forEach(m => { if (m){ m.wrapS=m.wrapT=THREE.RepeatWrapping; } });   // so world-scaled UVs tile instead of clamping
   mat.map=t.map; if(t.normalMap) mat.normalMap=t.normalMap; if(t.roughnessMap) mat.roughnessMap=t.roughnessMap;
   mat.bumpMap=null; mat.roughness=1.0; mat.metalness=0.0;
   const j=0.8+Math.random()*0.2;                               // per-block tone jitter → irregular masonry, not one flat colour
@@ -4115,6 +4116,18 @@ function combPattern(){
 }
 const combEq = (a,b) => a.length===b.length && a.every((v,i)=>v===b[i]);
 const combInvert = a => a.map(v => v ? 0 : 1);            // the complementary comb — its fingers fill the other's gaps
+// remap a BoxGeometry's UVs so the texture tiles at a fixed WORLD scale on every face (a thin face shows a thin slice of
+// the texture at the right scale, not the whole thing squashed). Needs RepeatWrapping on the map. Harness-safe (guarded).
+const BLOCK_TEX_SCALE = 0.7;
+function boxWorldUV(geo, w, h, d, scale){
+  try {
+    const uv = geo.attributes && geo.attributes.uv; if (!uv) return;
+    const S = [ [d,h],[d,h],[w,d],[w,d],[w,h],[w,h] ];          // per-face (uDim,vDim): +x,-x,+y,-y,+z,-z
+    for (let f=0; f<6; f++){ const us = S[f][0]/scale, vs = S[f][1]/scale;
+      for (let k=0; k<4; k++){ const i=f*4+k; uv.setX(i, uv.getX(i)*us); uv.setY(i, uv.getY(i)*vs); } }
+    uv.needsUpdate = true;
+  } catch(e){}
+}
 // ONE custom solid stone, built from boxes, with BOTH the pyramid steps and the finger joint carved in. Exposed outer
 // faces recede tier-by-tier (real steps). On the INTERIOR connecting face(s) along the wall axis, a middle band carries
 // the joint: FINGER cells reach the mating plane, NOTCH cells are left as genuine gaps (real carved pockets). Exposed
@@ -4132,10 +4145,13 @@ function makeJointStone(pattern, slot, color){
   const intP = !aPosEx, intN = !aNegEx;                                               // interior (mating) sides → carve the joint
   const NT = 7, tierH = H/NT, inset = 0.04, combDepth = BLOCK_SIZE*0.17, K = PUZZLE_K;
   const cellC = (2*halfC)/K;
-  // add a box given (a,c) ranges → real x/z
+  // add a box given (a,c) ranges → real x/z. UVs are remapped to WORLD size so the stone texture reads at the same scale
+  // on every face (thin side faces no longer squash the texture).
   const addAC = (a0,a1,c0,c1,y,h) => { if (a1-a0 < 0.004 || c1-c0 < 0.004) return;
     const x0 = (axis==='x')?a0:c0, x1 = (axis==='x')?a1:c1, z0 = (axis==='x')?c0:a0, z1 = (axis==='x')?c1:a1;
-    const b = new THREE.Mesh(new THREE.BoxGeometry(x1-x0, h, z1-z0), mat); b.position.set((x0+x1)/2, y, (z0+z1)/2);
+    const w = x1-x0, d = z1-z0, geo = new THREE.BoxGeometry(w, h, d);
+    boxWorldUV(geo, w, h, d, BLOCK_TEX_SCALE);
+    const b = new THREE.Mesh(geo, mat); b.position.set((x0+x1)/2, y, (z0+z1)/2);
     b.castShadow = true; b.receiveShadow = true; g.add(b); };
   for (let i=0; i<NT; i++){
     const y = -H/2 + tierH*(i+0.5), ov = tierH + 0.006;
