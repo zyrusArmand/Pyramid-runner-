@@ -533,7 +533,7 @@
     background:linear-gradient(180deg, rgba(52,34,20,.80), rgba(28,16,26,.86));
     -webkit-backdrop-filter:blur(9px) saturate(1.1); backdrop-filter:blur(9px) saturate(1.1);
     padding:11px 20px; border-radius:16px; border:1px solid rgba(243,200,120,.42);
-    text-align:center; max-width:80vw;
+    text-align:center; max-width:92vw; width:max-content;
     box-shadow:0 8px 26px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,224,160,.22), inset 0 0 22px rgba(255,180,90,.06);
     opacity:0; transition:opacity .35s ease, transform .35s ease; }
   #hint.show { opacity:1; transform:translateX(-50%) translateY(0); }
@@ -1040,7 +1040,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.368 · 2026.06.15</div>
+  <div id="appVersion">v1.369 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1290,7 +1290,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.368';
+const APP_VERSION = '1.369';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -6578,7 +6578,7 @@ function startGame(atLevel){
   $('storm').style.opacity='0'; scene.fog.near=16; scene.fog.far=46; S.stormA=0; sun.position.set(7,16,9); sun.intensity = 0.72; hemi.intensity = 0.55;
   $('reviveScreen').classList.add('hidden'); $('adModal').classList.add('hidden'); $('hint').classList.remove('show');
   $('menuBtn').style.display = 'block'; $('restartBtn').style.display='block';
-  if (puzzleMode) showHint('Read the GLOWING stone’s comb — pick the block whose fingers fill its gaps. Drag centre to rotate, tap sides to switch, tap to fit', 6500);
+  if (puzzleMode) showHint('Pick the stone that fits the glowing one.   SWIPE sides to switch  ·  DRAG to spin  ·  TAP to place', 6500);
   else if (firstTime) showHint('TAP to drop the stone INTO the glowing outline — nail it for a PERFECT', 5500);
   updateHUD(); spawnBlock(); setLevelName(true);
 }
