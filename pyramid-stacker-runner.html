@@ -745,7 +745,7 @@
 </div>
 
 <div id="puzzleHud">
-  <div id="puzzleHint">MATCH the glowing key · SWIPE / DRAG to inspect · TAP to fit</div>
+  <div id="puzzleHint">DRAG centre to rotate · tap LEFT / RIGHT to switch · TAP centre to fit the GLOWING stone</div>
   <div id="puzzleTimerBar"><div id="puzzleTimerFill"></div></div>
 </div>
 
@@ -1026,7 +1026,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.346 · 2026.06.15</div>
+  <div id="appVersion">v1.347 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1276,7 +1276,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.346';
+const APP_VERSION = '1.347';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4098,46 +4098,47 @@ function combPattern(){
   return arr;
 }
 const combEq = (a,b) => a.length===b.length && a.every((v,i)=>v===b[i]);
-function makePuzzleBlock(pattern, color){
-  const g = new THREE.Group();
+const combInvert = a => a.map(v => v ? 0 : 1);            // the complementary comb — its fingers fill the other's gaps
+// add the finger/comb joint on TOP of a real stepped pyramid stone, along its width
+function addCombTo(group, pattern, color){
+  const topY = LAYER_HEIGHT*1.04/2, cell = PUZZLE_W/PUZZLE_K;
   const mat = new THREE.MeshStandardMaterial({ color, roughness:0.78, metalness:0.05 });
-  const base = new THREE.Mesh(new THREE.BoxGeometry(PUZZLE_W, PUZZLE_H, PUZZLE_D), mat); base.castShadow = true; g.add(base);
-  const cell = PUZZLE_W/PUZZLE_K;
-  pattern.forEach((on,i) => { if (!on) return;                    // a finger pokes up where the comb is solid; a slot is just the gap
-    const f = new THREE.Mesh(new THREE.BoxGeometry(cell*0.84, PUZZLE_FH, PUZZLE_D*0.94), mat);
-    f.position.set(-PUZZLE_W/2 + cell*(i+0.5), PUZZLE_H/2 + PUZZLE_FH/2 - 0.005, 0); f.castShadow = true; g.add(f);
-  });
-  g.__pattern = pattern.join('');
-  scene.add(g); return g;
-}
-// the glowing "MATCH THIS" key: the required comb shown as a flat ghost socket — fingers sit where the correct block's
-// fingers must go, the dips are its slots. The player finds the candidate whose comb lines up with this.
-function makeGhostComb(pattern){
-  const g = new THREE.Group();
-  const mat = new THREE.MeshBasicMaterial({ color:0x2ddbff, transparent:true, opacity:0.4, depthWrite:false });
-  const cell = PUZZLE_W/PUZZLE_K;
-  g.add(new THREE.Mesh(new THREE.BoxGeometry(PUZZLE_W*1.04, 0.05, PUZZLE_D*1.04), mat));   // base plate
+  applyEraBlockTex(mat);
   pattern.forEach((on,i) => { if (!on) return;
-    const f = new THREE.Mesh(new THREE.BoxGeometry(cell*0.84, PUZZLE_FH*0.85, PUZZLE_D*0.92), mat.clone());
-    f.position.set(-PUZZLE_W/2 + cell*(i+0.5), PUZZLE_FH*0.45, 0); g.add(f);
+    const f = new THREE.Mesh(new THREE.BoxGeometry(cell*0.84, PUZZLE_FH, PUZZLE_D), mat);
+    f.position.set(-PUZZLE_W/2 + cell*(i+0.5), topY + PUZZLE_FH/2 - 0.01, 0); f.castShadow = true; group.add(f);
   });
-  scene.add(g); return g;
+  group.__pattern = pattern.join(''); group.__combMat = mat;
 }
-function puzzleCenterPos(){ return new THREE.Vector3(0, S.layer*LAYER_HEIGHT + 1.35, 0.15); }   // candidate floats centred above the build
-function puzzleGhostPos(){ return new THREE.Vector3(0, S.layer*LAYER_HEIGHT + 0.42, 0.2); }       // the key sits just below it
+// a candidate / placed stone = the ACTUAL pyramid stone for this slot (steps, taper, era texture) + its comb on top
+function makeJointStone(pattern, slot, color){
+  const stone = slot.capstone ? makeCapstonePeak(color) : makeSteppedPiece(slot.len, slot.axis, color, slot.center, slot.n);
+  addCombTo(stone, pattern, color);
+  return stone;
+}
+// glow the last-placed stone so its fingers/gaps read — the next block must COMPLEMENT it
+function setPuzzleGlow(group, on){
+  if (!group) return;
+  group.traverse(o => { if (o.isMesh && o.material && o.material.emissive){
+    o.material.emissive.setHex(on ? 0x2ec0ff : 0x000000); o.material.emissiveIntensity = on ? 0.8 : 0; } });
+  group.__glow = !!on;
+}
+function puzzleCenterPos(){ return new THREE.Vector3(0, S.layer*LAYER_HEIGHT + 1.45, 0.15); }   // candidate floats centred above the build
 
 function spawnCandidates(){
   const slot = puzzleSlot();
-  const target = combPattern();                                   // the comb this course needs
+  // the correct comb COMPLEMENTS the last-placed (glowing) stone — its fingers fill that stone's gaps. The very first
+  // stone of the build has nothing to mate with, so any choice seats (free starter).
+  const firstStone = !S.lastComb;
+  const target = firstStone ? combPattern() : combInvert(S.lastComb);
   let w1 = combPattern(); while (combEq(w1,target)) w1 = combPattern();
   let w2 = combPattern(); while (combEq(w2,target) || combEq(w2,w1)) w2 = combPattern();
   const color = layerColor(S.layer);
   const items = [ { pat:w1, correct:false }, { pat:target, correct:true }, { pat:w2, correct:false } ];
   for (let a=items.length-1; a>0; a--){ const b=Math.floor(RND()*(a+1)); const t=items[a]; items[a]=items[b]; items[b]=t; }   // shuffle so the right one isn't always centre
-  items.forEach(it => { it.mesh = makePuzzleBlock(it.pat, color); it.mesh.visible = false;
+  items.forEach(it => { it.mesh = makeJointStone(it.pat, slot, color); it.mesh.visible = false;
     it.spin = new THREE.Vector3((RND()-0.5)*0.7, 0.35+RND()*0.5, (RND()-0.5)*0.6); });   // each tumbles slowly on its own
-  const ghost = makeGhostComb(target); ghost.position.copy(puzzleGhostPos());
-  S.cand = { slot, items, idx:1, timer:PUZZLE_TIME, placing:false, drag:null, ghost };
+  S.cand = { slot, items, idx:1, timer:PUZZLE_TIME, placing:false, drag:null, firstStone };
   S.active = null;
   showPuzzleActive();
   showPuzzleHud(true); updatePuzzleTimer(PUZZLE_TIME);
@@ -4146,29 +4147,31 @@ function showPuzzleActive(){
   if (!S.cand) return;
   S.cand.items.forEach((it,i)=> it.mesh.visible = (i===S.cand.idx));
   const it = S.cand.items[S.cand.idx];
-  it.mesh.position.copy(puzzleCenterPos()); it.mesh.scale.set(1.35,1.35,1.35);
+  it.mesh.position.copy(puzzleCenterPos()); it.mesh.scale.set(1.4,1.4,1.4);
 }
 function cyclePuzzle(dir){ if (!S.cand || S.cand.placing) return; S.cand.idx = (S.cand.idx + dir + 3) % 3; showPuzzleActive(); if (Sound.step) Sound.step(); }
 function tryFitPuzzle(){ if (!S.cand || S.cand.placing) return; const it = S.cand.items[S.cand.idx];
-  if (it.correct || S.cand.slot.capstone) puzzleLock(it); else puzzleFail(it); }
+  if (it.correct || S.cand.firstStone || S.cand.slot.capstone) puzzleLock(it); else puzzleFail(it); }
 function puzzleTimeout(){ if (!S.cand || S.cand.placing) return;
-  if (S.cand.slot.capstone) puzzleLock(S.cand.items.find(i=>i.correct) || S.cand.items[S.cand.idx]);
+  if (S.cand.firstStone || S.cand.slot.capstone) puzzleLock(S.cand.items.find(i=>i.correct) || S.cand.items[S.cand.idx]);
   else puzzleFail(null); }
-function clearCandidates(){ if (S.cand){ S.cand.items.forEach(it=>{ try{ scene.remove(it.mesh); }catch(e){} }); if (S.cand.ghost){ try{ scene.remove(S.cand.ghost); }catch(e){} } } }
+function clearCandidates(){ if (S.cand){ S.cand.items.forEach(it=>{ try{ scene.remove(it.mesh); }catch(e){} }); } }
 
 function puzzleLock(it){
-  S.cand.placing = true; const slot = S.cand.slot;
+  S.cand.placing = true; const slot = S.cand.slot, pat = it.pat;
   clearCandidates();
   const color = layerColor(S.layer);
-  const stone = slot.capstone ? makeCapstonePeak(color) : makeSteppedPiece(slot.len, slot.axis, color, slot.center, slot.n);
+  const stone = makeJointStone(pat, slot, color);                 // the real stepped stone + this block's comb
   stone.position.copy(slot.center); S.allBlocks.push(stone);
   const a = { mesh:stone, center:slot.center.clone(), axis:slot.axis, seat:slot.center[slot.axis],
               mode:slot.capstone?'sym':'open', len:slot.len, cells:slot.cells, capstone:slot.capstone, n:slot.n };
   attachCourseRamp(a); pushCells(a, true, false, 0);
   S.buildQual += 0.85; S.buildCount++; S.integrity = Math.min(1, S.integrity + 0.02); S.score += 80;
   if (Sound.perfect) Sound.perfect(1); showPop('LOCKED ✓'); spawnDust(slot.center.clone(), 0xffe6a0, 10, 2, 1.6); shake(0.12);
+  // this stone becomes the reference: glow it so its fingers/gaps read, and the NEXT block must complement its comb
+  setPuzzleGlow(S.lastBlock, false); S.lastBlock = stone; S.lastComb = pat; setPuzzleGlow(stone, true);
   S.cand = null; showPuzzleHud(false); updateHUD();
-  if (slot.capstone){ startRun(); return; }
+  if (slot.capstone){ setPuzzleGlow(stone, false); startRun(); return; }   // climb without a glowing crown
   advance(slot.len);
 }
 function puzzleFail(it){
@@ -6461,7 +6464,7 @@ function startGame(atLevel){
   $('storm').style.opacity='0'; scene.fog.near=16; scene.fog.far=46; S.stormA=0; sun.position.set(7,16,9); sun.intensity = 0.72; hemi.intensity = 0.55;
   $('reviveScreen').classList.add('hidden'); $('adModal').classList.add('hidden'); $('hint').classList.remove('show');
   $('menuBtn').style.display = 'block'; $('restartBtn').style.display='block';
-  if (puzzleMode) showHint('Find the block whose comb matches the glowing key — SWIPE / DRAG to inspect, TAP to fit', 5500);
+  if (puzzleMode) showHint('Read the GLOWING stone’s comb — pick the block whose fingers fill its gaps. Drag centre to rotate, tap sides to switch, tap to fit', 6500);
   else if (firstTime) showHint('TAP to drop the stone INTO the glowing outline — nail it for a PERFECT', 5500);
   updateHUD(); spawnBlock(); setLevelName(true);
 }
@@ -7434,7 +7437,12 @@ window.addEventListener('pointerdown', e => {
   if (S.gameOver || S.paused) return;                                      // over/confirm screens use their own buttons
   if (S.fight && S.fight.active){ if (fightInJoyZone(e.clientX, e.clientY)) fightJoyStart(e.clientX, e.clientY, e.pointerId); return; }   // PHASE 3: bottom-left joystick only
   if (S.phase==='build'){
-    if (S.puzzle){ gStart = { x:e.clientX, y:e.clientY }; if (S.cand) S.cand.drag = { x:e.clientX, y:e.clientY }; return; }   // LEVEL 0: tap to fit / swipe to switch / drag to inspect
+    if (S.puzzle){ const W = window.innerWidth || 360;
+      const zone = e.clientX < W*0.30 ? 'L' : e.clientX > W*0.70 ? 'R' : 'C';   // left/right edges switch, centre circle rotates/fits
+      gStart = { x:e.clientX, y:e.clientY, zone };
+      if (zone==='C' && S.cand) S.cand.drag = { x:e.clientX, y:e.clientY };
+      return;
+    }
     drop(); return;
   }
   if (S.phase==='run'){ gStart = { x:e.clientX, y:e.clientY }; }   // wait for swipe direction
@@ -7450,10 +7458,11 @@ window.addEventListener('pointermove', e => {
 window.addEventListener('pointercancel', e => { if (S.fight && S.fight.active) fightJoyEnd(e.pointerId); }, { passive:true });
 window.addEventListener('pointerup', e => {
   if (S.fight && S.fight.active){ gStart = null; fightJoyEnd(e.pointerId); return; }       // release the joystick
-  if (S.phase==='build' && S.puzzle && gStart){     // LEVEL 0: tap = fit · big horizontal swipe = switch candidate
-    const dx = e.clientX - gStart.x, dy = e.clientY - gStart.y; gStart = null; if (S.cand) S.cand.drag = null;
-    if (Math.hypot(dx,dy) < 14) tryFitPuzzle();
-    else if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) cyclePuzzle(dx > 0 ? 1 : -1);
+  if (S.phase==='build' && S.puzzle && gStart){     // LEVEL 0: left edge = prev · right edge = next · centre tap = fit · centre drag = rotate
+    const dx = e.clientX - gStart.x, dy = e.clientY - gStart.y, zone = gStart.zone; gStart = null; if (S.cand) S.cand.drag = null;
+    if (zone==='L') cyclePuzzle(-1);
+    else if (zone==='R') cyclePuzzle(1);
+    else if (Math.hypot(dx,dy) < 14) tryFitPuzzle();   // centre: a tap fits; a drag was rotation (already applied)
     return;
   }
   if (S.phase!=='run' || !gStart) return;
@@ -7550,6 +7559,10 @@ function animate(){
       it.mesh.position.copy(puzzleCenterPos()); }
     S.cand.timer -= dt; updatePuzzleTimer(S.cand.timer);
     if (S.cand.timer <= 0) puzzleTimeout();
+  }
+  if (S.puzzle && S.lastBlock && S.lastBlock.__glow){           // the reference stone breathes so its fingers/gaps pop
+    const gi = 0.55 + 0.4*Math.sin(performance.now()*0.005);
+    S.lastBlock.traverse(o => { if (o.isMesh && o.material && o.material.emissive) o.material.emissiveIntensity = gi; });
   }
   for (let i=S.falling.length-1;i>=0;i--){ const f=S.falling[i];
     f.vel.y -= 9.8*sdt; f.mesh.position.addScaledVector(f.vel,sdt);
