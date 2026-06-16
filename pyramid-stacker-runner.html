@@ -1040,7 +1040,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.370 · 2026.06.15</div>
+  <div id="appVersion">v1.371 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1290,7 +1290,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.370';
+const APP_VERSION = '1.371';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4197,7 +4197,7 @@ function spawnCandidates(){
   const items = [ { pat:w1, correct:false }, { pat:target, correct:true }, { pat:w2, correct:false } ];
   for (let a=items.length-1; a>0; a--){ const b=Math.floor(RND()*(a+1)); const t=items[a]; items[a]=items[b]; items[b]=t; }   // shuffle so the right one isn't always centre
   items.forEach(it => { it.mesh = makeJointStone(it.pat, slot, color); it.mesh.visible = false;
-    it.spinAxis = new THREE.Vector3(RND()-0.5, RND()-0.5, RND()-0.5).normalize(); it.spinRate = 0.2 + RND()*0.22; });   // each tumbles slowly on its own (world-space)
+    it.mesh.rotation.set(0.32, 0.6, 0); });   // a fixed 3/4 starting angle (no auto-tumble) — you turn it yourself by dragging
   S.cand = { slot, items, idx:1, timer:PUZZLE_TIME, placing:false, drag:null, firstStone, slideX:0 };
   S.active = null;
   showPuzzleActive();
@@ -7693,14 +7693,12 @@ function animate(){
     c.timer -= dt; updatePuzzleTimer(c.timer);
     if (c.timer <= 0) puzzleTimeout();
   }
-  // LEVEL 0 (stones): tumble the active candidate, hold it centred, and run the choose-timer down
+  // LEVEL 0 (stones): hold the active candidate centred (NO auto-tumble — it only turns when you drag it) and run the timer
   else if (S.puzzle && S.phase==='build' && S.cand && !S.cand.placing && !S.paused){
     const it = S.cand.items[S.cand.idx];
     S.cand.slideX = (S.cand.slideX||0) * (1 - Math.min(1, dt*9));      // slide the swapped stone in toward centre
     if (Math.abs(S.cand.slideX) < 0.002) S.cand.slideX = 0;
-    if (it && it.mesh){
-      if (!S.cand.drag){ puzzleRotateWorld(it.mesh, it.spinAxis, it.spinRate*sdt); }   // gentle world-space tumble, paused while you drag
-      const p = puzzleCenterPos(); it.mesh.position.set(p.x + S.cand.slideX, p.y, p.z); }
+    if (it && it.mesh){ const p = puzzleCenterPos(); it.mesh.position.set(p.x + S.cand.slideX, p.y, p.z); }
     S.cand.timer -= dt; updatePuzzleTimer(S.cand.timer);
     if (S.cand.timer <= 0) puzzleTimeout();
   }
