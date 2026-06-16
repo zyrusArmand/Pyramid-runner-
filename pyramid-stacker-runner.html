@@ -1040,7 +1040,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.357 · 2026.06.15</div>
+  <div id="appVersion">v1.358 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1290,7 +1290,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.357';
+const APP_VERSION = '1.358';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4146,10 +4146,11 @@ function makeJointStone(pattern, slot, color){
     addAC(coreL, coreR, cB, cF, y, ov);                                              // core (recedes on exposed across faces)
     [[intP, 1], [intN, -1]].forEach(([interior, sgn]) => {
       if (!interior) return;
-      const inner = sgn>0 ? (halfA - combDepth) : -(halfA - combDepth), outer = sgn>0 ? halfA : -halfA;
+      const inner = sgn>0 ? (halfA - combDepth) : -(halfA - combDepth);
+      if (!inBand){ const o = sgn>0 ? halfA : -halfA; addAC(Math.min(inner,o), Math.max(inner,o), cB, cF, y, ov); return; }   // above/below the band → flush mating face
+      const outer = sgn>0 ? (halfA + combDepth) : -(halfA + combDepth);             // FINGERS protrude past the mating plane (so they slot into the neighbour's notches)
       const a0 = Math.min(inner,outer), a1 = Math.max(inner,outer);
-      if (!inBand){ addAC(a0, a1, cB, cF, y, ov); return; }                          // above/below the band → solid mating face
-      for (let k=0;k<K;k++){ if (!pattern[k]) continue;                              // a FINGER reaches the mating plane; a NOTCH is left as a real gap
+      for (let k=0;k<K;k++){ if (!pattern[k]) continue;                              // a FINGER is an extrusion; a NOTCH is left as a real gap → the two interlock
         const cc = -halfC + cellC*(k+0.5), c0 = Math.max(cc - cellC*0.39, cB), c1 = Math.min(cc + cellC*0.39, cF);
         addAC(a0, a1, c0, c1, y, ov); }
     });
