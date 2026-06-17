@@ -1060,7 +1060,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.385 · 2026.06.15</div>
+  <div id="appVersion">v1.386 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1313,7 +1313,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.385';
+const APP_VERSION = '1.386';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -5611,7 +5611,7 @@ function startRun(){
   // courses light/dark so the staircase reads in 3D from the low chase-cam (each band reads as a step shadow).
   // Done per-plate at climb time (the build phase keeps its single shared material so the active-piece glow still works).
   S.allBlocks.forEach(b => {
-    if (!b || !b.children) return;
+    if (!b || !b.children || b.__climbPrepped) return; b.__climbPrepped = true;   // prep once, so a run-retry can re-enter startRun without re-banding the stones
     const tone = 0.93 + Math.random()*0.14;            // per-stone tone → hand-laid masonry, not one flat printed colour
     b.children.forEach((plate, idx) => {
       if (!plate.material) return;
@@ -5634,11 +5634,13 @@ function startRun(){
   // BUILD → CLIMB: the quality of the pyramid you built shapes the climb. A clean build climbs at the normal
   // baseline difficulty and pays richer coins; a sloppy one means a more treacherous climb.
   const stars = pyramidRating(); S.buildStars = stars;
-  totalBuilds++; Store.set('builds', totalBuilds);                                   // lifetime pyramids built
-  if (gameLevel > maxLevel){ maxLevel = gameLevel; Store.set('maxLevel', maxLevel); grantEraChars(); } // highest level reached → free peasant for any new era
-  if (!Store.get('gift3', 0) && maxLevel >= 3) giftFirstCharacter();   // early collection hook: a free hero a few levels in
-  missionEvent('stars', stars); missionEvent('builds', 1);   // goals: build quality + pyramids built
-  bumpRecord('bestStars', stars);                            // achievements: flawless build, build counts, levels reached
+  if (!S.runCredited){ S.runCredited = true;                                         // credit the build ONCE (a run-retry re-enters startRun but must not re-count)
+    totalBuilds++; Store.set('builds', totalBuilds);                                 // lifetime pyramids built
+    if (gameLevel > maxLevel){ maxLevel = gameLevel; Store.set('maxLevel', maxLevel); grantEraChars(); } // highest level reached → free peasant for any new era
+    if (!Store.get('gift3', 0) && maxLevel >= 3) giftFirstCharacter();   // early collection hook: a free hero a few levels in
+    missionEvent('stars', stars); missionEvent('builds', 1);   // goals: build quality + pyramids built
+    bumpRecord('bestStars', stars);                            // achievements: flawless build, build counts, levels reached
+  }
   // build → climb: a GREAT build climbs at the normal baseline difficulty (no easier-than-normal reward); a sloppier one
   // is progressively MORE treacherous (more hazards). Good builds still pay richer coins — that's the upside, not an easier path.
   const hazardMul = stars>=5 ? 1.0 : stars>=4 ? 1.1 : stars>=3 ? 1.22 : stars>=2 ? 1.35 : 1.5;
@@ -7238,9 +7240,29 @@ function renderLevels(){
     c.addEventListener('pointerdown', ev => { ev.stopPropagation(); ev.preventDefault(); startLevel(parseInt(c.getAttribute('data-lv'), 10)); }));
 }
 function startLevel(n){ dailyMode = false; puzzleMode = false; levelXMode = false; $('levelsPanel').classList.add('hidden'); startGame(n); }
-// TEMP test helper: instantly restart whatever mode you're in (Level X / Level 0 / daily / a normal level), from any section
+// TEMP test helper: retry the CURRENT SECTION. In the build → restart the build. In the run → drop back to the START of
+// the climb on the SAME pyramid (a run checkpoint — no rebuild). Not level-based.
 function quickRetry(){ if (atMenu) return;
+  if (S.phase === 'run' && S.run && !S.gameOver){ restartRun(); return; }
   if (levelXMode) startLevelX(); else if (puzzleMode) startPuzzleLevel(); else if (dailyMode) startGame(1); else startGame(gameLevel); }
+// Re-enter the run on the pyramid you already built: clear everything spawned for the run (runner, hazards, coins, cave),
+// keep the pyramid + scenery, then run startRun again and drop straight into the climb (skipping the rating/relic screens).
+function restartRun(){
+  if (S.run && S.run.caveLight){ try { scene.remove(S.run.caveLight); } catch(e){} }
+  const keep = new Set(S.allBlocks);
+  [...scene.children].forEach(o => {
+    if (!o || o.__env || o===ground || o===sky || o===sun || o===hemi || o.isLight) return;   // keep world + lights
+    if (keep.has(o)) return;                                                                   // keep the built pyramid
+    if (o.isMesh || o.isGroup) scene.remove(o);                                                // drop runner / hazards / coins / cave / ramps
+  });
+  [...scene.children].forEach(o => { if (o.__caveHid){ o.visible = true; o.__caveHid = false; } });   // undo any cave hiding
+  S.allBlocks.forEach(b => { if (b && b.__caveHid){ b.visible = true; b.__caveHid = false; } });
+  _caveGroup = null; _caveMouths = [];
+  S.falling = []; S.fx = []; S.squash = []; S.dropAnims = []; S.fight = null; S.fightWon = false;
+  S.phase = 'build';                         // so startRun's run-setup runs cleanly
+  startRun();                                // rebuilds tiles/runner/run-state from the existing pyramid (credit + banding are guarded)
+  startClimbNow();                           // skip the rating/relic screens — straight back into the climb
+}
 // DAILY CHALLENGE — the same seeded climb for everyone, resets at local midnight
 let _dailyClockIv = 0;
 function dailyResetMs(){ const d = new Date(), m = new Date(d); m.setHours(24,0,0,0); return m - d; }
