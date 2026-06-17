@@ -1050,7 +1050,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.377 · 2026.06.15</div>
+  <div id="appVersion">v1.378 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1303,7 +1303,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.377';
+const APP_VERSION = '1.378';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -3728,7 +3728,7 @@ function spawnBlock(){
     if (mesh.material && mesh.material.emissive) mesh.material.emissive.setRGB(0.4, 0.28, 0.0);   // gold glow
     showPop('✦ GOLDEN BLOCK — NAIL IT'); Sound.treasure();
   }
-  if (S.active){ S.active.pattern = xPattern; attachCourseRamp(S.active); }   // remember this stone's comb so the NEXT one can complement it; ramp rides on the stone
+  if (S.active){ S.active.pattern = xPattern; if (!S.levelX) attachCourseRamp(S.active); }   // remember the comb; LEVEL X skips the smooth ramp so you climb the raw stepped joint stones
 }
 
 function drop(){
