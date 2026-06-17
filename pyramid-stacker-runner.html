@@ -1060,7 +1060,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.388 · 2026.06.15</div>
+  <div id="appVersion">v1.389 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1313,7 +1313,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.388';
+const APP_VERSION = '1.389';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4450,42 +4450,74 @@ function buildCaveCorridor(mouth){
   }
   for (let i=0; i<CAVE_TILES; i++) tiles.push({ pos:pts[i].clone(), gap:false, weak:false, mesh:null, crumbled:false, halfW:LANE_W*1.7, lyr:'cave' });
 
-  // ---- TRAPS: chasm gaps + spike pits (JUMP), pendulum blades (SLIDE/dodge), boulders & rubble (dodge / jump) ----
+  // ---- TRAPS: chasm/spike pits (JUMP), pendulum blades (SLIDE/dodge), boulders & rubble (dodge/jump), flame jets
+  // (SLIDE under), ceiling crushers (be in the safe lane), lintel gates (slide/jump the right lane) ----
   let last = -99;
-  for (let i=10; i<CAVE_TILES-10; i++){
-    if (i - last < 6 || RND() > 0.6) continue;
+  for (let i=10; i<CAVE_TILES-8; i++){
+    if (i - last < 5 || RND() > 0.7) continue;
     last = i;
-    const kind = ['chasm','spikepit','pendulum','boulder','rubble'][Math.floor(RND()*5)];
+    const kind = ['chasm','spikepit','pendulum','boulder','rubble','flame','crusher','lintel'][Math.floor(RND()*8)];
     const t = tiles[i], p = t.pos;
     if (kind==='chasm' || kind==='spikepit'){
       t.gap = true;                                            // jump it or fall
       const pit = new THREE.Mesh(new THREE.BoxGeometry(CAVE_HALF*2, 1.2, CAVE_STEP*1.1), darkMat); pit.position.set(p.x, p.y-0.65, p.z); g.add(pit);
-      if (kind==='spikepit'){ for (let s=-1; s<=1; s++){ const sp = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.22, 6), caveMat(0x8a8a8a,false)); sp.position.set(p.x + s*LANE_W, p.y-0.12, p.z); g.add(sp); } }
+      if (kind==='spikepit'){ for (let s=-1; s<=1; s++){ const sp = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.22, 6), caveMat(0x9a9aa0,false)); sp.position.set(p.x + s*LANE_W, p.y-0.12, p.z); g.add(sp); } }
     } else if (kind==='pendulum'){
       const lane = rndLane(); t.ob = { type:'lane', lane, slidable:true, kind:'pendulum' };
       const piv = new THREE.Group(); piv.position.set(p.x + lane*LANE_W, p.y + CAVE_WALLH, p.z);
       const arm = new THREE.Mesh(new THREE.BoxGeometry(0.03, CAVE_WALLH*0.7, 0.03), wallMat); arm.position.y = -CAVE_WALLH*0.35; piv.add(arm);
-      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.16, 0.04), caveMat(0xb8b8c0,false)); blade.material.metalness = 0.6; blade.material.roughness = 0.3; blade.position.y = -CAVE_WALLH*0.7; piv.add(blade);
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.16, 0.04), caveMat(0xc0c0cc,false)); blade.material.metalness = 0.7; blade.material.roughness = 0.25; blade.material.emissive = new THREE.Color(0x223040); blade.material.emissiveIntensity = 0.4; blade.position.y = -CAVE_WALLH*0.7; piv.add(blade);
       g.add(piv); t.obMesh = piv; _caveFx.push({ type:'pendulum', mesh:piv, ph:RND()*6.28 });
     } else if (kind==='boulder'){
       const lane = rndLane(); t.ob = { type:'lane', lane, kind:'boulder' };
       const b = new THREE.Mesh(new THREE.DodecahedronGeometry(0.16), caveMat(0x6f5d44,true)); b.position.set(p.x + lane*LANE_W, p.y+0.14, p.z); g.add(b); t.obMesh = b; _caveFx.push({ type:'spin', mesh:b });
-    } else {  // rubble — low, jumpable
+    } else if (kind==='rubble'){
       const lane = rndLane(); t.ob = { type:'lane', lane, jumpable:true, kind:'rubble' };
       const rb = new THREE.Group(); for (let k=0; k<4; k++){ const c = new THREE.Mesh(new THREE.DodecahedronGeometry(0.05+RND()*0.04), caveMat(0x5f4f38,true)); c.position.set((RND()-0.5)*0.18, 0.04+RND()*0.05, (RND()-0.5)*0.1); rb.add(c); }
       rb.position.set(p.x + lane*LANE_W, p.y, p.z); g.add(rb); t.obMesh = rb;
+    } else if (kind==='flame'){
+      t.ob = { type:'beamT', on:true, kind:'flame' };           // timed flame curtain across ALL lanes → slide under while it's firing
+      const fl = new THREE.Mesh(new THREE.BoxGeometry(CAVE_HALF*1.9, CAVE_WALLH*0.66, 0.05), new THREE.MeshStandardMaterial({ color:0xff8a2e, emissive:0xff5a10, emissiveIntensity:1.2, transparent:true, opacity:0.82, roughness:0.5 }));
+      fl.position.set(p.x, p.y + CAVE_WALLH*0.33, p.z); g.add(fl); t.obMesh = fl;
+      for (let s=-1; s<=1; s++){ const noz = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.04,0.06,8), caveMat(0x2a2018,false)); noz.position.set(p.x+s*LANE_W, p.y+0.02, p.z); g.add(noz); }
+      _caveFx.push({ type:'flame', ob:t.ob, mesh:fl, ph:RND()*2 });
+    } else if (kind==='crusher'){
+      const safeLane = rndLane(); t.ob = { type:'crush', closed:false, safeLane, kind:'crusher' };   // ceiling slab drops over every lane but the safe one
+      const slab = new THREE.Group();
+      [-1,0,1].filter(l => l!==safeLane).forEach(l => { const pc = new THREE.Mesh(new THREE.BoxGeometry(LANE_W*1.5, 0.18, 0.16), caveMat(0x9a8050,true)); pc.position.set(p.x + l*LANE_W, 0, p.z); slab.add(pc); });
+      g.add(slab); t.obMesh = slab;
+      _caveFx.push({ type:'crusher', ob:t.ob, mesh:slab, hi:p.y + CAVE_WALLH - 0.12, lo:p.y + 0.16, ph:RND()*3 });
+      slab.position.y = p.y + CAVE_WALLH - 0.12;
+    } else {  // lintel — two lanes get a bar: a HIGH one to slide under, a LOW one to jump; the third lane is clear
+      const clear = rndLane(); const gates = [-1,0,1].filter(l => l!==clear).map(l => ({ lane:l, duck: RND()<0.5 }));
+      t.ob = { type:'gate', gates, kind:'lintel' };
+      gates.forEach(gt => { const bar = new THREE.Mesh(new THREE.BoxGeometry(LANE_W*1.4, 0.12, 0.1), caveMat(0x7a6646,true)); bar.material.emissive = new THREE.Color(0x3a2a10); bar.material.emissiveIntensity = 0.3; bar.position.set(p.x + gt.lane*LANE_W, gt.duck ? p.y + CAVE_WALLH*0.52 : p.y + 0.12, p.z); g.add(bar); });
+      t.obMesh = null;
     }
   }
 
-  // ---- enclosure: floor (skipped over pits), ceiling, side walls, with gold veins for colour ----
+  // ---- enclosure: floor (skipped over pits), ceiling, side walls; gold veins + glowing cyan runes for colour ----
+  const runeMat = new THREE.MeshStandardMaterial({ color:0x8fe0ff, emissive:0x1f7aa6, emissiveIntensity:0.7, roughness:0.6 });
   for (let i=0; i<CAVE_TILES-1; i++){
     const A = pts[i], B = pts[i+1], mid = A.clone().add(B).multiplyScalar(0.5);
     const dz = B.z-A.z, dy = B.y-A.y, len = Math.hypot(dz,dy) || 0.1, ang = Math.atan2(-dy, dz);
     if (!tiles[i].gap && !tiles[i+1].gap){ const fl = new THREE.Mesh(new THREE.BoxGeometry(CAVE_HALF*2, 0.16, len*1.12), floorMat); fl.position.set(mid.x, mid.y-0.1, mid.z); fl.rotation.x = ang; fl.receiveShadow = true; g.add(fl); }
     const ce = new THREE.Mesh(new THREE.BoxGeometry(CAVE_HALF*2, 0.14, len*1.12), wallMat); ce.position.set(mid.x, mid.y+CAVE_WALLH, mid.z); ce.rotation.x = ang; g.add(ce);
     [-1,1].forEach(s => { const w = new THREE.Mesh(new THREE.BoxGeometry(0.16, CAVE_WALLH, len*1.12), wallMat); w.position.set(mid.x + s*CAVE_HALF, mid.y+CAVE_WALLH/2-0.1, mid.z); g.add(w);
-      if (i % 9 === 4){ const vein = new THREE.Mesh(new THREE.BoxGeometry(0.02, CAVE_WALLH*0.5, 0.05), veinMat); vein.position.set(mid.x + s*(CAVE_HALF-0.02), mid.y+CAVE_WALLH*0.45, mid.z); g.add(vein); } });
+      if (i % 9 === 4){ const vein = new THREE.Mesh(new THREE.BoxGeometry(0.02, CAVE_WALLH*0.5, 0.05), veinMat); vein.position.set(mid.x + s*(CAVE_HALF-0.02), mid.y+CAVE_WALLH*0.45, mid.z); g.add(vein); }
+      if (i % 13 === 6){ const rune = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.2, 0.13), runeMat); rune.position.set(mid.x + s*(CAVE_HALF-0.015), mid.y+CAVE_WALLH*0.52, mid.z); g.add(rune); } });
   }
+
+  // ---- glowing, pulsating lane guides on ALL THREE lanes (three shared materials so the pulse is cheap) ----
+  const guideMats = [0,1,2].map(() => new THREE.MeshStandardMaterial({ color:0xffd27a, emissive:0xff8a1e, emissiveIntensity:0.8, roughness:0.5, metalness:0.1 }));
+  for (let i=0; i<CAVE_TILES-1; i++){
+    if (tiles[i].gap || tiles[i+1].gap) continue;
+    const A = pts[i], B = pts[i+1], mid = A.clone().add(B).multiplyScalar(0.5);
+    const dz = B.z-A.z, dy = B.y-A.y, len = Math.hypot(dz,dy) || 0.1, ang = Math.atan2(-dy, dz);
+    [-1,0,1].forEach((lane,li) => { const gd = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.02, len*1.14), guideMats[li]); gd.position.set(mid.x + lane*LANE_W, mid.y-0.004, mid.z); gd.rotation.x = ang; g.add(gd); });
+  }
+  guideMats.forEach((m, li) => _caveFx.push({ type:'guide', mat:m, ph: li*2.0 }));
+  _caveFx.push({ type:'rune', mat:runeMat });
 
   // ---- torches every ~7 tiles, alternating walls: a bracket + a flickering flame (warm colour & life) ----
   for (let i=6; i<CAVE_TILES-4; i += 7){
@@ -4506,6 +4538,10 @@ function updateCaveFx(dt, rpos){
     if (fx.type==='torch'){ const f = 0.55 + 0.4*Math.sin(T*9 + fx.ph) + 0.15*Math.sin(T*23 + fx.ph*1.7); if (fx.mesh.material) fx.mesh.material.emissiveIntensity = Math.max(0.3, f); fx.mesh.scale.y = 1 + 0.18*Math.sin(T*12 + fx.ph); }
     else if (fx.type==='pendulum'){ fx.mesh.rotation.z = Math.sin(T*2.3 + fx.ph) * 0.95; }
     else if (fx.type==='spin'){ fx.mesh.rotation.y += dt*0.6; }
+    else if (fx.type==='guide'){ fx.mat.emissiveIntensity = 0.5 + 0.55*(0.5 + 0.5*Math.sin(T*4.5 + fx.ph)); }   // glowing pulse, per-lane phase
+    else if (fx.type==='rune'){ fx.mat.emissiveIntensity = 0.45 + 0.4*Math.sin(T*3 + 1); }
+    else if (fx.type==='flame'){ const on = ((T*0.8 + fx.ph) % 2.0) < 1.0; fx.ob.on = on; if (fx.mesh){ fx.mesh.visible = on; if (on && fx.mesh.material){ fx.mesh.scale.y = 0.85 + 0.25*Math.sin(T*22); fx.mesh.material.emissiveIntensity = 1.0 + 0.5*Math.sin(T*18); } } }
+    else if (fx.type==='crusher'){ const closed = ((T*0.85 + fx.ph) % 2.4) < 1.1; fx.ob.closed = closed; if (fx.mesh){ const tgt = closed ? fx.lo : fx.hi; fx.mesh.position.y += (tgt - fx.mesh.position.y) * Math.min(1, dt*10); } }
   });
   if (r.caveLight && rpos) r.caveLight.position.set(rpos.x, rpos.y + 0.45, rpos.z + 0.12);
 }
