@@ -53,12 +53,15 @@
   #puzzleTimerBar { width:100%; height:6px; border-radius:5px; background:rgba(20,12,28,.5); border:1px solid rgba(243,200,120,.3); overflow:hidden; }
   #puzzleTimerFill { height:100%; width:100%; border-radius:5px; background:#9fe9c0; transition:width .12s linear, background .25s; }
   .puzzleArrow { position:fixed; top:39%; z-index:7; display:none; pointer-events:none;
-    font-family:'Cinzel',serif; font-size:46px; line-height:1; font-weight:700;
-    color:#ffd24a; text-shadow:0 0 14px rgba(255,200,74,.6), 0 2px 4px rgba(0,0,0,.5); animation:arrowPulse 1.1s ease-in-out infinite; }
+    font-family:'Cinzel',serif; font-size:78px; line-height:1; font-weight:700;
+    color:#8ef6ff; text-shadow:0 0 12px rgba(120,240,255,.9), 0 0 26px rgba(90,225,255,.55), 0 2px 5px rgba(0,0,0,.6);
+    animation:arrowPulse 1.0s ease-in-out infinite; }   /* big, tall, high-contrast cyan against the gold scene */
   .puzzleArrow.show { display:block; }
-  #puzzleArrowL { left:calc(50% - 152px); transform:translate(-50%,-50%) scaleY(2.1); }   /* just outside the rotate ring, stretched tall */
-  #puzzleArrowR { left:calc(50% + 152px); transform:translate(-50%,-50%) scaleY(2.1); }
-  @keyframes arrowPulse { 0%,100%{ opacity:.5; } 50%{ opacity:1; } }
+  #puzzleArrowL { left:calc(50% - 162px); transform:translate(-50%,-50%) scaleY(2.9); }   /* just outside the rotate ring, stretched tall */
+  #puzzleArrowR { left:calc(50% + 162px); transform:translate(-50%,-50%) scaleY(2.9); }
+  @keyframes arrowPulse {
+    0%,100%{ opacity:.5; text-shadow:0 0 8px rgba(120,240,255,.6), 0 0 16px rgba(90,225,255,.35), 0 2px 5px rgba(0,0,0,.6); }
+    50%{ opacity:1; text-shadow:0 0 18px rgba(150,248,255,1), 0 0 40px rgba(110,235,255,.8), 0 2px 5px rgba(0,0,0,.6); } }
   /* the rotate-zone ring around the previewed stone */
   #puzzleRing { position:fixed; left:50%; top:39%; transform:translate(-50%,-50%); z-index:6; display:none; pointer-events:none;
     width:260px; height:260px; border-radius:50%; border:2px solid rgba(255,214,90,.85);
@@ -764,8 +767,8 @@
 <div id="puzzleHud">
   <div id="puzzleTimerBar"><div id="puzzleTimerFill"></div></div>
 </div>
-<div id="puzzleArrowL" class="puzzleArrow">‹</div>
-<div id="puzzleArrowR" class="puzzleArrow">›</div>
+<div id="puzzleArrowL" class="puzzleArrow">❮</div>
+<div id="puzzleArrowR" class="puzzleArrow">❯</div>
 <div id="puzzleRing"></div>
 
 <div id="coinHud" class="hidden"><span class="coinIcon"></span><span id="coinVal">0</span><span class="coinLbl"></span></div>
@@ -1046,7 +1049,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.375 · 2026.06.15</div>
+  <div id="appVersion">v1.376 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1299,7 +1302,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.375';
+const APP_VERSION = '1.376';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4221,7 +4224,11 @@ function setPuzzleGlow(group, on){
     o.material.emissive.setHex(on ? 0x2ec0ff : 0x000000); o.material.emissiveIntensity = on ? 0.8 : 0; } });
   group.__glow = !!on;
 }
-function puzzleCenterPos(){ return new THREE.Vector3(0, S.layer*LAYER_HEIGHT + 0.95, 0.15); }   // candidate floats centred above the build (lowered so it stays in the ring at the closer puzzle zoom)
+function puzzleCenterPos(){   // where the floating candidate hovers. Level 0 = centred above the tiny pyramid; Level X = right above the actual cell being filled, so the placed reference stone next to it is in frame
+  const baseY = S.layer*LAYER_HEIGHT + (S.levelX ? 1.2 : 0.95);
+  const sc = (S.levelX && S.cand && S.cand.slot && S.cand.slot.center && !S.cand.capstone) ? S.cand.slot.center : null;
+  return sc ? new THREE.Vector3(sc.x, baseY, sc.z) : new THREE.Vector3(0, baseY, 0.15);
+}
 
 function spawnCandidates(){
   const slot = puzzleSlot();
@@ -6561,11 +6568,18 @@ function updateBuildCam(dt){
   if (S.camPB === undefined) S.camPB = wantPz ? 1 : 0;
   S.camPB += ((wantPz?1:0) - S.camPB) * Math.min(1, dt*4);
   const a = S.camRotE + (Math.PI/4)*S.camPB, R = Math.max(S.camPB > 0.02 ? 5.4 : 0, S.camRE * (1 - 0.4*S.camPB)), h = S.camHE;
-  camera.position.set(Math.sin(a)*R, h + R*0.34, Math.cos(a)*R);
+  // LEVEL X interrupt: pan/orbit around the CURRENT cell (not the pyramid centre) so the placed reference stone sits in
+  // frame next to the floating choice. Eased, so the camera glides over for the pick and back to centre afterwards.
+  const onCell = S.levelX && S.cand && S.cand.slot && S.cand.slot.center && !S.cand.capstone;
+  const tAimX = onCell ? S.cand.slot.center.x : 0, tAimZ = onCell ? S.cand.slot.center.z : 0;
+  S.aimXE = (S.aimXE ?? 0) + (tAimX - (S.aimXE ?? 0)) * Math.min(1, dt*4);
+  S.aimZE = (S.aimZE ?? 0) + (tAimZ - (S.aimZE ?? 0)) * Math.min(1, dt*4);
+  const aimX = S.aimXE, aimZ = S.aimZE;
+  camera.position.set(aimX + Math.sin(a)*R, h + R*0.34, aimZ + Math.cos(a)*R);
   // the whole structure feels like it's TEETERING once integrity drops low
   const unstable = Math.max(0, 0.45 - (S.integrity ?? 1));
   if (unstable > 0){ const tw = Date.now()*0.006; camera.position.x += Math.sin(tw)*unstable*0.6; camera.position.y += Math.cos(tw*1.3)*unstable*0.35; }
-  camera.lookAt(0, h, 0);                                  // aim at the row being built
+  camera.lookAt(aimX, h, aimZ);                            // aim at the row being built (or the current cell during a Level X pick)
   applyShake();
 }
 function applyShake(){
