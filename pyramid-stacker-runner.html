@@ -1050,7 +1050,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.379 · 2026.06.15</div>
+  <div id="appVersion">v1.380 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1303,7 +1303,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.379';
+const APP_VERSION = '1.380';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -3424,9 +3424,11 @@ function makeSteppedPiece(len, axis, color, center, n){
 
 // The pyramid's crown: a small stepped pyramid that terraces up on ALL FOUR sides to a peak,
 // matching the stepped stone of every other course (instead of a plain gold cube).
-function makeCapstonePeak(color){
-  const mat = new THREE.MeshStandardMaterial({ color, roughness:0.92, metalness:0.04 });  // exactly the other stones' look
-  if (STONE_BUMP){ mat.bumpMap = STONE_BUMP; mat.bumpScale = 0.07; }
+function makeCapstonePeak(color, jointTex){
+  // jointTex = match the LEVEL X joint stones (world-scaled UVs, roughness 0.86, no bump) instead of the default
+  // stepped-stone look — so the crown's texture lines up with the rest of the Level X pyramid.
+  const mat = new THREE.MeshStandardMaterial({ color, roughness: jointTex ? 0.86 : 0.92, metalness:0.04 });
+  if (STONE_BUMP && !jointTex){ mat.bumpMap = STONE_BUMP; mat.bumpScale = 0.07; }
   applyEraBlockTex(mat);
   const g = new THREE.Group();
   // same stepping cadence as every other stone (STEP_N courses, 0.04 inset/course) but receding on ALL FOUR
@@ -3434,7 +3436,9 @@ function makeCapstonePeak(color){
   const h = LAYER_HEIGHT*1.04, N = STEP_N, stepH = h/N, inset = 0.04, baseW = BLOCK_SIZE*0.999;
   for (let i=0; i<N; i++){
     const w = Math.max(0.28, baseW - 2*i*inset);            // recede on all four faces → flat stand on top
-    const plate = new THREE.Mesh(new THREE.BoxGeometry(w, stepH+0.01, w), mat);
+    const ph = stepH+0.01, geo = new THREE.BoxGeometry(w, ph, w);
+    if (jointTex) boxWorldUV(geo, w, ph, w, BLOCK_TEX_SCALE);   // world-scaled tiling, matching the joint stones
+    const plate = new THREE.Mesh(geo, mat);
     plate.position.y = -h/2 + stepH*(i+0.5);
     plate.receiveShadow = true; plate.castShadow = (i < 2);
     g.add(plate);
@@ -3654,7 +3658,7 @@ function spawnBlock(){
   const color = layerColor(S.layer);                  // capstone matches the rest of the pyramid's stone
 
   let mesh;
-  if (capstone){ mesh = makeCapstonePeak(color); }    // stepped crown that comes to a peak
+  if (capstone){ mesh = makeCapstonePeak(color, S.levelX); }    // stepped crown that comes to a peak (Level X → joint-stone texturing)
   else if (S.levelX){ mesh = makeJointStone(xPattern, { axis, center, cells, n:nForLayer(S.layer), len:1, capstone:false }, color); }   // joint-shaped stone, comb pre-matched
   else mesh = makeSteppedPiece(len, axis, color, center, nForLayer(S.layer));   // real stepped-pyramid stone
 
