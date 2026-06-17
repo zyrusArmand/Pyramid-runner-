@@ -1060,7 +1060,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.383 · 2026.06.15</div>
+  <div id="appVersion">v1.384 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1313,7 +1313,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.383';
+const APP_VERSION = '1.384';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4431,12 +4431,16 @@ function climbPath(){
 const CAVE_TILES = 170;            // ~30s of corridor at climb speed (tuned by feel)
 const CAVE_STEP  = 0.42;           // spacing between corridor tiles
 const CAVE_HALF  = LANE_W*1.9, CAVE_WALLH = 0.95;
-let _caveGroup = null, _caveMouths = [];
+let _caveGroup = null, _caveMouths = [], _caveFx = [];
+function caveMat(hex, bump){ const m = new THREE.MeshStandardMaterial({ color:hex, roughness:1, metalness:0 }); if (bump && STONE_BUMP){ m.bumpMap = STONE_BUMP; m.bumpScale = 0.06; } return m; }
 function buildCaveCorridor(mouth){
   if (_caveGroup){ try { scene.remove(_caveGroup); } catch(e){} _caveGroup = null; }
+  _caveFx = [];
   const tiles = [], g = new THREE.Group();
-  const floorMat = new THREE.MeshStandardMaterial({ color:0x4f4030, roughness:1, metalness:0 });
-  const wallMat  = new THREE.MeshStandardMaterial({ color:0x342a1d, roughness:1, metalness:0 });
+  const floorMat = caveMat(0x6a5238, true), wallMat = caveMat(0x4a3a26, true), darkMat = caveMat(0x0a0705, false);
+  const veinMat  = new THREE.MeshStandardMaterial({ color:0xc9a24a, roughness:0.5, metalness:0.3, emissive:0x3a2600, emissiveIntensity:0.5 });
+  const flameMat = () => new THREE.MeshStandardMaterial({ color:0xffb648, emissive:0xff7a1e, emissiveIntensity:1, roughness:0.6 });
+  const rndLane = () => [-1,0,1][Math.floor(RND()*3)];
   const pts = [];
   for (let i=0; i<CAVE_TILES; i++){
     const f = i/(CAVE_TILES-1);
@@ -4445,15 +4449,65 @@ function buildCaveCorridor(mouth){
     pts.push(new THREE.Vector3(mouth.x, y, z));
   }
   for (let i=0; i<CAVE_TILES; i++) tiles.push({ pos:pts[i].clone(), gap:false, weak:false, mesh:null, crumbled:false, halfW:LANE_W*1.7, lyr:'cave' });
+
+  // ---- TRAPS: chasm gaps + spike pits (JUMP), pendulum blades (SLIDE/dodge), boulders & rubble (dodge / jump) ----
+  let last = -99;
+  for (let i=10; i<CAVE_TILES-10; i++){
+    if (i - last < 6 || RND() > 0.6) continue;
+    last = i;
+    const kind = ['chasm','spikepit','pendulum','boulder','rubble'][Math.floor(RND()*5)];
+    const t = tiles[i], p = t.pos;
+    if (kind==='chasm' || kind==='spikepit'){
+      t.gap = true;                                            // jump it or fall
+      const pit = new THREE.Mesh(new THREE.BoxGeometry(CAVE_HALF*2, 1.2, CAVE_STEP*1.1), darkMat); pit.position.set(p.x, p.y-0.65, p.z); g.add(pit);
+      if (kind==='spikepit'){ for (let s=-1; s<=1; s++){ const sp = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.22, 6), caveMat(0x8a8a8a,false)); sp.position.set(p.x + s*LANE_W, p.y-0.12, p.z); g.add(sp); } }
+    } else if (kind==='pendulum'){
+      const lane = rndLane(); t.ob = { type:'lane', lane, slidable:true, kind:'pendulum' };
+      const piv = new THREE.Group(); piv.position.set(p.x + lane*LANE_W, p.y + CAVE_WALLH, p.z);
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.03, CAVE_WALLH*0.7, 0.03), wallMat); arm.position.y = -CAVE_WALLH*0.35; piv.add(arm);
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.16, 0.04), caveMat(0xb8b8c0,false)); blade.material.metalness = 0.6; blade.material.roughness = 0.3; blade.position.y = -CAVE_WALLH*0.7; piv.add(blade);
+      g.add(piv); t.obMesh = piv; _caveFx.push({ type:'pendulum', mesh:piv, ph:RND()*6.28 });
+    } else if (kind==='boulder'){
+      const lane = rndLane(); t.ob = { type:'lane', lane, kind:'boulder' };
+      const b = new THREE.Mesh(new THREE.DodecahedronGeometry(0.16), caveMat(0x6f5d44,true)); b.position.set(p.x + lane*LANE_W, p.y+0.14, p.z); g.add(b); t.obMesh = b; _caveFx.push({ type:'spin', mesh:b });
+    } else {  // rubble — low, jumpable
+      const lane = rndLane(); t.ob = { type:'lane', lane, jumpable:true, kind:'rubble' };
+      const rb = new THREE.Group(); for (let k=0; k<4; k++){ const c = new THREE.Mesh(new THREE.DodecahedronGeometry(0.05+RND()*0.04), caveMat(0x5f4f38,true)); c.position.set((RND()-0.5)*0.18, 0.04+RND()*0.05, (RND()-0.5)*0.1); rb.add(c); }
+      rb.position.set(p.x + lane*LANE_W, p.y, p.z); g.add(rb); t.obMesh = rb;
+    }
+  }
+
+  // ---- enclosure: floor (skipped over pits), ceiling, side walls, with gold veins for colour ----
   for (let i=0; i<CAVE_TILES-1; i++){
     const A = pts[i], B = pts[i+1], mid = A.clone().add(B).multiplyScalar(0.5);
     const dz = B.z-A.z, dy = B.y-A.y, len = Math.hypot(dz,dy) || 0.1, ang = Math.atan2(-dy, dz);
-    const fl = new THREE.Mesh(new THREE.BoxGeometry(CAVE_HALF*2, 0.16, len*1.12), floorMat); fl.position.set(mid.x, mid.y-0.1, mid.z); fl.rotation.x = ang; fl.receiveShadow = true; g.add(fl);
-    const ce = new THREE.Mesh(new THREE.BoxGeometry(CAVE_HALF*2, 0.14, len*1.12), wallMat);  ce.position.set(mid.x, mid.y+CAVE_WALLH, mid.z); ce.rotation.x = ang; g.add(ce);
-    [-1,1].forEach(s => { const w = new THREE.Mesh(new THREE.BoxGeometry(0.16, CAVE_WALLH, len*1.12), wallMat); w.position.set(mid.x + s*CAVE_HALF, mid.y+CAVE_WALLH/2-0.1, mid.z); g.add(w); });
+    if (!tiles[i].gap && !tiles[i+1].gap){ const fl = new THREE.Mesh(new THREE.BoxGeometry(CAVE_HALF*2, 0.16, len*1.12), floorMat); fl.position.set(mid.x, mid.y-0.1, mid.z); fl.rotation.x = ang; fl.receiveShadow = true; g.add(fl); }
+    const ce = new THREE.Mesh(new THREE.BoxGeometry(CAVE_HALF*2, 0.14, len*1.12), wallMat); ce.position.set(mid.x, mid.y+CAVE_WALLH, mid.z); ce.rotation.x = ang; g.add(ce);
+    [-1,1].forEach(s => { const w = new THREE.Mesh(new THREE.BoxGeometry(0.16, CAVE_WALLH, len*1.12), wallMat); w.position.set(mid.x + s*CAVE_HALF, mid.y+CAVE_WALLH/2-0.1, mid.z); g.add(w);
+      if (i % 9 === 4){ const vein = new THREE.Mesh(new THREE.BoxGeometry(0.02, CAVE_WALLH*0.5, 0.05), veinMat); vein.position.set(mid.x + s*(CAVE_HALF-0.02), mid.y+CAVE_WALLH*0.45, mid.z); g.add(vein); } });
   }
+
+  // ---- torches every ~7 tiles, alternating walls: a bracket + a flickering flame (warm colour & life) ----
+  for (let i=6; i<CAVE_TILES-4; i += 7){
+    const p = pts[i], s = (i % 14 === 6) ? -1 : 1;
+    const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.12), caveMat(0x2a2018,false)); bracket.position.set(p.x + s*(CAVE_HALF-0.05), p.y+CAVE_WALLH*0.66, p.z); g.add(bracket);
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.14, 7), flameMat()); flame.position.set(p.x + s*(CAVE_HALF-0.09), p.y+CAVE_WALLH*0.74, p.z); g.add(flame);
+    _caveFx.push({ type:'torch', mesh:flame, ph:RND()*6.28 });
+  }
+
   scene.add(g); _caveGroup = g;
   return tiles;
+}
+// flicker the torches, swing the pendulums, spin the boulders, and ride the warm torch-glow light along with the runner
+function updateCaveFx(dt, rpos){
+  const r = S.run; if (!r) return;
+  const T = performance.now() * 0.001;
+  if (r.caveFx) r.caveFx.forEach(fx => {
+    if (fx.type==='torch'){ const f = 0.55 + 0.4*Math.sin(T*9 + fx.ph) + 0.15*Math.sin(T*23 + fx.ph*1.7); if (fx.mesh.material) fx.mesh.material.emissiveIntensity = Math.max(0.3, f); fx.mesh.scale.y = 1 + 0.18*Math.sin(T*12 + fx.ph); }
+    else if (fx.type==='pendulum'){ fx.mesh.rotation.z = Math.sin(T*2.3 + fx.ph) * 0.95; }
+    else if (fx.type==='spin'){ fx.mesh.rotation.y += dt*0.6; }
+  });
+  if (r.caveLight && rpos) r.caveLight.position.set(rpos.x, rpos.y + 0.45, rpos.z + 0.12);
 }
 // a carved DARK doorway framed into the pyramid's front face — the cave mouth you run through (a real opening in the wall)
 function buildCaveMouth(pos){
@@ -5618,6 +5672,9 @@ function startRun(){
       S.run.caveEndIdx    = entry + corridor.length;          // last corridor tile
       S.run.caveResumeIdx = entry + 1 + corridor.length;      // first top-climb tile after the splice
       S.run.caveDone = false; S.run.storms = [];              // no open-air storms on Level X
+      S.run.caveFx = _caveFx;                                 // torches / pendulums / boulders to animate
+      S.run.caveLight = THREE.PointLight ? new THREE.PointLight(0xff8a3a, 0, 3.2) : null;   // warm torch-glow that rides with the runner
+      if (S.run.caveLight) scene.add(S.run.caveLight);
     }
   }
   // NB: obstacles / coins / power-ups / lane guides are NOT created yet — only when the climb starts
@@ -5818,8 +5875,10 @@ function updateRun(dt){
     sun.intensity = 0.82 + (0.30 - 0.82)*e; hemi.intensity = 0.46 + (0.20 - 0.46)*e;
     const fogFar = 46 + (13 - 46)*e;
     scene.fog.far += (fogFar - scene.fog.far) * Math.min(1, dt*3); scene.fog.near = scene.fog.far * 0.3;
+    if (r.caveLight) r.caveLight.intensity = 1.6 * e;          // torch-glow fades in with the dark
     S.stormA = 0; $('storm').style.opacity = '0';
   }
+  if (S.levelX && r.caveFx) updateCaveFx(dt, g.position);      // flicker torches, swing blades, spin boulders
   // (the fog + screen tint convey the storm; no per-frame dust particles — keeps mobile smooth)
 
   // hold for the "PYRAMID COMPLETE / CLIMB" beat before moving
