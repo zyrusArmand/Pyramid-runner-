@@ -52,17 +52,17 @@
   #puzzleHint { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:1.5px; color:#e7d3a6; opacity:.85; text-shadow:0 1px 4px rgba(0,0,0,.6); }
   #puzzleTimerBar { width:100%; height:6px; border-radius:5px; background:rgba(20,12,28,.5); border:1px solid rgba(243,200,120,.3); overflow:hidden; }
   #puzzleTimerFill { height:100%; width:100%; border-radius:5px; background:#9fe9c0; transition:width .12s linear, background .25s; }
-  /* big, tall, high-contrast cyan chevrons (SVG so they stay crisp at this size) just outside the rotate ring */
+  /* the original slim GOLD chevrons, just stretched longer with a vibrant pulsing glow */
   .puzzleArrow { position:fixed; top:39%; z-index:7; display:none; pointer-events:none;
-    width:54px; height:300px; transform:translate(-50%,-50%);
-    animation:arrowPulse 1.0s ease-in-out infinite; }
-  .puzzleArrow polyline { fill:none; stroke:#8ef6ff; stroke-width:7; stroke-linecap:round; stroke-linejoin:round; }
+    font-family:'Cinzel',serif; font-size:50px; line-height:1; font-weight:700; color:#ffd24a;
+    text-shadow:0 0 14px rgba(255,205,80,.85), 0 0 28px rgba(255,190,70,.5), 0 2px 4px rgba(0,0,0,.5);
+    animation:arrowPulse 0.95s ease-in-out infinite; }
   .puzzleArrow.show { display:block; }
-  #puzzleArrowL { left:calc(50% - 158px); }
-  #puzzleArrowR { left:calc(50% + 158px); }
+  #puzzleArrowL { left:calc(50% - 156px); transform:translate(-50%,-50%) scaleY(3.6); }   /* just outside the ring, stretched tall but slim */
+  #puzzleArrowR { left:calc(50% + 156px); transform:translate(-50%,-50%) scaleY(3.6); }
   @keyframes arrowPulse {
-    0%,100%{ opacity:.55; filter:drop-shadow(0 0 6px rgba(120,240,255,.55)); }
-    50%{ opacity:1; filter:drop-shadow(0 0 18px rgba(150,248,255,.95)); } }
+    0%,100%{ opacity:.5; text-shadow:0 0 8px rgba(255,205,80,.5), 0 0 16px rgba(255,190,70,.3), 0 2px 4px rgba(0,0,0,.5); }
+    50%{ opacity:1; text-shadow:0 0 22px rgba(255,226,135,1), 0 0 46px rgba(255,200,80,.85), 0 2px 4px rgba(0,0,0,.5); } }
   /* the rotate-zone ring around the previewed stone */
   #puzzleRing { position:fixed; left:50%; top:39%; transform:translate(-50%,-50%); z-index:6; display:none; pointer-events:none;
     width:260px; height:260px; border-radius:50%; border:2px solid rgba(255,214,90,.85);
@@ -768,8 +768,8 @@
 <div id="puzzleHud">
   <div id="puzzleTimerBar"><div id="puzzleTimerFill"></div></div>
 </div>
-<svg id="puzzleArrowL" class="puzzleArrow" viewBox="0 0 40 220" aria-hidden="true"><polyline points="29,14 13,110 29,206"/></svg>
-<svg id="puzzleArrowR" class="puzzleArrow" viewBox="0 0 40 220" aria-hidden="true"><polyline points="11,14 27,110 11,206"/></svg>
+<div id="puzzleArrowL" class="puzzleArrow">‹</div>
+<div id="puzzleArrowR" class="puzzleArrow">›</div>
 <div id="puzzleRing"></div>
 
 <div id="coinHud" class="hidden"><span class="coinIcon"></span><span id="coinVal">0</span><span class="coinLbl"></span></div>
@@ -1050,7 +1050,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.378 · 2026.06.15</div>
+  <div id="appVersion">v1.379 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1303,7 +1303,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.378';
+const APP_VERSION = '1.379';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
