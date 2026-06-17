@@ -174,6 +174,8 @@
   /* perfect / collect flash */
   #flash { position:fixed; inset:0; z-index:9; pointer-events:none; opacity:0; background:#fff; }
   #flash.show { animation:flashfx .32s ease-out; }
+  /* Level X cave-transition fade (to black, hides the in/out teleport) */
+  #caveFade { position:fixed; inset:0; z-index:9; pointer-events:none; opacity:0; background:#050403; transition:opacity .3s ease; }
   /* golden level-transition wipe */
   #wipe { position:fixed; inset:0; z-index:8; pointer-events:none; opacity:0; transform:translateX(-70%);
     background:linear-gradient(105deg, transparent 38%, rgba(255,228,158,0) 46%, rgba(255,234,176,.92) 50%,
@@ -798,6 +800,7 @@
 <div id="speed"></div>
 <div id="wipe"></div>
 <div id="flash"></div>
+<div id="caveFade"></div>
 <div id="ratingOverlay">
   <div id="ratingTint"></div>
   <div id="ratingRays"></div>
@@ -1050,7 +1053,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.380 · 2026.06.15</div>
+  <div id="appVersion">v1.381 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1303,7 +1306,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.380';
+const APP_VERSION = '1.381';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4414,6 +4417,57 @@ function climbPath(){
   return tiles;
 }
 
+// ===== LEVEL X — INSIDE-THE-PYRAMID CAVE RUN =====
+// A torch-lit corridor spliced into the climb: after the first layer the runner ducks into a cave (fade), runs a separate
+// three-lane tunnel, then pops back out onto a course near the summit (fade). Built in an isolated spot above the world;
+// the chase-cam just follows the runner there, so it never overlaps the pyramid.
+const CAVE_ORIGIN = new THREE.Vector3(0, 40, 0);
+const CAVE_TILES = 170;            // ~30s of corridor at climb speed (tuned by feel; we can switch to a real timer later)
+const CAVE_STEP  = 0.45;           // spacing between corridor tiles
+let _caveGroup = null, _caveLightSave = null;
+function buildCaveTiles(){
+  if (_caveGroup){ try { scene.remove(_caveGroup); } catch(e){} _caveGroup = null; }
+  const tiles = [], g = new THREE.Group();
+  const floorMat = new THREE.MeshStandardMaterial({ color:0x5b4a36, roughness:1, metalness:0 });
+  const wallMat  = new THREE.MeshStandardMaterial({ color:0x3c3022, roughness:1, metalness:0 });
+  const ox = CAVE_ORIGIN.x, oy = CAVE_ORIGIN.y, oz = CAVE_ORIGIN.z;
+  const halfW = LANE_W*1.9, len = CAVE_TILES*CAVE_STEP, midZ = oz + len/2, wallH = 0.9;
+  for (let i=0; i<CAVE_TILES; i++) tiles.push({ pos:new THREE.Vector3(ox, oy, oz + i*CAVE_STEP), gap:false, weak:false, mesh:null, crumbled:false, halfW:LANE_W*1.7, lyr:'cave' });
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(halfW*2, 0.2, len+1), floorMat); floor.position.set(ox, oy-0.11, midZ); floor.receiveShadow = true; g.add(floor);
+  [-1,1].forEach(s => { const w = new THREE.Mesh(new THREE.BoxGeometry(0.18, wallH, len+1), wallMat); w.position.set(ox + s*halfW, oy + wallH/2 - 0.1, midZ); w.receiveShadow = true; g.add(w); });
+  const ceil = new THREE.Mesh(new THREE.BoxGeometry(halfW*2, 0.18, len+1), wallMat); ceil.position.set(ox, oy + wallH - 0.1, midZ); g.add(ceil);
+  scene.add(g); g.visible = false; _caveGroup = g;
+  return tiles;
+}
+function setCaveLighting(on){
+  if (on){ _caveLightSave = { si:sun.intensity, hi:hemi.intensity };
+    sun.position.set(2, 6, 2); sun.intensity = 0.3; hemi.intensity = 0.2;
+    if (scene.fog){ scene.fog.near = 0.5; scene.fog.far = 14; } }
+  else { sun.position.set(8, 15, 6); sun.intensity = 0.82; hemi.intensity = 0.46;
+    if (scene.fog){ scene.fog.near = 22; scene.fog.far = 46; } }
+}
+function caveFadeTo(o){ const e = $('caveFade'); if (e) e.style.opacity = String(o); }
+function enterCave(){
+  const r = S.run; if (!r || r.inCave || r.caveDone) return;
+  r.inCave = true; r.transitioning = true; caveFadeTo(1);
+  setTimeout(() => {
+    r.savedTiles = r.tiles; r.tiles = r.caveTiles; r.idx = 0; r.t = 0; r.lane = 0; r.laneX = 0;
+    if (_caveGroup) _caveGroup.visible = true; setCaveLighting(true);
+    if (S.runner) S.runner.position.copy(r.tiles[0].pos);
+    r.transitioning = false; caveFadeTo(0); showPop('INTO THE PYRAMID');
+  }, 320);
+}
+function exitCave(){
+  const r = S.run; if (!r || !r.inCave) return;
+  r.transitioning = true; caveFadeTo(1);
+  setTimeout(() => {
+    if (_caveGroup) _caveGroup.visible = false; setCaveLighting(false);
+    r.tiles = r.savedTiles; r.idx = Math.max(0, r.caveExitIdx || 0); r.t = 0; r.inCave = false; r.caveDone = true;
+    if (S.runner) S.runner.position.copy(r.tiles[r.idx].pos);
+    r.transitioning = false; caveFadeTo(0); showPop('OUT NEAR THE SUMMIT');
+  }, 320);
+}
+
 // SMOOTH RAMPS: fill the stepped section under the three lanes with a solid, flush incline so the path reads as three
 // smooth ramps cut into the stepped pyramid — NOT a stair. Each consecutive pair of solid (non-gap, non-crumbled) tiles
 // gets a stone slab tilted along the slope that buries the step notch beneath the tread. Where a block is missing, broken
@@ -5538,6 +5592,12 @@ function startRun(){
             perkReflex: perks.nearMissSlow, reflexCD: 0,
             freeSaves: perks.freeSaves + rel.save, coinMul: perks.coinMul * rel.coinMul,
             storms, revives:0, usedAdRevive:false, invuln:0, dead:false, deathReason:'fell', boulders:[] };
+  if (S.levelX){                                   // LEVEL X: splice the inside-the-pyramid corridor in after the first layer, out near the top
+    let entry = -1, exit = -1; const exitLyr = baseBlocks - 2;
+    for (let i=0; i<tiles.length; i++){ if (tiles[i].lyr === 0) entry = i; }            // last tile of the first layer
+    for (let i=0; i<tiles.length; i++){ if (tiles[i].lyr === exitLyr){ exit = i; break; } }   // first tile of the course one below the top
+    if (entry >= 0 && exit > entry){ S.run.caveEntryIdx = entry; S.run.caveExitIdx = exit; S.run.caveTiles = buildCaveTiles(); S.run.inCave = false; S.run.caveDone = false; }
+  }
   // NB: obstacles / coins / power-ups / lane guides are NOT created yet — only when the climb starts
   // (loadRunDressing in beginClimb), so the rating screen shows a clean pyramid with nothing moving on it.
   g.position.copy(tiles[0].pos);
@@ -5682,6 +5742,7 @@ function updateRun(dt){
     followCam(dt, true); return;
   }
   if (r.dead){ followCam(dt, false); return; }     // frozen while the revive prompt is up
+  if (r.transitioning){ followCam(dt, false); placeShadow(g, r); return; }   // frozen behind the cave fade while tiles swap
 
   if (S.fight && S.fight.active){ updateFight(dt); return; }   // PHASE 3: boss fight owns the loop
 
@@ -5716,11 +5777,13 @@ function updateRun(dt){
   }
 
   // sandstorm: ease the fog in/out depending on whether we're inside a storm stretch
-  const inStorm = (r.storms||[]).some(s => r.idx >= s[0] && r.idx <= s[1]);
-  scene.fog.far  += ((inStorm ? 17 : 46) - scene.fog.far) * Math.min(1, dt*1.6);
-  scene.fog.near  = scene.fog.far * 0.32;
-  S.stormA = (S.stormA||0) + ((inStorm ? 0.55 : 0) - (S.stormA||0)) * Math.min(1, dt*2);
-  $('storm').style.opacity = S.stormA.toFixed(2);
+  if (!r.inCave){                                  // storms + open-air fog don't apply inside the pyramid
+    const inStorm = (r.storms||[]).some(s => r.idx >= s[0] && r.idx <= s[1]);
+    scene.fog.far  += ((inStorm ? 17 : 46) - scene.fog.far) * Math.min(1, dt*1.6);
+    scene.fog.near  = scene.fog.far * 0.32;
+    S.stormA = (S.stormA||0) + ((inStorm ? 0.55 : 0) - (S.stormA||0)) * Math.min(1, dt*2);
+    $('storm').style.opacity = S.stormA.toFixed(2);
+  }
   // (the fog + screen tint convey the storm; no per-frame dust particles — keeps mobile smooth)
 
   // hold for the "PYRAMID COMPLETE / CLIMB" beat before moving
@@ -5752,13 +5815,15 @@ function updateRun(dt){
   r.t += r.speed * dt / 1;
   while (r.t >= 1){
     r.t -= 1; r.idx++;
-    if (r.idx >= r.tiles.length-1){     // reached the summit
+    if (r.idx >= r.tiles.length-1){     // reached the end of the current path
       r.idx = r.tiles.length-1; r.t = 0;
+      if (r.inCave){ exitCave(); return; }   // LEVEL X: end of the corridor → pop back out near the summit
       if (isGuardianLevel(gameLevel) && S.guardian && S.guardian.alive && !S.fightWon){
         startFight(); return;           // PHASE 3: square off against the era boss before you can claim the peak
       }
       summitVictory(); return;          // normal levels (and after a won fight) → celebrate, offer NEXT LEVEL
     }
+    if (S.levelX && !r.inCave && !r.caveDone && r.caveEntryIdx != null && r.idx >= r.caveEntryIdx){ enterCave(); return; }   // duck into the cave after the first layer
     Sound.step();
     if (r.invuln <= 0 && tileUnsafe(r.tiles[r.idx])){
       if (!r.jumping){ crumbleTile(r.tiles[r.idx]); startFall(); return; }
