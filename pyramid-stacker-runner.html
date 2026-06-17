@@ -1060,7 +1060,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.387 · 2026.06.15</div>
+  <div id="appVersion">v1.388 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1313,7 +1313,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.387';
+const APP_VERSION = '1.388';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -3590,7 +3590,7 @@ function resetState(){
     pathSlots:[],          // ordered per-cell {pos, placed} for the runner
     buildPath:[], buildRampLayers:{},   // live three-lane pathway that grows up the front-centre as you build
     fight:null, fightWon:false,   // phase-3 boss fight state
-    run:null, runner:null };
+    run:null, runner:null, reachedRun:false };
   if (levelXMode) planLevelXInterrupts();
 }
 // LEVEL X: walk the whole build cell-by-cell, then pick 2–6 mid-wall cells (never a wall's first/freebie cell) to become
@@ -5605,6 +5605,7 @@ function fightJoyEnd(id){
 
 function startRun(){
   S.phase = 'run';
+  S.reachedRun = true;                      // from here on, RETRY restarts the CLIMB (a checkpoint), not the build
   Sound.cap();
   wipe();                                   // golden sweep on the build → climb transition
   // Prep the built stones for the close-up climb: drop the grainy bump map, keep them matte, and BAND alternate
@@ -7244,7 +7245,8 @@ function startLevel(n){ dailyMode = false; puzzleMode = false; levelXMode = fals
 // even mid-climb or after dying — retry drops back to the START of the climb on the SAME pyramid (a checkpoint, no
 // rebuild). Only while still stacking does it restart the build.
 function quickRetry(){ if (atMenu) return;
-  if (S.run){ restartRun(); return; }
+  if (S.reachedRun && S.allBlocks && S.allBlocks.length){ showPop('↻ RETRY CLIMB'); restartRun(); return; }   // a pyramid exists → checkpoint at the climb start
+  showPop('↻ RETRY BUILD');
   if (levelXMode) startLevelX(); else if (puzzleMode) startPuzzleLevel(); else if (dailyMode) startGame(1); else startGame(gameLevel); }
 // Re-enter the run on the pyramid you already built: clear everything spawned for the run (runner, hazards, coins, cave),
 // keep the pyramid + scenery, reset any death/over state, then run startRun again and drop straight into the climb.
