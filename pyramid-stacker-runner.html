@@ -1060,7 +1060,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.384 · 2026.06.15</div>
+  <div id="appVersion">v1.385 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1313,7 +1313,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.384';
+const APP_VERSION = '1.385';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -4509,6 +4509,18 @@ function updateCaveFx(dt, rpos){
   });
   if (r.caveLight && rpos) r.caveLight.position.set(rpos.x, rpos.y + 0.45, rpos.z + 0.12);
 }
+// While you're inside the tunnel, HIDE the whole outside world (pyramid blocks, ramps, ground, sky, props, climb hazards)
+// so nothing pokes through the corridor. Nothing is moved or destroyed — just .visible toggled — so the exterior is
+// untouched and restored intact on the way out. The cave corridor, its mouths, the runner, lights and the glow stay shown.
+function hideWorldForCave(on){
+  const keep = new Set([sun, hemi, _caveGroup, S.runner, S.shadow, S.run && S.run.caveLight, S.run && S.run.bubble].filter(Boolean));
+  _caveMouths.forEach(m => keep.add(m));
+  scene.children.forEach(o => {
+    if (!o || keep.has(o)) return;
+    if (on){ if (o.visible !== false && !o.__caveHid){ o.__caveHid = true; o.visible = false; } }
+    else if (o.__caveHid){ o.visible = true; o.__caveHid = false; }
+  });
+}
 // a carved DARK doorway framed into the pyramid's front face — the cave mouth you run through (a real opening in the wall)
 function buildCaveMouth(pos){
   const g = new THREE.Group();
@@ -4527,6 +4539,8 @@ function caveExit(){
   const r = S.run; if (!r || r.caveDone) return;
   r.transitioning = true; caveFadeTo(1);
   setTimeout(() => {
+    if (r.worldHidden){ hideWorldForCave(false); r.worldHidden = false; }   // bring the pyramid/world back, intact
+    if (_caveGroup) _caveGroup.visible = false;                              // tuck the tunnel away once you're out
     r.idx = Math.max(0, r.caveResumeIdx || (r.caveEndIdx + 1)); r.t = 0; r.caveDone = true;
     if (S.runner) S.runner.position.copy(r.tiles[r.idx].pos);
     r.transitioning = false; caveFadeTo(0); showPop('OUT NEAR THE SUMMIT');
@@ -5863,15 +5877,15 @@ function updateRun(dt){
     S.stormA = (S.stormA||0) + ((inStorm ? 0.55 : 0) - (S.stormA||0)) * Math.min(1, dt*2);
     $('storm').style.opacity = S.stormA.toFixed(2);
   } else {
-    // LEVEL X: smoothly DARKEN as you run into the tunnel and brighten back near the exit (no hard cut)
+    // LEVEL X: smoothly DARKEN as you run into the tunnel; stay dark until the exit fade brightens it back
     let target = 0;
     if (r.caveStartIdx != null && !r.caveDone && r.idx >= r.caveStartIdx){
-      const inFrom = r.idx - r.caveStartIdx, inTo = (r.caveEndIdx || 0) - r.idx;
-      target = Math.max(0, Math.min(1, Math.min(inFrom, inTo) / 7));
+      target = Math.max(0, Math.min(1, (r.idx - r.caveStartIdx) / 6));
     }
     r.caveAmtE = (r.caveAmtE ?? 0) + (target - (r.caveAmtE ?? 0)) * Math.min(1, dt*5);
     const e = r.caveAmtE;
     r.inCave = e > 0.4;
+    if (r.inCave && !r.worldHidden){ hideWorldForCave(true); r.worldHidden = true; }   // clear the outside so nothing pokes through the tunnel
     sun.intensity = 0.82 + (0.30 - 0.82)*e; hemi.intensity = 0.46 + (0.20 - 0.46)*e;
     const fogFar = 46 + (13 - 46)*e;
     scene.fog.far += (fogFar - scene.fog.far) * Math.min(1, dt*3); scene.fog.near = scene.fog.far * 0.3;
@@ -6787,6 +6801,7 @@ function startGame(atLevel){
   checkDailyStreak();                          // first game of the day → streak bump + bonus coins
   $('ratingOverlay').classList.remove('show'); $('nextLevelWrap').classList.remove('show'); $('relicPicker').classList.remove('show'); $('introOverlay').classList.remove('show'); $('featureIntro').classList.remove('show'); $('multHud').classList.add('hidden');
   resetState();
+  [...scene.children].forEach(o => { if (o.__caveHid){ o.visible = true; o.__caveHid = false; } });   // undo any leftover cave hiding (e.g. died inside) so ground/sky never start invisible
   [...scene.children].forEach(o => { if (o.__env || o===ground || o===sky) return; if (o.isMesh) scene.remove(o); if (o.isGroup) scene.remove(o); });
   if (typeof coverPyramid !== 'undefined' && coverPyramid) coverPyramid.visible = false;   // hide the menu centrepiece during play
   S.phase='build';
