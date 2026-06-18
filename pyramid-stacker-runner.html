@@ -387,12 +387,6 @@
     background:rgba(20,12,28,.6); border:1.5px solid rgba(243,200,120,.45); border-radius:12px;
     padding:11px 15px; pointer-events:auto; }
   #restartBtn:active { transform:scale(.95); }
-  /* TEMP test button: instant retry of the current mode, lower-right, works in every game section */
-  #retryBtn { position:fixed; right:calc(max(16px,env(safe-area-inset-right)) + 8px); bottom:calc(max(26px,env(safe-area-inset-bottom)) + 100px); z-index:7;
-    display:none; align-items:center; gap:5px; font-family:'Space Mono',monospace; font-size:10px; font-weight:700; letter-spacing:1.5px; color:#cfe6ff;
-    background:rgba(14,20,32,.72); border:1.5px solid rgba(150,200,255,.5); border-radius:14px; padding:7px 11px; pointer-events:auto; cursor:pointer; }
-  #retryBtn.show { display:inline-flex; }
-  #retryBtn:active { transform:scale(.92); }
 
   /* ---------- home screen (cover art + buttons) ---------- */
   #startScreen { padding:0; justify-content:flex-end; }
@@ -786,7 +780,6 @@
 <div id="coinPops"></div>
 <div id="menuBtn">☰</div>
 <div id="restartBtn">↻</div>
-<div id="retryBtn" title="Retry this mode from the start">↻ RETRY</div>
 <div id="emoteBtn" aria-label="Emote"><svg viewBox="0 0 64 64" fill="none" stroke="#ffe7ad" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 23 Q30 11 53 21"/><path d="M10 31 Q30 19 54 31 Q32 43 10 31 Z" fill="rgba(255,231,173,.16)"/><circle cx="31" cy="31" r="5.2" fill="#ffd86a" stroke="none"/><path d="M23 39 L18 53"/><path d="M41 38 Q47 50 38 54 Q31 55 33 47"/></svg></div>
 
 <div id="meterWrap"><div id="meterLabel">LAYER STABILITY</div>
@@ -1060,7 +1053,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.389 · 2026.06.15</div>
+  <div id="appVersion">v1.390 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1313,7 +1306,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.389';
+const APP_VERSION = '1.390';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -6846,7 +6839,6 @@ function startGame(atLevel){
   S.phase='build';
   if (dailyMode){ __seeded = true; __seed = dailySeed(); } else { __seeded = false; }
   atMenu = false;
-  $('retryBtn').classList.add('show');                 // TEMP retry button visible through the whole run
   $('startScreen').classList.add('hidden'); $('overScreen').classList.add('hidden');
   $('leaderPanel').classList.add('hidden'); $('shopPanel').classList.add('hidden'); $('levelsPanel').classList.add('hidden');
   $('lblA').textContent='SCORE'; $('lblB').textContent='LAYER'; $('levelStat').style.display='';
@@ -6936,7 +6928,6 @@ function beginBuild(){
 let shopTab = 'chars';
 function showStart(){            // the main "home" menu (cover art + PLAY / LEADERBOARD / SHOP)
   atMenu = true; charPrevOn = false; puzzleMode = false; levelXMode = false;   // leaving to the menu always exits Level 0 / Level X
-  $('retryBtn').classList.remove('show');
   ['puzzleHud','puzzleArrowL','puzzleArrowR','puzzleRing'].forEach(id => { const ph=$(id); if (ph) ph.classList.remove('show'); });
   if (S.fight) endFight();        // tear down any in-progress boss fight UI
   $('emoteBtn').classList.remove('show');
@@ -7841,7 +7832,6 @@ btn('emoteBtn',      startEmote);           // stop + turn + do a character emot
 btn('punchBtn',      pPunch);               // PHASE 3 boss fight: punch
 btn('kickBtn',       pKick);                // PHASE 3 boss fight: kick
 btn('throwBtn',      pThrow);               // PHASE 3 boss fight: throw the prop
-btn('retryBtn',      quickRetry);           // TEMP: instant retry of the current mode (build/stack or climb/run)
 btn('restartYes',    ()=>{ hideRestartConfirm(); startGame(gameLevel); });   // restart the current level
 btn('restartNo',     hideRestartConfirm);
 btn('climbBtn',      beginClimb);        // start the climb from the rating screen
