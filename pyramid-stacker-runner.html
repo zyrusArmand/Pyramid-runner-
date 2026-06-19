@@ -1053,7 +1053,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.392 · 2026.06.15</div>
+  <div id="appVersion">v1.393 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1306,7 +1306,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.392';
+const APP_VERSION = '1.393';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -2220,9 +2220,8 @@ function makeRunner(){
       if (a.elbow){ const fore = new THREE.Mesh(new THREE.SphereGeometry(0.044, 14, 12), fur); fore.scale.set(1.05, 1.5, 1.05); fore.position.y = -0.058; a.elbow.add(fore); }
     });
     [g.legL, g.legR].forEach(l => { const th = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 12), fur); th.scale.set(1.12, 1.5, 1.12); th.position.y = -0.05; th.castShadow = true; l.add(th); });
-    // white chest/belly patch + a little six-pack
+    // white chest/belly patch
     const belly = new THREE.Mesh(new THREE.SphereGeometry(0.072, 18, 14), white); belly.scale.set(0.78, 1.05, 0.5); belly.position.set(0, 0.37, 0.058); g.add(belly);
-    for (let r=0; r<3; r++) for (let c=-1; c<=1; c++){ const ab = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 7), white); ab.position.set(c*0.026, 0.40 - r*0.026, 0.092); g.add(ab); }
     // ---- CAT HEAD: pointed ears (pink inner), white muzzle puffs, pink nose, whiskers ----
     [-1,1].forEach(s => {
       const ear = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.072, 4), fur); ear.position.set(s*0.052, 0.668, -0.004); ear.rotation.z = -s*0.2; ear.castShadow = true; g.add(ear);
@@ -2231,20 +2230,37 @@ function makeRunner(){
     });
     if (nose){ nose.material = pink; nose.scale.set(1.4, 0.9, 1.0); nose.position.y = 0.574; }
     [-1,1].forEach(s => { for (let k=0; k<3; k++){ const wk = new THREE.Mesh(new THREE.BoxGeometry(0.072, 0.0028, 0.0028), white); wk.position.set(s*0.062, 0.571 + (k-1)*0.011, 0.084); wk.rotation.z = (k-1)*0.16*-s; wk.rotation.y = s*0.32; g.add(wk); } });
-    // ---- TAIL: a fat gray cat tail (white tip) curving back & up ----
-    const tail = new THREE.Group();
-    for (let i=0; i<7; i++){ const sg = new THREE.Mesh(new THREE.SphereGeometry(0.032 - i*0.0028, 12, 10), i>=6 ? white : fur); sg.position.set(0, 0.004*i*i, -0.022*i); sg.castShadow = true; tail.add(sg); }
-    tail.position.set(0, 0.27, -0.082); g.add(tail);
-    // ---- BASEBALL / TRAINING CARD strapped to his back ----
+    // ---- TAIL: ONE smooth connected gray cat tail (white tip) — short cylinders welded by joint spheres, curving back & up ----
+    const tail = new THREE.Group(); const TN = 11, tp = [];
+    for (let i=0; i<TN; i++){ const f = i/(TN-1); tp.push(new THREE.Vector3(0, 0.02 + 0.2*f*f, -0.12*f*(1.4-f))); }
+    for (let i=0; i<TN-1; i++){ const A = tp[i], B = tp[i+1], dy = B.y-A.y, dz = B.z-A.z, len = Math.hypot(dy,dz) || 0.01;
+      const rA = 0.032*(1 - i/(TN+2)), rB = 0.032*(1 - (i+1)/(TN+2)), mat = i>=TN-3 ? white : fur;
+      const cyl = new THREE.Mesh(new THREE.CylinderGeometry(rB, rA, len*1.06, 12), mat); cyl.position.set(0, (A.y+B.y)/2, (A.z+B.z)/2); cyl.rotation.x = Math.atan2(dz, dy); cyl.castShadow = true; tail.add(cyl);
+      const jt = new THREE.Mesh(new THREE.SphereGeometry(rA, 12, 10), mat); jt.position.set(0, A.y, A.z); tail.add(jt); }
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.032*(1-(TN-1)/(TN+2)), 12, 10), white); tip.position.set(0, tp[TN-1].y, tp[TN-1].z); tail.add(tip);
+    tail.position.set(0, 0.255, -0.085); g.add(tail);
+    // ---- BASEBALL CARD strapped to his back, FRONT FACING OUTWARD (rotated 180°) ----
     const card = new THREE.Group();
-    card.add(new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.155, 0.008), new THREE.MeshStandardMaterial({ color:0xf4efe2, roughness:0.6 })));
-    const top = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.026, 0.009), new THREE.MeshStandardMaterial({ color:0xc0303a, roughness:0.5 })); top.position.set(0, 0.064, 0.001); card.add(top);
-    const photo = new THREE.Mesh(new THREE.BoxGeometry(0.084, 0.078, 0.009), new THREE.MeshStandardMaterial({ color:0x4a86c0, roughness:0.5 })); photo.position.set(0, 0.012, 0.001); card.add(photo);
-    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.018, 12, 10), white); ball.position.set(0, 0.012, 0.012); card.add(ball);
-    [-1,1].forEach(s => { const st = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.0022, 0.0022), new THREE.MeshStandardMaterial({ color:0xc0303a })); st.position.set(s*0.004, 0.012, 0.029); st.rotation.z = 0.5; card.add(st); });
-    const nameP = new THREE.Mesh(new THREE.BoxGeometry(0.088, 0.02, 0.009), new THREE.MeshStandardMaterial({ color:0x2a2a32 })); nameP.position.set(0, -0.052, 0.001); card.add(nameP);
+    const cream = new THREE.MeshStandardMaterial({ color:0xf6f1e3, roughness:0.55 });
+    const red   = new THREE.MeshStandardMaterial({ color:0xc0303a, roughness:0.5 });
+    const navy  = new THREE.MeshStandardMaterial({ color:0x223a6a, roughness:0.5 });
+    const sky   = new THREE.MeshStandardMaterial({ color:0x5aa0d8, roughness:0.5 });
+    const gold2 = new THREE.MeshStandardMaterial({ color:0xe8c45a, metalness:0.5, roughness:0.4 });
+    const figM  = new THREE.MeshStandardMaterial({ color:0x2a2a30, roughness:0.6 });
+    card.add(new THREE.Mesh(new THREE.BoxGeometry(0.116, 0.16, 0.007), red));                                   // red border
+    const face = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.144, 0.009), cream); face.position.z = 0.001; card.add(face);   // cream face
+    const banner = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.024, 0.011), navy); banner.position.set(0, 0.058, 0.002); card.add(banner);   // team name banner
+    const win = new THREE.Mesh(new THREE.BoxGeometry(0.086, 0.07, 0.011), sky); win.position.set(0, 0.012, 0.003); card.add(win);            // photo window (sky)
+    const phHead = new THREE.Mesh(new THREE.SphereGeometry(0.011, 10, 8), figM); phHead.position.set(0, 0.03, 0.012); card.add(phHead);       // little player on the card
+    const phBody = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.034, 0.008), figM); phBody.position.set(0, 0.006, 0.012); card.add(phBody);
+    const bat = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.005, 0.04, 8), gold2); bat.position.set(-0.012, 0.004, 0.014); bat.rotation.z = 0.7; card.add(bat);   // bat
+    const ball2 = new THREE.Mesh(new THREE.SphereGeometry(0.013, 12, 10), cream); ball2.position.set(0.018, -0.006, 0.016); card.add(ball2);  // baseball
+    [-1,1].forEach(s => { const seam = new THREE.Mesh(new THREE.BoxGeometry(0.013, 0.0016, 0.0016), red); seam.position.set(0.018, -0.006, 0.029); seam.rotation.z = s*0.6; card.add(seam); });   // stitches
+    const namePlate = new THREE.Mesh(new THREE.BoxGeometry(0.092, 0.018, 0.011), red); namePlate.position.set(0, -0.04, 0.002); card.add(namePlate);   // name plate
+    [-0.058, -0.07].forEach(yy => { const line = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.005, 0.011), navy); line.position.set(0, yy, 0.002); card.add(line); });   // stat lines
+    [[-0.046, 0.066],[0.046, 0.066]].forEach(c => { const star = new THREE.Mesh(new THREE.SphereGeometry(0.006, 8, 6), gold2); star.position.set(c[0], c[1], 0.004); card.add(star); });   // corner stars
     const strap = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.34, 0.01), dark); strap.position.set(-0.02, 0.42, 0.0); strap.rotation.z = 0.24; g.add(strap);
-    card.position.set(0.012, 0.42, -0.118); card.rotation.set(0.05, 0, 0.1); card.castShadow = true; g.add(card);
+    card.position.set(0.012, 0.42, -0.124); card.rotation.set(0.05, Math.PI, -0.1); card.castShadow = true; g.add(card);
   } else {
     // explorer (and the colour variants): a rounded pack + a soft sun hat
     const pack = new THREE.Mesh(new THREE.SphereGeometry(0.085, 18, 14),
