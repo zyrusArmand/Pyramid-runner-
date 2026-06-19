@@ -1053,7 +1053,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.390 · 2026.06.15</div>
+  <div id="appVersion">v1.391 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1306,7 +1306,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.390';
+const APP_VERSION = '1.391';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1565,6 +1565,7 @@ const CHARACTERS = {
   nzekro:   { name:'NZEKRO (THE HOBBYIST)', cost:3333, swatch:'#6e7178', color:0x6e7178, skin:0xa06d42, style:'nzekro',   exclusive:true },
   nassar:   { name:'NASSAR',       cost:3333, swatch:'#1f7a8a', color:0x1f7a8a, skin:0x8f6034, style:'nassar',   exclusive:true },
   thailand: { name:'MR.THAILAND',  cost:3333, swatch:'#57b94a', color:0x57b94a, skin:0x57b94a, style:'thailand', exclusive:true },
+  jjtoe:    { name:'JJ TOE',        cost:3333, swatch:'#9aa0a6', color:0x9aa0a6, skin:0xefebe4, style:'jjtoe',    exclusive:true },
 };
 CHAR_SPEC.forEach(s => {
   const [era,tier,key,name,color,skin,head,glow,reuse] = s;
@@ -2200,6 +2201,50 @@ function makeRunner(){
       [-1,0,1].forEach(t => { const toe = new THREE.Mesh(new THREE.SphereGeometry(0.027, 10, 8), skinG); toe.scale.set(0.74, 0.5, 1.25); toe.position.set(t*0.03, -0.012, 0.075); toe.castShadow = true; L.wrist.add(toe); }); });
     [g.armL, g.armR].forEach(A => { if (!A || !A.wrist) return;
       [-1,0,1].forEach(t => { const fin = new THREE.Mesh(new THREE.SphereGeometry(0.017, 8, 8), skinG); fin.scale.set(0.7,0.5,1.25); fin.position.set(t*0.017, -0.05, 0.008); A.wrist.add(fin); }); });
+  } else if (style === 'jjtoe'){
+    // 🐱💪 JJ TOE — an absurdly SWOLE gray-&-white gym-bro CAT. Biped rig kept exactly (runs the same); just cat-dressed + jacked.
+    const fur   = cMat;                                                        // gray fur (ch.color)
+    const white = new THREE.MeshStandardMaterial({ color:0xefebe4, roughness:0.72 });
+    const pink  = new THREE.MeshStandardMaterial({ color:0xe79aa6, roughness:0.55 });
+    const dark  = new THREE.MeshStandardMaterial({ color:0x161616, roughness:0.55 });
+    // ---- ABSURDLY BUFF upper body (funny proportions: boulder shoulders, tiny waist) ----
+    torso.scale.set(1.26, 1.06, 0.82);                                         // barrel chest
+    shoulders.scale.set(1.98, 0.66, 1.02); shoulders.position.y = 0.486;       // boulder delts yoke
+    waist.scale.set(0.72, 0.94, 0.66);                                         // cinched gym waist
+    neck.scale.set(1.8, 1.1, 1.8);                                             // thick traps neck
+    const traps = new THREE.Mesh(new THREE.SphereGeometry(0.072, 18, 14), fur); traps.scale.set(1.8, 0.7, 0.95); traps.position.set(0, 0.5, -0.012); traps.castShadow = true; g.add(traps);
+    [-1,1].forEach(s => { const pec = new THREE.Mesh(new THREE.SphereGeometry(0.063, 18, 14), fur); pec.scale.set(0.96, 0.82, 0.64); pec.position.set(s*0.05, 0.432, 0.05); pec.castShadow = true; g.add(pec); });
+    [g.armL, g.armR].forEach(a => {                                            // delts cover the joints; huge biceps + forearms
+      const delt = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 12), fur); delt.scale.set(1.12, 1.0, 1.12); delt.position.y = 0.004; delt.castShadow = true; a.add(delt);
+      const bi = new THREE.Mesh(new THREE.SphereGeometry(0.052, 16, 12), fur); bi.scale.set(1.05, 1.55, 1.05); bi.position.y = -0.072; bi.castShadow = true; a.add(bi);
+      if (a.elbow){ const fore = new THREE.Mesh(new THREE.SphereGeometry(0.044, 14, 12), fur); fore.scale.set(1.05, 1.5, 1.05); fore.position.y = -0.058; a.elbow.add(fore); }
+    });
+    [g.legL, g.legR].forEach(l => { const th = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 12), fur); th.scale.set(1.12, 1.5, 1.12); th.position.y = -0.05; th.castShadow = true; l.add(th); });
+    // white chest/belly patch + a little six-pack
+    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.072, 18, 14), white); belly.scale.set(0.78, 1.05, 0.5); belly.position.set(0, 0.37, 0.058); g.add(belly);
+    for (let r=0; r<3; r++) for (let c=-1; c<=1; c++){ const ab = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 7), white); ab.position.set(c*0.026, 0.40 - r*0.026, 0.092); g.add(ab); }
+    // ---- CAT HEAD: pointed ears (pink inner), white muzzle puffs, pink nose, whiskers ----
+    [-1,1].forEach(s => {
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.072, 4), fur); ear.position.set(s*0.052, 0.668, -0.004); ear.rotation.z = -s*0.2; ear.castShadow = true; g.add(ear);
+      const inner = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.046, 4), pink); inner.position.set(s*0.052, 0.662, 0.012); inner.rotation.z = -s*0.2; g.add(inner);
+      const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.027, 12, 10), white); cheek.position.set(s*0.03, 0.564, 0.083); g.add(cheek);
+    });
+    if (nose){ nose.material = pink; nose.scale.set(1.4, 0.9, 1.0); nose.position.y = 0.574; }
+    [-1,1].forEach(s => { for (let k=0; k<3; k++){ const wk = new THREE.Mesh(new THREE.BoxGeometry(0.072, 0.0028, 0.0028), white); wk.position.set(s*0.062, 0.571 + (k-1)*0.011, 0.084); wk.rotation.z = (k-1)*0.16*-s; wk.rotation.y = s*0.32; g.add(wk); } });
+    // ---- TAIL: a fat gray cat tail (white tip) curving back & up ----
+    const tail = new THREE.Group();
+    for (let i=0; i<7; i++){ const sg = new THREE.Mesh(new THREE.SphereGeometry(0.032 - i*0.0028, 12, 10), i>=6 ? white : fur); sg.position.set(0, 0.004*i*i, -0.022*i); sg.castShadow = true; tail.add(sg); }
+    tail.position.set(0, 0.27, -0.082); g.add(tail);
+    // ---- BASEBALL / TRAINING CARD strapped to his back ----
+    const card = new THREE.Group();
+    card.add(new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.155, 0.008), new THREE.MeshStandardMaterial({ color:0xf4efe2, roughness:0.6 })));
+    const top = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.026, 0.009), new THREE.MeshStandardMaterial({ color:0xc0303a, roughness:0.5 })); top.position.set(0, 0.064, 0.001); card.add(top);
+    const photo = new THREE.Mesh(new THREE.BoxGeometry(0.084, 0.078, 0.009), new THREE.MeshStandardMaterial({ color:0x4a86c0, roughness:0.5 })); photo.position.set(0, 0.012, 0.001); card.add(photo);
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.018, 12, 10), white); ball.position.set(0, 0.012, 0.012); card.add(ball);
+    [-1,1].forEach(s => { const st = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.0022, 0.0022), new THREE.MeshStandardMaterial({ color:0xc0303a })); st.position.set(s*0.004, 0.012, 0.029); st.rotation.z = 0.5; card.add(st); });
+    const nameP = new THREE.Mesh(new THREE.BoxGeometry(0.088, 0.02, 0.009), new THREE.MeshStandardMaterial({ color:0x2a2a32 })); nameP.position.set(0, -0.052, 0.001); card.add(nameP);
+    const strap = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.34, 0.01), dark); strap.position.set(-0.02, 0.42, 0.0); strap.rotation.z = 0.24; g.add(strap);
+    card.position.set(0.012, 0.42, -0.118); card.rotation.set(0.05, 0, 0.1); card.castShadow = true; g.add(card);
   } else {
     // explorer (and the colour variants): a rounded pack + a soft sun hat
     const pack = new THREE.Mesh(new THREE.SphereGeometry(0.085, 18, 14),
