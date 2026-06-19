@@ -1053,7 +1053,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.397 · 2026.06.15</div>
+  <div id="appVersion">v1.398 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1306,7 +1306,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.397';
+const APP_VERSION = '1.398';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -6469,14 +6469,15 @@ function makeEmoteGolf(){
   club.add((()=>{ const m = new THREE.Mesh(new THREE.CylinderGeometry(0.0045, 0.006, 0.34, 10), shaftM); m.position.y = -0.22; return m; })());
   const head = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.03, 0.024), headM); head.position.set(0.016, -0.4, 0.006); head.castShadow = true; club.add(head);
   golf.add(club); golf.__club = club;
-  // BALL on the ground
-  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.016, 12, 10), whiteM); ball.castShadow = true; golf.add(ball); golf.__ball = ball;
-  // HOLE (dark disc) + FLAG (pole + triangle)
-  const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.004, 18), darkM); golf.add(hole); golf.__hole = hole;
+  // GROUND props (ball + cup + flag) live in their OWN sub-group. playEmote counter-rotates this group against the body's
+  // turn so the cup/flag/ball stay PUT in the world while he swings (they no longer orbit with him).
+  const ground = new THREE.Group(); golf.add(ground); golf.__ground = ground;
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.016, 12, 10), whiteM); ball.castShadow = true; ground.add(ball); golf.__ball = ball;
+  const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.004, 18), darkM); ground.add(hole); golf.__hole = hole;
   const flagGrp = new THREE.Group();
   flagGrp.add((()=>{ const m = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.17, 8), shaftM); m.position.y = 0.085; return m; })());
   const flag = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.055, 3), redM); flag.rotation.z = -Math.PI/2; flag.position.set(0.03, 0.15, 0); flagGrp.add(flag); golf.__flag = flag;
-  golf.add(flagGrp); golf.__flagGrp = flagGrp;
+  ground.add(flagGrp); golf.__flagGrp = flagGrp;
   return golf;
 }
 function playEmote(g, r, t, dt){
@@ -6584,52 +6585,53 @@ function playEmote(g, r, t, dt){
         const a=i/F.__sparkles.length*Math.PI*2, rad=0.06+life*0.16; sp.position.set(Math.cos(a)*rad, 0.31+Math.sin(a)*rad*0.8, 0.24); sp.scale.setScalar(0.5+(1-life)*1.3); if (sp.material) sp.material.emissiveIntensity = 0.9*(1-life); });
     }
   } else if (style === 'jjtoe'){
-    // ⛳ a REAL golf swing: address → coil (shoulders turn back, weight to the back foot) → downswing (uncoil, weight to the
-    // front foot) → impact → a balanced finish turned to the target. Ball & cup sit to his SIDE so the whole swing faces
-    // the viewer; the ball then rolls into the cup and vanishes (HOLE IN ONE).
-    const G = r.emoteProps, club = G && G.__club, ball = G && G.__ball, hole = G && G.__hole, flag = G && G.__flag, flagGrp = G && G.__flagGrp;
+    // ⛳ a REAL golf swing — and the body stays PLANTED (only turns/leans in place, never translates) so the camera never
+    // moves, and the cup/flag/ball sit in their own ground group that's counter-rotated so they never orbit with him.
+    // address → backswing COIL (shoulders turn back, weight to back foot) → downswing → IMPACT → balanced finish.
+    const G = r.emoteProps, club = G && G.__club, ground = G && G.__ground, ball = G && G.__ball, flag = G && G.__flag, hole = G && G.__hole, flagGrp = G && G.__flagGrp;
     if (r.__golfBX === undefined){ r.__golfBX = g.position.x; r.__golfBY = g.position.y; r.__golfBZ = g.position.z; }
-    if (hole) hole.position.set(0.44, 0.006, 0.06);                 // cup off to his side
-    if (flagGrp) flagGrp.position.set(0.44, 0.008, 0.06);
-    if (club){ club.position.set(0.07, 0.40, 0.13); club.visible = true; }
-    // body turn (coil/uncoil), spine lean over the ball, weight shift, and the club's up/down arc
-    let turnY, leanX, shiftX, clubX, clubZ;
-    if (t < 0.95){ const wg = Math.sin(t*6)*0.05; turnY = -0.16; leanX = 0.24; shiftX = 0; clubX = 0.5 + wg; clubZ = -0.18; }                     // ADDRESS + waggle
-    else if (t < 1.7){ const w = (t-0.95)/0.75; turnY = -0.16 - 0.66*w; leanX = 0.24; shiftX = -0.028*w; clubX = 0.5 - 2.75*w; clubZ = -0.18 - 0.5*w; }   // BACKSWING (coil, weight back)
-    else if (t < 1.96){ const w = (t-1.7)/0.26; turnY = -0.82 + 1.02*w; leanX = 0.24 - 0.04*w; shiftX = -0.028 + 0.088*w; clubX = -2.25 + 2.85*w; clubZ = -0.68 + 0.74*w; }   // DOWNSWING → IMPACT (uncoil fast, weight forward)
-    else if (t < 2.75){ const w = Math.min(1, (t-1.96)/0.6); turnY = 0.2 + 0.5*w; leanX = 0.2 - 0.2*w; shiftX = 0.06; clubX = 0.6 - 2.6*w; clubZ = 0.06 + 0.6*w; }   // FOLLOW-THROUGH → balanced finish
-    else { turnY = 0.7; leanX = 0; shiftX = 0.06; clubX = -2.0; clubZ = 0.66; }
-    g.rotation.y = turnY; g.rotation.x = leanX;
-    g.position.set(r.__golfBX + shiftX, r.__golfBY, r.__golfBZ);
-    if (club){ club.rotation.x = clubX; club.rotation.z = clubZ; }
-    // knees: back knee flexes while weight is back, front knee posts as weight moves forward
-    if (g.legL){ g.legL.rotation.set(0,0,0.04); g.legR.rotation.set(0,0,-0.04);
-      if (g.legL.elbow) g.legL.elbow.rotation.x = 0.12 + Math.max(0,-shiftX)*4;
-      if (g.legR.elbow) g.legR.elbow.rotation.x = 0.12 + Math.max(0, shiftX)*2.5; }
+    const ez = x => x<0.5 ? 2*x*x : 1 - Math.pow(-2*x+2, 2)/2;     // easeInOut
+    if (club) club.position.set(0.055, 0.40, 0.12);
+    if (hole) hole.position.set(0.4, 0.004, 0.04);                 // cup off to his side, on the ground
+    if (flagGrp) flagGrp.position.set(0.4, 0.006, 0.04);
+    let turnY, leanX, clubX, clubZ, armX, kBack, kFront;
+    if (t < 1.0){ turnY=-0.1; leanX=0.26; clubX=0.6; clubZ=-0.18; armX=-0.7; kBack=0.22; kFront=0.22; }                                                                       // ADDRESS
+    else if (t < 1.8){ const w=ez((t-1.0)/0.8); turnY=-0.1-0.95*w; leanX=0.26; clubX=0.6-3.35*w; clubZ=-0.18-0.4*w; armX=-0.7-0.95*w; kBack=0.34; kFront=0.1; }                // BACKSWING coil
+    else if (t < 2.06){ const w=ez((t-1.8)/0.26); turnY=-1.05+1.18*w; leanX=0.26-0.02*w; clubX=-2.75+3.25*w; clubZ=-0.58+0.5*w; armX=-1.65+1.3*w; kBack=0.1; kFront=0.3; }      // DOWNSWING → IMPACT
+    else if (t < 2.9){ const w=ez(Math.min(1,(t-2.06)/0.72)); turnY=0.13+0.67*w; leanX=0.24-0.24*w; clubX=0.5-3.15*w; clubZ=-0.08+0.7*w; armX=-0.35-1.55*w; kBack=0.05; kFront=0.16; }   // FOLLOW-THROUGH → finish
+    else { turnY=0.8; leanX=0; clubX=-2.65; clubZ=0.62; armX=-1.9; kBack=0.04; kFront=0.12; }
+    if (t < 1.0) clubX += Math.sin(t*6)*0.04;                       // little waggle at address
+    g.position.set(r.__golfBX, r.__golfBY, r.__golfBZ);            // PLANTED — never drifts (camera stays still)
+    g.rotation.set(leanX, turnY, 0);                               // spine tilt + body turn, in place
+    if (ground) ground.rotation.y = -turnY;                        // keep the cup/flag/ball world-fixed (don't orbit with the turn)
+    if (club) club.rotation.set(clubX, 0, clubZ);
+    // knees flex for the weight shift (NOT by moving the body)
+    if (g.legL){ g.legL.rotation.set(0,0,0.04); if (g.legL.elbow) g.legL.elbow.rotation.x = kFront; }
+    if (g.legR){ g.legR.rotation.set(0,0,-0.04); if (g.legR.elbow) g.legR.elbow.rotation.x = kBack; }
     // both arms grip the club and ride the arc together
-    const ax = Math.max(-1.45, -0.5 + clubX*0.34);
-    if (g.armR){ g.armR.rotation.x = ax; g.armR.rotation.z = -0.16; } bend(g.armR, -0.6 - Math.max(0,-clubX)*0.4);
-    if (g.armL){ g.armL.rotation.x = ax; g.armL.rotation.z = 0.16; } bend(g.armL, -0.6);
-    // BALL: launches at impact, rolls along the ground to the cup on his side, hops once, drops in & vanishes
-    const impactT = 1.92;
+    const eb = -0.5 + Math.min(0, armX+0.5)*0.55;
+    if (g.armR){ g.armR.rotation.x = armX; g.armR.rotation.z = -0.14; } bend(g.armR, eb);
+    if (g.armL){ g.armL.rotation.x = armX; g.armL.rotation.z = 0.14; } bend(g.armL, eb);
+    // BALL: launches at impact, rolls (world-fixed via the counter-rotated ground) to the cup, hops once, drops in & vanishes
+    const impactT = 1.96;
     if (ball){
-      if (t < impactT){ ball.position.set(0.13, 0.018, 0.07); ball.visible = true; }
-      else { const w = Math.min(1, (t-impactT)/0.85);
-        ball.position.x = 0.13 + (0.44-0.13)*w; ball.position.z = 0.07 + (0.06-0.07)*w;
-        ball.position.y = 0.018 + (w<0.8 ? Math.sin(w/0.8*Math.PI)*0.04 : -(w-0.8)/0.2*0.05);   // a hop, then plunk into the cup
+      if (t < impactT){ ball.position.set(0.12, 0.016, 0.04); ball.visible = true; }
+      else { const w = Math.min(1, (t-impactT)/0.8);
+        ball.position.x = 0.12 + (0.4-0.12)*w; ball.position.z = 0.04;
+        ball.position.y = 0.016 + (w<0.8 ? Math.sin(w/0.8*Math.PI)*0.04 : -(w-0.8)/0.2*0.045);
         ball.rotation.z -= dt*24; ball.visible = w < 0.98;
-        if (w >= 0.98 && !r.__golfDone){ r.__golfDone = true; try { Sound.perfect && Sound.perfect(2); } catch(e){} try { sparkle(g.position.clone().add(new THREE.Vector3(0.44,0.05,0.06))); } catch(e){} showPop('HOLE IN ONE!'); }
+        if (w >= 0.98 && !r.__golfDone){ r.__golfDone = true; try { Sound.perfect && Sound.perfect(2); } catch(e){} showPop('HOLE IN ONE!'); }
       }
     }
-    if (flag) flag.rotation.z = -Math.PI/2 + Math.sin(t*6)*0.12;
-    // CELEBRATE once it's in — stand tall, fist pump toward the cup
-    if (t > 2.8){
-      const c = Math.sin((t-2.8)*9);
+    if (flag) flag.rotation.z = -Math.PI/2 + Math.sin(t*6)*0.1;
+    // CELEBRATE once it's in — stand tall, two-fist pump (still planted)
+    if (t > 2.95){
+      const c = Math.sin((t-2.95)*9);
       if (club) club.visible = false;
-      g.rotation.x = 0; g.rotation.y = 0.25;
+      g.rotation.set(0, 0.2, 0); if (ground) ground.rotation.y = -0.2;
       if (g.armR){ g.armR.rotation.x = -2.1 + c*0.25; g.armR.rotation.z = -0.3; } bend(g.armR, -1.0);
       if (g.armL){ g.armL.rotation.x = -2.1 + c*0.25; g.armL.rotation.z = 0.3; } bend(g.armL, -1.0);
-      g.position.set(r.__golfBX, r.__golfBY + Math.abs(c)*0.007, r.__golfBZ);
+      g.position.set(r.__golfBX, r.__golfBY + Math.abs(c)*0.006, r.__golfBZ);
     }
   } else {
     // default: a friendly wave
