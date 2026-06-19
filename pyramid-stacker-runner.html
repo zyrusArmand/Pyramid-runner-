@@ -1053,7 +1053,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.394 · 2026.06.15</div>
+  <div id="appVersion">v1.395 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1306,7 +1306,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.394';
+const APP_VERSION = '1.395';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -6212,7 +6212,7 @@ function slowmo(){ S.timeScale = 0.32; }      // brief bullet-time, eased back t
 
 // ---- EMOTES: tap the 🎭 button to stop, turn to the camera, and do a little character routine ----
 function emoteDur(){ const s = character().style;
-  return s==='nzekro' ? 4.6 : s==='miah' ? 3.4 : s==='ant' ? 3.0 : s==='american' ? 3.2 : s==='frida' ? 6.0 : 2.0; }
+  return s==='nzekro' ? 4.6 : s==='miah' ? 3.4 : s==='ant' ? 3.0 : s==='american' ? 3.2 : s==='frida' ? 6.0 : s==='jjtoe' ? 3.8 : 2.0; }
 function startEmote(){
   const r = S.run, g = S.runner;
   if (!r || !g || r.emote || r.falling || r.dead || r.celebrating || r.awaitStart || r.startDelay > 0) return;
@@ -6225,6 +6225,7 @@ function startEmote(){
     else if (style === 'ant'){ r.emoteProps = makeEmoteSpray(); g.add(r.emoteProps); }
     else if (style === 'nzekro'){ r.emoteProps = makeEmoteCanvas(); g.add(r.emoteProps); }
     else if (style === 'frida'){ r.emoteProps = makeEmoteFrida(); g.add(r.emoteProps); }
+    else if (style === 'jjtoe'){ r.emoteProps = makeEmoteGolf(); g.add(r.emoteProps); r.__golfDone = false; }
   } catch(e){}
   try { (style==='miah' || style==='frida') ? (Sound.cap && Sound.cap()) : (Sound.step && Sound.step()); } catch(e){}
 }
@@ -6239,6 +6240,7 @@ function previewEmote(){
     else if (style==='ant'){ em.emoteProps = makeEmoteSpray(); g.add(em.emoteProps); }
     else if (style==='nzekro'){ em.emoteProps = makeEmoteCanvas(); g.add(em.emoteProps); }
     else if (style==='frida'){ em.emoteProps = makeEmoteFrida(); g.add(em.emoteProps); }
+    else if (style==='jjtoe'){ em.emoteProps = makeEmoteGolf(); g.add(em.emoteProps); }
   } catch(e){}
   curChar = save;
   charPrev.emote = em;
@@ -6449,6 +6451,31 @@ function makeEmoteCanvas(){
   return grp;
 }
 // per-character emote animation
+// ⛳ JJ TOE's golf set: a club (pivoted at the grip so it swings as one), a ball, and a hole with a flag
+function makeEmoteGolf(){
+  const golf = new THREE.Group();
+  const shaftM = new THREE.MeshStandardMaterial({ color:0xd2d6db, metalness:0.7, roughness:0.3 });
+  const headM  = new THREE.MeshStandardMaterial({ color:0x2a2d33, metalness:0.6, roughness:0.35 });
+  const gripM  = new THREE.MeshStandardMaterial({ color:0x18181c, roughness:0.7 });
+  const whiteM = new THREE.MeshStandardMaterial({ color:0xf4f4f0, roughness:0.45 });
+  const redM   = new THREE.MeshStandardMaterial({ color:0xc83b3b, roughness:0.5 });
+  const darkM  = new THREE.MeshStandardMaterial({ color:0x0b0b0d, roughness:0.95 });
+  // CLUB — grip at the pivot (top), shaft hangs DOWN -y to an angled head; rotating the group swings the whole club
+  const club = new THREE.Group();
+  club.add((()=>{ const m = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.06, 10), gripM); m.position.y = -0.03; return m; })());
+  club.add((()=>{ const m = new THREE.Mesh(new THREE.CylinderGeometry(0.0045, 0.006, 0.34, 10), shaftM); m.position.y = -0.22; return m; })());
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.03, 0.024), headM); head.position.set(0.016, -0.4, 0.006); head.castShadow = true; club.add(head);
+  golf.add(club); golf.__club = club;
+  // BALL on the ground
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.016, 12, 10), whiteM); ball.castShadow = true; golf.add(ball); golf.__ball = ball;
+  // HOLE (dark disc) + FLAG (pole + triangle)
+  const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.004, 18), darkM); golf.add(hole); golf.__hole = hole;
+  const flagGrp = new THREE.Group();
+  flagGrp.add((()=>{ const m = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.17, 8), shaftM); m.position.y = 0.085; return m; })());
+  const flag = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.055, 3), redM); flag.rotation.z = -Math.PI/2; flag.position.set(0.03, 0.15, 0); flagGrp.add(flag); golf.__flag = flag;
+  golf.add(flagGrp); golf.__flagGrp = flagGrp;
+  return golf;
+}
 function playEmote(g, r, t, dt){
   const style = character().style || '';
   const bend = (a, x) => { if (a && a.elbow) a.elbow.rotation.x = x; };
@@ -6552,6 +6579,43 @@ function playEmote(g, r, t, dt){
       // SPARKLES burst outward when the tray first appears (~3.0–3.9s)
       if (F.__sparkles) F.__sparkles.forEach((sp,i)=>{ if (cooking){ sp.visible=false; return; } const life=Math.min(1,(t-3.0)/0.9); if (life>=1){ sp.visible=false; return; } sp.visible=true;
         const a=i/F.__sparkles.length*Math.PI*2, rad=0.06+life*0.16; sp.position.set(Math.cos(a)*rad, 0.31+Math.sin(a)*rad*0.8, 0.24); sp.scale.setScalar(0.5+(1-life)*1.3); if (sp.material) sp.material.emissiveIntensity = 0.9*(1-life); });
+    }
+  } else if (style === 'jjtoe'){
+    // ⛳ little GOLF SWING → HOLE IN ONE: address, backswing, whip through, the ball rolls into the cup & vanishes, then a fist-pump
+    const G = r.emoteProps, club = G && G.__club, ball = G && G.__ball, hole = G && G.__hole, flag = G && G.__flag, flagGrp = G && G.__flagGrp;
+    if (hole) hole.position.set(0.06, 0.006, 0.34);
+    if (flagGrp) flagGrp.position.set(0.06, 0.008, 0.34);
+    if (club){ club.position.set(0.0, 0.42, 0.115); club.visible = true; }
+    // grip pose: both hands together out front, leaning over the ball
+    if (g.armR){ g.armR.rotation.x = -0.62; g.armR.rotation.z = -0.22; } bend(g.armR, -0.85);
+    if (g.armL){ g.armL.rotation.x = -0.62; g.armL.rotation.z = 0.22; } bend(g.armL, -0.85);
+    let swing = 0;                                  // club roll (frontal swing arc)
+    if (t < 0.95){ swing = Math.sin(t*7)*0.07; g.position.y += Math.sin(t*7)*0.001; }   // address + waggle
+    else if (t < 1.5){ const w=(t-0.95)/0.55; swing = 1.95*w*w; }                         // backswing up
+    else if (t < 1.7){ const w=(t-1.5)/0.2;  swing = 1.95 - 3.55*w; }                     // downswing whip
+    else if (t < 2.7){ swing = -1.6; }                                                    // follow-through hold
+    else { swing = -1.6; }
+    const contact = t >= 1.66;
+    if (club) club.rotation.z = swing;
+    // BALL: still at address, launches at contact, rolls to the cup, hops once, drops in & disappears
+    if (ball){
+      if (!contact){ ball.position.set(0.016, 0.018, 0.13); ball.visible = true; }
+      else { const w = Math.min(1, (t-1.66)/0.95);
+        ball.position.x = 0.016 + (0.06-0.016)*w;
+        ball.position.z = 0.13 + (0.34-0.13)*w;
+        ball.position.y = 0.018 + (w<0.8 ? Math.sin(w/0.8*Math.PI)*0.035 : -(w-0.8)/0.2*0.05);   // a hop, then plunk into the cup
+        ball.rotation.x += dt*22; ball.visible = w < 0.98;                                          // gone once it's in
+        if (w >= 0.98 && !r.__golfDone){ r.__golfDone = true; try { Sound.perfect && Sound.perfect(2); } catch(e){} try { sparkle(g.position.clone().add(new THREE.Vector3(0.06,0.04,0.34))); } catch(e){} showPop('HOLE IN ONE!'); }
+      }
+    }
+    if (flag) flag.rotation.z = -Math.PI/2 + Math.sin(t*6)*0.12;     // flag flutters
+    // CELEBRATE — drop into a two-fist pump once the ball's in
+    if (t > 2.7){
+      const c = Math.sin((t-2.7)*9);
+      if (club) club.visible = false;
+      if (g.armR){ g.armR.rotation.x = -2.15 + c*0.25; g.armR.rotation.z = -0.32; } bend(g.armR, -1.0);
+      if (g.armL){ g.armL.rotation.x = -2.15 + c*0.25; g.armL.rotation.z = 0.32; } bend(g.armL, -1.0);
+      g.position.y += Math.abs(c)*0.007;
     }
   } else {
     // default: a friendly wave
