@@ -1053,7 +1053,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.393 · 2026.06.15</div>
+  <div id="appVersion">v1.394 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1306,7 +1306,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.393';
+const APP_VERSION = '1.394';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -2207,19 +2207,18 @@ function makeRunner(){
     const white = new THREE.MeshStandardMaterial({ color:0xefebe4, roughness:0.72 });
     const pink  = new THREE.MeshStandardMaterial({ color:0xe79aa6, roughness:0.55 });
     const dark  = new THREE.MeshStandardMaterial({ color:0x161616, roughness:0.55 });
-    // ---- ABSURDLY BUFF upper body (funny proportions: boulder shoulders, tiny waist) ----
-    torso.scale.set(1.26, 1.06, 0.82);                                         // barrel chest
-    shoulders.scale.set(1.98, 0.66, 1.02); shoulders.position.y = 0.486;       // boulder delts yoke
-    waist.scale.set(0.72, 0.94, 0.66);                                         // cinched gym waist
-    neck.scale.set(1.8, 1.1, 1.8);                                             // thick traps neck
-    const traps = new THREE.Mesh(new THREE.SphereGeometry(0.072, 18, 14), fur); traps.scale.set(1.8, 0.7, 0.95); traps.position.set(0, 0.5, -0.012); traps.castShadow = true; g.add(traps);
-    [-1,1].forEach(s => { const pec = new THREE.Mesh(new THREE.SphereGeometry(0.063, 18, 14), fur); pec.scale.set(0.96, 0.82, 0.64); pec.position.set(s*0.05, 0.432, 0.05); pec.castShadow = true; g.add(pec); });
-    [g.armL, g.armR].forEach(a => {                                            // delts cover the joints; huge biceps + forearms
-      const delt = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 12), fur); delt.scale.set(1.12, 1.0, 1.12); delt.position.y = 0.004; delt.castShadow = true; a.add(delt);
-      const bi = new THREE.Mesh(new THREE.SphereGeometry(0.052, 16, 12), fur); bi.scale.set(1.05, 1.55, 1.05); bi.position.y = -0.072; bi.castShadow = true; a.add(bi);
-      if (a.elbow){ const fore = new THREE.Mesh(new THREE.SphereGeometry(0.044, 14, 12), fur); fore.scale.set(1.05, 1.5, 1.05); fore.position.y = -0.058; a.elbow.add(fore); }
+    // ---- BUFF but cleaner upper body (toned down so it reads less clunky) ----
+    torso.scale.set(1.18, 1.05, 0.84);                                         // broad chest, smoother
+    shoulders.scale.set(1.66, 0.62, 0.98); shoulders.position.y = 0.484;       // wide delts, not boulders
+    waist.scale.set(0.74, 0.94, 0.68);                                         // cinched gym waist
+    neck.scale.set(1.5, 1.08, 1.5);                                            // sturdy neck
+    const traps = new THREE.Mesh(new THREE.SphereGeometry(0.066, 18, 14), fur); traps.scale.set(1.5, 0.62, 0.9); traps.position.set(0, 0.498, -0.012); traps.castShadow = true; g.add(traps);
+    [g.armL, g.armR].forEach(a => {                                            // delts cover the joints; tidy biceps + forearms
+      const delt = new THREE.Mesh(new THREE.SphereGeometry(0.062, 16, 12), fur); delt.scale.set(1.08, 1.0, 1.08); delt.position.y = 0.004; delt.castShadow = true; a.add(delt);
+      const bi = new THREE.Mesh(new THREE.SphereGeometry(0.046, 16, 12), fur); bi.scale.set(1.04, 1.5, 1.04); bi.position.y = -0.07; bi.castShadow = true; a.add(bi);
+      if (a.elbow){ const fore = new THREE.Mesh(new THREE.SphereGeometry(0.04, 14, 12), fur); fore.scale.set(1.04, 1.45, 1.04); fore.position.y = -0.058; a.elbow.add(fore); }
     });
-    [g.legL, g.legR].forEach(l => { const th = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 12), fur); th.scale.set(1.12, 1.5, 1.12); th.position.y = -0.05; th.castShadow = true; l.add(th); });
+    [g.legL, g.legR].forEach(l => { const th = new THREE.Mesh(new THREE.SphereGeometry(0.055, 16, 12), fur); th.scale.set(1.08, 1.45, 1.08); th.position.y = -0.05; th.castShadow = true; l.add(th); });
     // white chest/belly patch
     const belly = new THREE.Mesh(new THREE.SphereGeometry(0.072, 18, 14), white); belly.scale.set(0.78, 1.05, 0.5); belly.position.set(0, 0.37, 0.058); g.add(belly);
     // ---- CAT HEAD: pointed ears (pink inner), white muzzle puffs, pink nose, whiskers ----
@@ -2238,7 +2237,7 @@ function makeRunner(){
       const cyl = new THREE.Mesh(new THREE.CylinderGeometry(rB, rA, len*1.06, 12), mat); cyl.position.set(0, (A.y+B.y)/2, (A.z+B.z)/2); cyl.rotation.x = Math.atan2(dz, dy); cyl.castShadow = true; tail.add(cyl);
       const jt = new THREE.Mesh(new THREE.SphereGeometry(rA, 12, 10), mat); jt.position.set(0, A.y, A.z); tail.add(jt); }
     const tip = new THREE.Mesh(new THREE.SphereGeometry(0.032*(1-(TN-1)/(TN+2)), 12, 10), white); tip.position.set(0, tp[TN-1].y, tp[TN-1].z); tail.add(tip);
-    tail.position.set(0, 0.255, -0.085); g.add(tail);
+    tail.position.set(-0.075, 0.25, -0.05); tail.rotation.set(0, -0.35, 0.5); g.add(tail);   // based at his hip, sweeping up & OUT to the side so it clears the centred card
     // ---- BASEBALL CARD strapped to his back, FRONT FACING OUTWARD (rotated 180°) ----
     const card = new THREE.Group();
     const cream = new THREE.MeshStandardMaterial({ color:0xf6f1e3, roughness:0.55 });
