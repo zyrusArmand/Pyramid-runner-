@@ -1053,7 +1053,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.396 · 2026.06.15</div>
+  <div id="appVersion">v1.397 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1306,7 +1306,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.396';
+const APP_VERSION = '1.397';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -2207,16 +2207,23 @@ function makeRunner(){
     const white = new THREE.MeshStandardMaterial({ color:0xe6e1d6, roughness:0.72 });
     const pink  = new THREE.MeshStandardMaterial({ color:0xe79aa6, roughness:0.55 });
     const dark  = new THREE.MeshStandardMaterial({ color:0x161616, roughness:0.55 });
-    // ---- BUFF upper body — V-taper from the TORSO, with ONE smooth muscle per arm (no stacked blobs → not the Michelin look) ----
-    torso.scale.set(1.16, 1.08, 0.86);                                         // broad chest
-    shoulders.scale.set(1.6, 0.6, 0.96); shoulders.position.y = 0.484;         // wide delts
-    waist.scale.set(0.8, 0.94, 0.74);                                          // cinched waist
-    neck.scale.set(1.34, 1.04, 1.34);                                          // sturdy neck (not a hump)
-    const traps = new THREE.Mesh(new THREE.SphereGeometry(0.058, 18, 14), fur); traps.scale.set(1.36, 0.56, 0.86); traps.position.set(0, 0.492, -0.012); traps.castShadow = true; g.add(traps);
-    // a single ELONGATED upper-arm muscle per arm (shoulder→elbow) — reads buff but smooth, not a chain of balls
-    [g.armL, g.armR].forEach(a => { const ua = new THREE.Mesh(new THREE.SphereGeometry(0.04, 16, 12), fur); ua.scale.set(1.12, 2.1, 1.12); ua.position.y = -0.045; ua.castShadow = true; a.add(ua); });
-    // small white CHEST BLAZE (gray-&-white cat marking) — not a big white belly that reads as tyres
-    const blaze = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 12), white); blaze.scale.set(0.46, 0.92, 0.42); blaze.position.set(0, 0.4, 0.07); g.add(blaze);
+    // ---- BIG bodybuilder build — ELONGATED muscle shapes (not round balls) on darker fur, so it reads jacked, never Michelin. NO nipples / abs. ----
+    torso.scale.set(1.24, 1.1, 0.92);                                          // big chest/back
+    shoulders.scale.set(1.9, 0.66, 1.06); shoulders.position.y = 0.486;        // huge delt yoke
+    waist.scale.set(0.82, 0.92, 0.74);                                         // tapered V waist
+    neck.scale.set(1.5, 1.06, 1.5);                                            // thick neck
+    const traps = new THREE.Mesh(new THREE.SphereGeometry(0.062, 18, 14), fur); traps.scale.set(1.55, 0.62, 0.9); traps.position.set(0, 0.496, -0.012); traps.castShadow = true; g.add(traps);
+    // big arms: delt cap + long upper-arm muscle + forearm — all stretched so they read as muscle, not stacked tyres
+    [g.armL, g.armR].forEach(a => {
+      const delt = new THREE.Mesh(new THREE.SphereGeometry(0.058, 16, 12), fur); delt.scale.set(1.22, 1.16, 1.22); delt.position.y = 0.002; delt.castShadow = true; a.add(delt);
+      const upper = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 12), fur); upper.scale.set(1.16, 2.05, 1.16); upper.position.y = -0.072; upper.castShadow = true; a.add(upper);
+      if (a.elbow){ const fore = new THREE.Mesh(new THREE.SphereGeometry(0.042, 14, 12), fur); fore.scale.set(1.12, 1.9, 1.12); fore.position.y = -0.072; fore.castShadow = true; a.elbow.add(fore); }
+    });
+    // big quads
+    [g.legL, g.legR].forEach(l => { const quad = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 12), fur); quad.scale.set(1.2, 1.7, 1.2); quad.position.y = -0.05; quad.castShadow = true; l.add(quad); });
+    // broad WHITE chest plate (cat's white front) — one smooth mass, NO nipple bumps — plus a slim belly blaze
+    const chest = new THREE.Mesh(new THREE.SphereGeometry(0.088, 20, 16), white); chest.scale.set(1.04, 0.72, 0.58); chest.position.set(0, 0.43, 0.05); chest.castShadow = true; g.add(chest);
+    const blaze = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 12), white); blaze.scale.set(0.5, 0.95, 0.42); blaze.position.set(0, 0.37, 0.072); g.add(blaze);
     // ---- CAT HEAD: pointed ears (pink inner), white muzzle puffs, pink nose, whiskers ----
     [-1,1].forEach(s => {
       const ear = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.072, 4), fur); ear.position.set(s*0.052, 0.668, -0.004); ear.rotation.z = -s*0.2; ear.castShadow = true; g.add(ear);
@@ -6327,7 +6334,7 @@ function makeEmoteFrida(){
 function endEmote(r, g){
   if (r && r.emoteProps && g){ try { g.remove(r.emoteProps); } catch(e){} r.emoteProps = null; }
   if (r && r.emoteNotes && g){ try { g.remove(r.emoteNotes); } catch(e){} r.emoteNotes = null; }
-  if (r){ r.emote = null; r.__antBX = undefined; r.__antBY = undefined; r.__antBZ = undefined; }
+  if (r){ r.emote = null; r.__antBX = undefined; r.__antBY = undefined; r.__antBZ = undefined; r.__golfBX = undefined; r.__golfDone = false; }
   if (g && g.__antWand) g.__antWand.visible = true;   // put Ant Man's wand back on his back
   if (g){ if (g.armL) g.armL.rotation.set(0,0,0); if (g.armR) g.armR.rotation.set(0,0,0);
     if (g.armL && g.armL.wrist) g.armL.wrist.rotation.set(0,0,0); if (g.armR && g.armR.wrist) g.armR.wrist.rotation.set(0,0,0);   // un-flick the wrists
@@ -6577,41 +6584,52 @@ function playEmote(g, r, t, dt){
         const a=i/F.__sparkles.length*Math.PI*2, rad=0.06+life*0.16; sp.position.set(Math.cos(a)*rad, 0.31+Math.sin(a)*rad*0.8, 0.24); sp.scale.setScalar(0.5+(1-life)*1.3); if (sp.material) sp.material.emissiveIntensity = 0.9*(1-life); });
     }
   } else if (style === 'jjtoe'){
-    // ⛳ little GOLF SWING → HOLE IN ONE: address, backswing, whip through, the ball rolls into the cup & vanishes, then a fist-pump
+    // ⛳ a REAL golf swing: address → coil (shoulders turn back, weight to the back foot) → downswing (uncoil, weight to the
+    // front foot) → impact → a balanced finish turned to the target. Ball & cup sit to his SIDE so the whole swing faces
+    // the viewer; the ball then rolls into the cup and vanishes (HOLE IN ONE).
     const G = r.emoteProps, club = G && G.__club, ball = G && G.__ball, hole = G && G.__hole, flag = G && G.__flag, flagGrp = G && G.__flagGrp;
-    if (hole) hole.position.set(0.06, 0.006, 0.34);
-    if (flagGrp) flagGrp.position.set(0.06, 0.008, 0.34);
-    if (club){ club.position.set(0.0, 0.42, 0.115); club.visible = true; }
-    // grip pose: both hands together out front, leaning over the ball
-    if (g.armR){ g.armR.rotation.x = -0.62; g.armR.rotation.z = -0.22; } bend(g.armR, -0.85);
-    if (g.armL){ g.armL.rotation.x = -0.62; g.armL.rotation.z = 0.22; } bend(g.armL, -0.85);
-    let swing = 0;                                  // club roll (frontal swing arc)
-    if (t < 0.95){ swing = Math.sin(t*7)*0.07; g.position.y += Math.sin(t*7)*0.001; }   // address + waggle
-    else if (t < 1.5){ const w=(t-0.95)/0.55; swing = 1.95*w*w; }                         // backswing up
-    else if (t < 1.7){ const w=(t-1.5)/0.2;  swing = 1.95 - 3.55*w; }                     // downswing whip
-    else if (t < 2.7){ swing = -1.6; }                                                    // follow-through hold
-    else { swing = -1.6; }
-    const contact = t >= 1.66;
-    if (club) club.rotation.z = swing;
-    // BALL: still at address, launches at contact, rolls to the cup, hops once, drops in & disappears
+    if (r.__golfBX === undefined){ r.__golfBX = g.position.x; r.__golfBY = g.position.y; r.__golfBZ = g.position.z; }
+    if (hole) hole.position.set(0.44, 0.006, 0.06);                 // cup off to his side
+    if (flagGrp) flagGrp.position.set(0.44, 0.008, 0.06);
+    if (club){ club.position.set(0.07, 0.40, 0.13); club.visible = true; }
+    // body turn (coil/uncoil), spine lean over the ball, weight shift, and the club's up/down arc
+    let turnY, leanX, shiftX, clubX, clubZ;
+    if (t < 0.95){ const wg = Math.sin(t*6)*0.05; turnY = -0.16; leanX = 0.24; shiftX = 0; clubX = 0.5 + wg; clubZ = -0.18; }                     // ADDRESS + waggle
+    else if (t < 1.7){ const w = (t-0.95)/0.75; turnY = -0.16 - 0.66*w; leanX = 0.24; shiftX = -0.028*w; clubX = 0.5 - 2.75*w; clubZ = -0.18 - 0.5*w; }   // BACKSWING (coil, weight back)
+    else if (t < 1.96){ const w = (t-1.7)/0.26; turnY = -0.82 + 1.02*w; leanX = 0.24 - 0.04*w; shiftX = -0.028 + 0.088*w; clubX = -2.25 + 2.85*w; clubZ = -0.68 + 0.74*w; }   // DOWNSWING → IMPACT (uncoil fast, weight forward)
+    else if (t < 2.75){ const w = Math.min(1, (t-1.96)/0.6); turnY = 0.2 + 0.5*w; leanX = 0.2 - 0.2*w; shiftX = 0.06; clubX = 0.6 - 2.6*w; clubZ = 0.06 + 0.6*w; }   // FOLLOW-THROUGH → balanced finish
+    else { turnY = 0.7; leanX = 0; shiftX = 0.06; clubX = -2.0; clubZ = 0.66; }
+    g.rotation.y = turnY; g.rotation.x = leanX;
+    g.position.set(r.__golfBX + shiftX, r.__golfBY, r.__golfBZ);
+    if (club){ club.rotation.x = clubX; club.rotation.z = clubZ; }
+    // knees: back knee flexes while weight is back, front knee posts as weight moves forward
+    if (g.legL){ g.legL.rotation.set(0,0,0.04); g.legR.rotation.set(0,0,-0.04);
+      if (g.legL.elbow) g.legL.elbow.rotation.x = 0.12 + Math.max(0,-shiftX)*4;
+      if (g.legR.elbow) g.legR.elbow.rotation.x = 0.12 + Math.max(0, shiftX)*2.5; }
+    // both arms grip the club and ride the arc together
+    const ax = Math.max(-1.45, -0.5 + clubX*0.34);
+    if (g.armR){ g.armR.rotation.x = ax; g.armR.rotation.z = -0.16; } bend(g.armR, -0.6 - Math.max(0,-clubX)*0.4);
+    if (g.armL){ g.armL.rotation.x = ax; g.armL.rotation.z = 0.16; } bend(g.armL, -0.6);
+    // BALL: launches at impact, rolls along the ground to the cup on his side, hops once, drops in & vanishes
+    const impactT = 1.92;
     if (ball){
-      if (!contact){ ball.position.set(0.016, 0.018, 0.13); ball.visible = true; }
-      else { const w = Math.min(1, (t-1.66)/0.95);
-        ball.position.x = 0.016 + (0.06-0.016)*w;
-        ball.position.z = 0.13 + (0.34-0.13)*w;
-        ball.position.y = 0.018 + (w<0.8 ? Math.sin(w/0.8*Math.PI)*0.035 : -(w-0.8)/0.2*0.05);   // a hop, then plunk into the cup
-        ball.rotation.x += dt*22; ball.visible = w < 0.98;                                          // gone once it's in
-        if (w >= 0.98 && !r.__golfDone){ r.__golfDone = true; try { Sound.perfect && Sound.perfect(2); } catch(e){} try { sparkle(g.position.clone().add(new THREE.Vector3(0.06,0.04,0.34))); } catch(e){} showPop('HOLE IN ONE!'); }
+      if (t < impactT){ ball.position.set(0.13, 0.018, 0.07); ball.visible = true; }
+      else { const w = Math.min(1, (t-impactT)/0.85);
+        ball.position.x = 0.13 + (0.44-0.13)*w; ball.position.z = 0.07 + (0.06-0.07)*w;
+        ball.position.y = 0.018 + (w<0.8 ? Math.sin(w/0.8*Math.PI)*0.04 : -(w-0.8)/0.2*0.05);   // a hop, then plunk into the cup
+        ball.rotation.z -= dt*24; ball.visible = w < 0.98;
+        if (w >= 0.98 && !r.__golfDone){ r.__golfDone = true; try { Sound.perfect && Sound.perfect(2); } catch(e){} try { sparkle(g.position.clone().add(new THREE.Vector3(0.44,0.05,0.06))); } catch(e){} showPop('HOLE IN ONE!'); }
       }
     }
-    if (flag) flag.rotation.z = -Math.PI/2 + Math.sin(t*6)*0.12;     // flag flutters
-    // CELEBRATE — drop into a two-fist pump once the ball's in
-    if (t > 2.7){
-      const c = Math.sin((t-2.7)*9);
+    if (flag) flag.rotation.z = -Math.PI/2 + Math.sin(t*6)*0.12;
+    // CELEBRATE once it's in — stand tall, fist pump toward the cup
+    if (t > 2.8){
+      const c = Math.sin((t-2.8)*9);
       if (club) club.visible = false;
-      if (g.armR){ g.armR.rotation.x = -2.15 + c*0.25; g.armR.rotation.z = -0.32; } bend(g.armR, -1.0);
-      if (g.armL){ g.armL.rotation.x = -2.15 + c*0.25; g.armL.rotation.z = 0.32; } bend(g.armL, -1.0);
-      g.position.y += Math.abs(c)*0.007;
+      g.rotation.x = 0; g.rotation.y = 0.25;
+      if (g.armR){ g.armR.rotation.x = -2.1 + c*0.25; g.armR.rotation.z = -0.3; } bend(g.armR, -1.0);
+      if (g.armL){ g.armL.rotation.x = -2.1 + c*0.25; g.armL.rotation.z = 0.3; } bend(g.armL, -1.0);
+      g.position.set(r.__golfBX, r.__golfBY + Math.abs(c)*0.007, r.__golfBZ);
     }
   } else {
     // default: a friendly wave
