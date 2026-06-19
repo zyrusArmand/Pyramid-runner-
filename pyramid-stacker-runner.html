@@ -1053,7 +1053,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.395 · 2026.06.15</div>
+  <div id="appVersion">v1.396 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1306,7 +1306,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.395';
+const APP_VERSION = '1.396';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -1565,7 +1565,7 @@ const CHARACTERS = {
   nzekro:   { name:'NZEKRO (THE HOBBYIST)', cost:3333, swatch:'#6e7178', color:0x6e7178, skin:0xa06d42, style:'nzekro',   exclusive:true },
   nassar:   { name:'NASSAR',       cost:3333, swatch:'#1f7a8a', color:0x1f7a8a, skin:0x8f6034, style:'nassar',   exclusive:true },
   thailand: { name:'MR.THAILAND',  cost:3333, swatch:'#57b94a', color:0x57b94a, skin:0x57b94a, style:'thailand', exclusive:true },
-  jjtoe:    { name:'JJ TOE',        cost:3333, swatch:'#9aa0a6', color:0x9aa0a6, skin:0xefebe4, style:'jjtoe',    exclusive:true },
+  jjtoe:    { name:'JJ TOE',        cost:3333, swatch:'#6f747b', color:0x6f747b, skin:0xe6e1d6, style:'jjtoe',    exclusive:true },
 };
 CHAR_SPEC.forEach(s => {
   const [era,tier,key,name,color,skin,head,glow,reuse] = s;
@@ -2204,23 +2204,19 @@ function makeRunner(){
   } else if (style === 'jjtoe'){
     // 🐱💪 JJ TOE — an absurdly SWOLE gray-&-white gym-bro CAT. Biped rig kept exactly (runs the same); just cat-dressed + jacked.
     const fur   = cMat;                                                        // gray fur (ch.color)
-    const white = new THREE.MeshStandardMaterial({ color:0xefebe4, roughness:0.72 });
+    const white = new THREE.MeshStandardMaterial({ color:0xe6e1d6, roughness:0.72 });
     const pink  = new THREE.MeshStandardMaterial({ color:0xe79aa6, roughness:0.55 });
     const dark  = new THREE.MeshStandardMaterial({ color:0x161616, roughness:0.55 });
-    // ---- BUFF but cleaner upper body (toned down so it reads less clunky) ----
-    torso.scale.set(1.18, 1.05, 0.84);                                         // broad chest, smoother
-    shoulders.scale.set(1.66, 0.62, 0.98); shoulders.position.y = 0.484;       // wide delts, not boulders
-    waist.scale.set(0.74, 0.94, 0.68);                                         // cinched gym waist
-    neck.scale.set(1.5, 1.08, 1.5);                                            // sturdy neck
-    const traps = new THREE.Mesh(new THREE.SphereGeometry(0.066, 18, 14), fur); traps.scale.set(1.5, 0.62, 0.9); traps.position.set(0, 0.498, -0.012); traps.castShadow = true; g.add(traps);
-    [g.armL, g.armR].forEach(a => {                                            // delts cover the joints; tidy biceps + forearms
-      const delt = new THREE.Mesh(new THREE.SphereGeometry(0.062, 16, 12), fur); delt.scale.set(1.08, 1.0, 1.08); delt.position.y = 0.004; delt.castShadow = true; a.add(delt);
-      const bi = new THREE.Mesh(new THREE.SphereGeometry(0.046, 16, 12), fur); bi.scale.set(1.04, 1.5, 1.04); bi.position.y = -0.07; bi.castShadow = true; a.add(bi);
-      if (a.elbow){ const fore = new THREE.Mesh(new THREE.SphereGeometry(0.04, 14, 12), fur); fore.scale.set(1.04, 1.45, 1.04); fore.position.y = -0.058; a.elbow.add(fore); }
-    });
-    [g.legL, g.legR].forEach(l => { const th = new THREE.Mesh(new THREE.SphereGeometry(0.055, 16, 12), fur); th.scale.set(1.08, 1.45, 1.08); th.position.y = -0.05; th.castShadow = true; l.add(th); });
-    // white chest/belly patch
-    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.072, 18, 14), white); belly.scale.set(0.78, 1.05, 0.5); belly.position.set(0, 0.37, 0.058); g.add(belly);
+    // ---- BUFF upper body — V-taper from the TORSO, with ONE smooth muscle per arm (no stacked blobs → not the Michelin look) ----
+    torso.scale.set(1.16, 1.08, 0.86);                                         // broad chest
+    shoulders.scale.set(1.6, 0.6, 0.96); shoulders.position.y = 0.484;         // wide delts
+    waist.scale.set(0.8, 0.94, 0.74);                                          // cinched waist
+    neck.scale.set(1.34, 1.04, 1.34);                                          // sturdy neck (not a hump)
+    const traps = new THREE.Mesh(new THREE.SphereGeometry(0.058, 18, 14), fur); traps.scale.set(1.36, 0.56, 0.86); traps.position.set(0, 0.492, -0.012); traps.castShadow = true; g.add(traps);
+    // a single ELONGATED upper-arm muscle per arm (shoulder→elbow) — reads buff but smooth, not a chain of balls
+    [g.armL, g.armR].forEach(a => { const ua = new THREE.Mesh(new THREE.SphereGeometry(0.04, 16, 12), fur); ua.scale.set(1.12, 2.1, 1.12); ua.position.y = -0.045; ua.castShadow = true; a.add(ua); });
+    // small white CHEST BLAZE (gray-&-white cat marking) — not a big white belly that reads as tyres
+    const blaze = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 12), white); blaze.scale.set(0.46, 0.92, 0.42); blaze.position.set(0, 0.4, 0.07); g.add(blaze);
     // ---- CAT HEAD: pointed ears (pink inner), white muzzle puffs, pink nose, whiskers ----
     [-1,1].forEach(s => {
       const ear = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.072, 4), fur); ear.position.set(s*0.052, 0.668, -0.004); ear.rotation.z = -s*0.2; ear.castShadow = true; g.add(ear);
