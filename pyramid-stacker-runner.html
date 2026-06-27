@@ -47,6 +47,18 @@
     background:rgba(14,20,32,.4); border:1.5px solid rgba(150,200,255,.45); transition:transform .12s; }
   #homeLvX span { color:#7fd0ff; }
   #homeLvX:active { transform:scale(.95); }
+  #homeJam { align-self:center; margin-top:8px; pointer-events:auto; cursor:pointer; font-family:'Space Mono',monospace;
+    font-size:10px; letter-spacing:2px; font-weight:700; color:#f3cf9a; padding:8px 18px; border-radius:20px;
+    background:rgba(28,16,10,.4); border:1.5px solid rgba(214,150,90,.5); transition:transform .12s; }
+  #homeJam span { color:#ffb86a; }
+  #homeJam:active { transform:scale(.95); }
+  /* THE JAMMED ASCENT — undo/restart controls (lower-centre) */
+  #jamHud { position:fixed; left:50%; bottom:calc(max(26px,env(safe-area-inset-bottom)) + 40px); transform:translateX(-50%);
+    z-index:7; display:none; gap:12px; pointer-events:none; }
+  #jamHud.show { display:flex; }
+  #jamHud .jamBtn { pointer-events:auto; cursor:pointer; font-family:'Space Mono',monospace; font-size:11px; font-weight:700; letter-spacing:1.5px;
+    color:#f3e6cf; background:rgba(20,12,28,.72); border:1.5px solid rgba(243,200,120,.45); border-radius:14px; padding:9px 16px; }
+  #jamHud .jamBtn:active { transform:scale(.93); }
   #puzzleHud { position:fixed; left:50%; top:calc(max(16px,env(safe-area-inset-top)) + 78px); transform:translateX(-50%);
     z-index:6; width:min(78vw,300px); display:none; flex-direction:column; align-items:center; gap:7px; pointer-events:none; }
   #puzzleHud.show { display:flex; }
@@ -816,6 +828,7 @@
   </div>
   <div class="cta hero" id="climbBtn">START CLIMB</div>
 </div>
+<div id="jamHud"><div class="jamBtn" id="jamUndo">↩ UNDO</div><div class="jamBtn" id="jamRestart">⟳ RESTART</div></div>
 <div id="introOverlay">
   <div id="introSub">PYRAMID COMPLETE</div>
   <div id="introLevel">LEVEL 2</div>
@@ -915,6 +928,7 @@
     </div>
     <div id="homeLv0" title="Level 0 — puzzle-fit build (beta)"><span>▦</span> LEVEL&nbsp;0 · PUZZLE</div>
     <div id="homeLvX" title="Level X — regular stacking with surprise puzzle stones (beta)"><span>✶</span> LEVEL&nbsp;X · HYBRID</div>
+    <div id="homeJam" title="The Jammed Ascent — slide-block puzzle, then climb (beta)"><span>⛏</span> JAMMED&nbsp;ASCENT</div>
   </div>
 </div>
 
@@ -1054,7 +1068,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.401 · 2026.06.15</div>
+  <div id="appVersion">v1.402 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1307,7 +1321,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.401';
+const APP_VERSION = '1.402';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -3690,7 +3704,7 @@ function shake(amt){ S.shakeAmt = Math.max(S.shakeAmt||0, amt); }
 // ---------- state ----------
 let S = {};
 function resetState(){
-  baseBlocks = puzzleMode ? PUZZLE_BASE : levelXMode ? LEVELX_BASE : (dailyMode ? 10 : baseForLevel(gameLevel));   // Level 0 = small puzzle pyramid; Level X = base-5; Daily = base-10; else grows with the level
+  baseBlocks = jamMode ? JAM_BASE : puzzleMode ? PUZZLE_BASE : levelXMode ? LEVELX_BASE : (dailyMode ? 10 : baseForLevel(gameLevel));   // Jammed Ascent = base-6; Level 0 = puzzle; Level X = base-5; Daily = base-10; else grows
   S = { phase:'build', gameOver:false, won:false, puzzle:puzzleMode, levelX:levelXMode, cand:null,
     wall:0, cellIndex:0, layer:0, capstone:false, wallDrift:0,
     camRot:0, camHeight:0, camR:baseBlocks + 5,
@@ -3742,6 +3756,7 @@ function addPlaceGuide(a){
 function removeKeystoneGuide(){ if (S.keyGuide){ scene.remove(S.keyGuide); S.keyGuide = null; } }
 
 function spawnBlock(){
+  if (jamMode && !S.jam){ startJamPuzzle(); return; }   // THE JAMMED ASCENT: no swing build — present the slide puzzle on a pre-built pyramid
   if (S.puzzle){ spawnCandidates(); return; }   // LEVEL 0: no swinging stone — present three puzzle candidates instead
   const capstone = S.capstone;
   if (S.levelX && !capstone){                   // LEVEL X: a few mid-build cells interrupt as a pick-1-of-3 puzzle; the rest swing in
@@ -4258,8 +4273,114 @@ function advance(len){
 // swipe L/R to bring another into view, drag to inspect, and TAP to try to fit it. Exactly one of the three matches the
 // course's required notch/tab shape — fit it and it locks; pick wrong (or let the 10s timer run out) and that course
 // takes a HOLE + a stability hit. The climb afterwards is exactly the same as every other level.
-function startPuzzleLevel(){ puzzleMode = true; levelXMode = false; dailyMode = false; startGame(1); }
-function startLevelX(){ levelXMode = true; puzzleMode = false; dailyMode = false; startGame(1); }   // LEVEL X: regular swing-stacking with joint stones + random puzzle interrupts
+function startPuzzleLevel(){ puzzleMode = true; levelXMode = false; jamMode = false; dailyMode = false; startGame(1); }
+function startLevelX(){ levelXMode = true; puzzleMode = false; jamMode = false; dailyMode = false; startGame(1); }   // LEVEL X: regular swing-stacking with joint stones + random puzzle interrupts
+
+// ===== "THE JAMMED ASCENT" — a Rush-Hour slide puzzle on the real 3D pyramid face, bookended by the existing CLIMB =====
+let jamMode = false;
+const JAM_BASE = 6, JAM_L = 3, JAM_R = 5;
+// VERIFIED-SOLVABLE layout (3 lanes × 5 rows). Each blocker is a 2-cell vertical bar: lane, rows r0..r1, dir (+1 right / -1 left).
+const JAM_LAYOUT = [
+  { id:'A', lane:1, r0:0, r1:1, dir:-1 }, { id:'B', lane:1, r0:2, r1:3, dir: 1 },
+  { id:'C', lane:2, r0:3, r1:4, dir: 1 }, { id:'D', lane:0, r0:1, r1:2, dir: 1 }, { id:'E', lane:2, r0:0, r1:1, dir: 1 },
+];
+const _jamRay = (typeof THREE !== 'undefined' && THREE.Raycaster) ? new THREE.Raycaster() : null;
+function startJamLevel(){ jamMode = true; puzzleMode = false; levelXMode = false; dailyMode = false; startGame(1); }
+
+// build a finished pyramid directly (no swing) so the climb has real geometry + path slots
+function buildJamPyramidDirect(){
+  S.allBlocks = []; S.pathSlots = []; S.layerBlocks = []; S.layerBoxes = []; S.capstone = false;
+  for (let L = 0; nForLayer(L) > 0; L++){
+    const n = nForLayer(L);
+    for (let w = 0; w < 4; w++){
+      const axis = (w===0||w===2)?'x':'z';
+      for (let ci = 0; ci < n; ci++){
+        const center = gridPos(w, ci, n, L).clone();
+        const mesh = makeSteppedPiece(1, axis, layerColor(L), center, n); mesh.position.copy(center);
+        S.allBlocks.push(mesh);
+        S.pathSlots.push({ pos: center.clone(), placed: true, weak: false, mesh });
+      }
+    }
+  }
+  const capL = baseBlocks, capCenter = new THREE.Vector3(0, capL*LAYER_HEIGHT, 0);
+  const capMesh = makeCapstonePeak(layerColor(capL)); capMesh.position.copy(capCenter); S.allBlocks.push(capMesh);
+  S.pathSlots.push({ pos: capCenter.clone(), placed: true, weak: false, mesh: capMesh });
+}
+function startJamPuzzle(){
+  buildJamPyramidDirect();
+  S.phase = 'jam'; S.buildQual = 3; S.buildCount = 4;                          // a fair build → a fair climb
+  const H = (JAM_BASE*BLOCK_SIZE)/2;
+  const blockers = JAM_LAYOUT.map(b => ({ ...b, removed:false, mesh:null, slideX:0, animT:0, animing:false, shake:0 }));
+  S.jam = { blockers, undo:[], solved:false, group:new THREE.Group(), laneW:BLOCK_SIZE*0.94, rowH:0.62, baseY:0.5, faceZ:H+0.45 };
+  scene.add(S.jam.group);
+  blockers.forEach(b => {
+    const h = (b.r1 - b.r0 + 1) * S.jam.rowH;
+    const grp = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color:0xb5582f, emissive:0x140600, roughness:0.82, metalness:0.05 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(S.jam.laneW*0.9, h*0.92, BLOCK_SIZE*0.62), mat); body.castShadow = true; grp.add(body);
+    const arrowMat = new THREE.MeshStandardMaterial({ color:0xffe39a, emissive:0x3a2a00, emissiveIntensity:0.6, roughness:0.5 });
+    const arrow = new THREE.Mesh(new THREE.ConeGeometry(S.jam.laneW*0.16, S.jam.laneW*0.34, 4), arrowMat);
+    arrow.rotation.z = b.dir>0 ? -Math.PI/2 : Math.PI/2; arrow.position.set(b.dir*S.jam.laneW*0.3, 0, BLOCK_SIZE*0.34); grp.add(arrow);
+    grp.__body = body; grp.__mat = mat; b.mesh = grp; b.h = h;
+    jamPlace(b); S.jam.group.add(grp);
+  });
+  setLevelName(true); showJamHud(true);
+  showPop('UNJAM THE FACE — slide blockers off, then CLIMB');
+}
+function jamCellX(lane){ return (lane - (JAM_L-1)/2) * S.jam.laneW; }
+function jamCellY(r0, r1){ return S.jam.baseY + ((r0+r1)/2 + 0.5) * S.jam.rowH; }
+function jamPlace(b){ if (b.mesh) b.mesh.position.set(jamCellX(b.lane) + b.slideX, jamCellY(b.r0,b.r1), S.jam.faceZ); }
+function jamOcc(){ const occ = Array.from({length:JAM_R}, ()=>Array(JAM_L).fill(null));
+  for (const b of S.jam.blockers){ if (b.removed) continue; for (let r=b.r0;r<=b.r1;r++) occ[r][b.lane]=b.id; } return occ; }
+function jamCanSlide(b, occ){ if (b.removed) return false;
+  for (let r=b.r0;r<=b.r1;r++){ for (let x=b.lane+b.dir; x>=0 && x<JAM_L; x+=b.dir){ if (occ[r][x] && occ[r][x]!==b.id) return false; } } return true; }
+function jamPathExists(occ){ let f=[]; for(let x=0;x<JAM_L;x++) if(!occ[0][x]) f.push(x);
+  for(let r=1;r<JAM_R;r++){ const nx=new Set(); for(const x of f) for(let d=-1;d<=1;d++){ const X=x+d; if(X>=0&&X<JAM_L&&!occ[r][X]) nx.add(X);} f=[...nx]; if(!f.length) return false; } return f.length>0; }
+function jamTrySlide(b){
+  if (!b || b.removed || b.animing || S.jam.solved) return;
+  if (jamCanSlide(b, jamOcc())){ b.animing = true; b.animT = 0; b.removed = true; S.jam.undo.push(b.id);
+    try { Sound.step && Sound.step(); } catch(e){} jamCheckSolve(); }
+  else { b.shake = 0.35; try { Sound.drop && Sound.drop(); } catch(e){} }     // blocked → dull thud + shake
+}
+function jamUndo(){ if (!S.jam || !S.jam.undo.length || S.jam.solved) return;
+  const b = S.jam.blockers.find(x=>x.id===S.jam.undo.pop());
+  if (b){ b.removed=false; b.slideX=0; b.animing=false; if (b.mesh){ b.mesh.visible=true; if(b.__mat) b.mesh.children.forEach(c=>{ if(c.material) c.material.opacity=1; }); jamPlace(b); } } jamUnhighlight(); }
+function jamRestart(){ if (!S.jam) return; S.jam.solved=false; S.jam.undo=[];
+  S.jam.blockers.forEach(b => { b.removed=false; b.slideX=0; b.animing=false; if (b.mesh){ b.mesh.visible=true; b.mesh.children.forEach(c=>{ if(c.material){ c.material.opacity=1; c.material.transparent=false; } }); jamPlace(b); } });
+  jamUnhighlight(); $('climbBtn').classList.remove('show'); }
+function jamCheckSolve(){ if (jamPathExists(jamOcc())){ S.jam.solved = true; jamHighlight(); $('climbBtn').classList.add('show'); showPop('PATH CLEAR — CLIMB!'); try { Sound.cap && Sound.cap(); } catch(e){} } }
+function jamHighlight(){ S.allBlocks.forEach(b => b && b.children && b.children.forEach(p => { if (p.material && p.material.emissive) p.material.emissive.setRGB(0,0.16,0.05); })); }
+function jamUnhighlight(){ S.allBlocks.forEach(b => b && b.children && b.children.forEach(p => { if (p.material && p.material.emissive) p.material.emissive.setRGB(0,0,0); })); }
+function updateJam(dt){
+  if (!S.jam) return;
+  S.jam.blockers.forEach(b => {
+    if (b.animing && b.mesh){ b.animT += dt; const k = Math.min(1, b.animT/0.32);
+      b.slideX = b.dir * (S.jam.laneW*(JAM_L+1)) * k; jamPlace(b);
+      if (b.__mat){ b.__mat.transparent = true; b.__mat.opacity = 1-k; }
+      if (k >= 1){ b.animing = false; b.mesh.visible = false; } }
+    if (b.shake > 0 && b.mesh){ b.shake = Math.max(0, b.shake - dt*2.2);
+      b.mesh.position.x = jamCellX(b.lane) + b.slideX + Math.sin(performance.now()*0.05)*b.shake*0.06; }
+  });
+  const cy = S.jam.baseY + JAM_R*S.jam.rowH*0.5;             // frame the face, head-on
+  camera.position.lerp(new THREE.Vector3(0, cy + 0.5, S.jam.faceZ + 4.4), Math.min(1, dt*4));
+  camera.lookAt(0, cy, S.jam.faceZ);
+}
+function jamPick(cx, cy){
+  if (!_jamRay || !S.jam) return null;
+  _jamRay.setFromCamera(new THREE.Vector2((cx/(window.innerWidth||360))*2-1, -(cy/(window.innerHeight||640))*2+1), camera);
+  const bodies = S.jam.blockers.filter(b=>!b.removed && b.mesh).map(b=>b.mesh.__body);
+  const hits = _jamRay.intersectObjects(bodies, false);
+  if (!hits.length) return null;
+  return S.jam.blockers.find(b => b.mesh && b.mesh.__body === hits[0].object);
+}
+function jamStartClimb(){
+  if (!S.jam || !S.jam.solved) return;
+  if (S.jam.group){ try { scene.remove(S.jam.group); } catch(e){} }
+  jamUnhighlight(); showJamHud(false); $('climbBtn').classList.remove('show');
+  S.coins += 5; bank += 5; Store.set('coins', bank); try { updateCoinHud && updateCoinHud(true); } catch(e){}   // deben for the solve
+  S.capstone = true; startRun();
+}
+function showJamHud(on){ const e=$('jamHud'); if (e) e.classList.toggle('show', !!on); }
 
 // the cell/centre/axis the next stone fills — mirrors spawnBlock's cell maths (single-cell pieces for the puzzle)
 function puzzleSlot(){
@@ -5861,6 +5982,7 @@ function startRun(){
 }
 // player tapped START CLIMB on the rating screen → pick a relic for THIS climb, then drop in
 function beginClimb(){
+  if (S.phase === 'jam'){ jamStartClimb(); return; }   // THE JAMMED ASCENT: the same START CLIMB button kicks off the climb on solve
   const r = S.run; if (!r || !r.awaitStart) return;
   if (!dailyMode && !r.relicOffered){ r.relicOffered = true; showRelicPicker(); return; }   // one blessing, chosen after the build, for this climb only
   proceedToClimb();
@@ -7148,6 +7270,7 @@ function nextLevel(){
 function beginBuild(){
   if (S.phase !== 'intro') return;
   $('introOverlay').classList.remove('show');
+  if (jamMode){ $('hud').style.display='flex'; $('coinHud').classList.remove('hidden'); $('menuBtn').style.display='block'; $('restartBtn').style.display='block'; startJamPuzzle(); return; }   // THE JAMMED ASCENT: skip the swing build, present the slide puzzle
   S.phase = 'build';
   $('lblA').textContent='SCORE'; $('lblB').textContent='LAYER'; $('levelStat').style.display='';
   $('lives').style.display='none'; $('meterLabel').textContent='STRUCTURAL INTEGRITY'; $('meterBar').style.display='block';
@@ -7161,9 +7284,9 @@ function beginBuild(){
 // ---------- home / leaderboard / shop ----------
 let shopTab = 'chars';
 function showStart(){            // the main "home" menu (cover art + PLAY / LEADERBOARD / SHOP)
-  atMenu = true; charPrevOn = false; puzzleMode = false; levelXMode = false;   // leaving to the menu always exits Level 0 / Level X
+  atMenu = true; charPrevOn = false; puzzleMode = false; levelXMode = false; jamMode = false;   // leaving to the menu always exits Level 0 / Level X
   setEraFont('egypt');           // the home/menu uses the default display font (Cinzel), matching the pinned PYRAMID logo
-  ['puzzleHud','puzzleArrowL','puzzleArrowR','puzzleRing'].forEach(id => { const ph=$(id); if (ph) ph.classList.remove('show'); });
+  ['puzzleHud','puzzleArrowL','puzzleArrowR','puzzleRing','jamHud'].forEach(id => { const ph=$(id); if (ph) ph.classList.remove('show'); });
   if (S.fight) endFight();        // tear down any in-progress boss fight UI
   $('emoteBtn').classList.remove('show');
   setLevelName(false); removeVictoryBeam();
@@ -7502,7 +7625,7 @@ function renderLevels(){
   if (grid.querySelectorAll) grid.querySelectorAll('.lvlCell[data-lv]').forEach(c =>
     c.addEventListener('pointerdown', ev => { ev.stopPropagation(); ev.preventDefault(); startLevel(parseInt(c.getAttribute('data-lv'), 10)); }));
 }
-function startLevel(n){ dailyMode = false; puzzleMode = false; levelXMode = false; $('levelsPanel').classList.add('hidden'); startGame(n); }
+function startLevel(n){ dailyMode = false; puzzleMode = false; levelXMode = false; jamMode = false; $('levelsPanel').classList.add('hidden'); startGame(n); }
 // TEMP test helper: retry the CURRENT SECTION (not the level). Once the run section has been reached (S.run exists) —
 // even mid-climb or after dying — retry drops back to the START of the climb on the SAME pyramid (a checkpoint, no
 // rebuild). Only while still stacking does it restart the build.
@@ -7988,6 +8111,9 @@ function btn(id, fn){ $(id).addEventListener('pointerdown', e => { e.stopPropaga
 btn('homePlay',      ()=>startGame());
 btn('homeLv0',       startPuzzleLevel);
 btn('homeLvX',       startLevelX);
+btn('homeJam',       startJamLevel);    // THE JAMMED ASCENT
+btn('jamUndo',       () => jamUndo());
+btn('jamRestart',    () => jamRestart());
 btn('homeLeader',    showLeader);
 btn('homeShop',      ()=>showShop());
 btn('homeGoalsBtn',  showGoals);
@@ -8096,6 +8222,7 @@ window.addEventListener('pointerdown', e => {
   if (atMenu){ return; }                                                   // menu uses its own buttons
   if (S.gameOver || S.paused) return;                                      // over/confirm screens use their own buttons
   if (S.fight && S.fight.active){ if (fightInJoyZone(e.clientX, e.clientY)) fightJoyStart(e.clientX, e.clientY, e.pointerId); return; }   // PHASE 3: bottom-left joystick only
+  if (S.phase==='jam'){ const b = jamPick(e.clientX, e.clientY); if (b) jamTrySlide(b); return; }   // THE JAMMED ASCENT: tap a blocker to slide it off
   if (S.phase==='build'){
     if (S.cand){ const W = window.innerWidth || 360;     // a pick-1-of-3 is active (Level 0 every block, or a Level X interrupt)
       const zone = e.clientX < W*0.30 ? 'L' : e.clientX > W*0.70 ? 'R' : 'C';   // left/right edges switch, centre circle rotates/fits
@@ -8305,6 +8432,7 @@ function animate(){
   });
 
   if (S.phase==='run'){ if (!S.paused) updateRun(sdt); }
+  else if (S.phase==='jam'){ if (!S.paused) updateJam(dt); }
   else updateBuildCam(dt);
 
   updateMotes(dt);                                             // drifting atmospheric particles
