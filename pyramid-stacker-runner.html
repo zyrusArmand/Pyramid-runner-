@@ -1054,7 +1054,7 @@
     <div class="setRow"><div class="setName">RESTORE FROM A CODE<span class="setHint">pull a save made on another device</span></div><div id="cloudRestoreBtn">ENTER</div></div>
   </div>
   <div class="backBtn" id="settingsBack">◀ BACK</div>
-  <div id="appVersion">v1.400 · 2026.06.15</div>
+  <div id="appVersion">v1.401 · 2026.06.15</div>
 </div>
 <div class="overlay hidden panel" id="ownerPanel">
   <div class="panelTitle">ANALYTICS</div>
@@ -1307,7 +1307,7 @@ const RemoteBoard = {
   }
 };
 // ---------- ANALYTICS + CLOUD SAVE (Supabase) ----------
-const APP_VERSION = '1.400';
+const APP_VERSION = '1.401';
 // a stable anonymous id for this player. It is part of the cloud-save blob, so once a player restores on a
 // new device that device adopts the same id → one player, correctly counted across devices.
 let playerId = Store.get('pid', null);
@@ -3855,7 +3855,7 @@ function spawnBlock(){
     if (mesh.material && mesh.material.emissive) mesh.material.emissive.setRGB(0.4, 0.28, 0.0);   // gold glow
     showPop('✦ GOLDEN BLOCK — NAIL IT'); Sound.treasure();
   }
-  if (S.active){ S.active.pattern = xPattern; if (!S.levelX) attachCourseRamp(S.active); }   // remember the comb; LEVEL X skips the smooth ramp so you climb the raw stepped joint stones
+  if (S.active){ S.active.pattern = xPattern; if (!S.levelX) attachCourseRamp(S.active); S.spawnAt = Date.now(); }   // remember the comb; LEVEL X skips the smooth ramp so you climb the raw stepped joint stones; stamp the spawn time so mashing can't instant-drop
 }
 
 function drop(){
@@ -8080,6 +8080,15 @@ function showRestartConfirm(){ if (atMenu || S.gameOver) return; S.paused = true
   $('restartConfirm').classList.remove('hidden'); }
 function hideRestartConfirm(){ S.paused = false; $('restartConfirm').classList.add('hidden'); }
 
+// Build-tap throttle: you can't drop a stone the instant it spawns, and rapid mashing is debounced — so spamming taps
+// can't dump every block at its spawn corner (which made a pile of crooked weak stones and a glitchy climb).
+let _lastBuildTap = 0;
+function tapDrop(){
+  const now = Date.now();
+  if (now - (S.spawnAt || 0) < 160) return;     // the stone must have started swinging
+  if (now - _lastBuildTap < 130) return;        // throttle machine-gun taps
+  _lastBuildTap = now; drop();
+}
 window.addEventListener('pointerdown', e => {
   const tn = (e.target && e.target.tagName) || '';
   if (tn==='INPUT' || tn==='TEXTAREA' || tn==='SELECT' || (e.target && e.target.isContentEditable)){ primeAudio(); return; }   // let text fields focus & type
@@ -8094,7 +8103,7 @@ window.addEventListener('pointerdown', e => {
       if (zone==='C' && S.cand) S.cand.drag = { x:e.clientX, y:e.clientY };
       return;
     }
-    drop(); return;
+    tapDrop(); return;
   }
   if (S.phase==='run'){ gStart = { x:e.clientX, y:e.clientY }; }   // wait for swipe direction
 }, { passive:false });
@@ -8145,7 +8154,7 @@ window.addEventListener('keydown', e => {
   if (S.phase==='intro'){ beginBuild(); return; }     // any key starts building the next pyramid
   if (S.phase==='build'){
     if (S.cand){ if (k==='Space') tryFitPuzzle(); else if (k==='ArrowLeft') cyclePuzzle(-1); else if (k==='ArrowRight') cyclePuzzle(1); return; }
-    if (k==='Space'||k==='ArrowUp'||k==='ArrowDown') drop(); return; }
+    if (k==='Space'||k==='ArrowUp'||k==='ArrowDown') tapDrop(); return; }
   if (S.phase==='run'){
     if (S.fight && S.fight.active){                 // PHASE 3 keyboard: Space punch, ↑ kick, ↓ throw (movement is the on-screen joystick)
       if (k==='Space') pPunch();
